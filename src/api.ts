@@ -31,6 +31,34 @@ export async function searchHackerNews(query: string): Promise<SearchItem[]> {
   }));
 }
 
+export async function searchCommonsImages(query: string): Promise<SearchItem[]> {
+  const params = new URLSearchParams({ action: "query", generator: "search", gsrsearch: query + " filetype:bitmap", gsrnamespace: "6", gsrlimit: "18", prop: "imageinfo", iiprop: "url|extmetadata", iiurlwidth: "640", format: "json", origin: "*" });
+  const response = await fetch("https://commons.wikimedia.org/w/api.php?" + params.toString());
+  if (!response.ok) throw new Error("Image discovery is unavailable right now.");
+  const data = await response.json();
+  return Object.values(data.query?.pages || {}).map((page: any) => ({
+    title: page.title?.replace(/^File:/, "") || "Untitled image",
+    description: page.imageinfo?.[0]?.extmetadata?.ImageDescription?.value?.replace(/<[^>]*>/g, "").slice(0, 220) || "Open the original Wikimedia Commons file for details and licensing.",
+    url: page.imageinfo?.[0]?.descriptionurl || "https://commons.wikimedia.org/wiki/" + encodeURIComponent(page.title),
+    image: page.imageinfo?.[0]?.thumburl || page.imageinfo?.[0]?.url,
+    source: "Wikimedia Commons"
+  }));
+}
+
+export async function searchArchiveVideos(query: string): Promise<SearchItem[]> {
+  const params = new URLSearchParams({ q: query + " AND mediatype:movies", fl: ["identifier", "title", "description", "creator", "year"].join(","), rows: "18", page: "1", output: "json" });
+  const response = await fetch("https://archive.org/advancedsearch.php?" + params.toString());
+  if (!response.ok) throw new Error("Video discovery is unavailable right now.");
+  const data = await response.json();
+  return (data.response?.docs || []).map((item: any) => ({
+    title: item.title || "Untitled video",
+    description: [item.creator, item.year, typeof item.description === "string" ? item.description.replace(/<[^>]*>/g, "").slice(0, 180) : ""].filter(Boolean).join(" · ") || "Open this Internet Archive video.",
+    url: "https://archive.org/details/" + encodeURIComponent(item.identifier),
+    image: "https://archive.org/services/img/" + encodeURIComponent(item.identifier),
+    source: "Internet Archive"
+  }));
+}
+
 export async function getWeather(place: string) {
   const geo = await fetch("https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(place) + "&count=1&language=en&format=json");
   if (!geo.ok) throw new Error("Location search failed.");
