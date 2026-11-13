@@ -41,72 +41,18 @@ const apiCatalog = [
 ];
 const languages = ["HTML","CSS","JavaScript","TypeScript","Python","C","C++","Java","C#","Go","Rust","PHP","Ruby","SQL","Bash"];
 const starterCode: Record<string, string> = {
-  HTML: "<!doctype html>
-<html>
-  <head>
-    <title>My Grand-Lumen Project</title>
-  </head>
-  <body>
-    <h1>Hello, Grand-Lumen!</h1>
-    <p>Build something remarkable.</p>
-  </body>
-</html>",
-  CSS: "body {
-  font-family: system-ui, sans-serif;
-  background: #080d1b;
-  color: white;
-  padding: 3rem;
-}",
-  JavaScript: "const vision = \"Build beyond limits\";
-console.log(vision);",
-  TypeScript: "type Project = {
-  name: string;
-  status: \"building\" | \"ready\";
-};
-
-const project: Project = { name: \"Grand-Lumen\", status: \"building\" };
-console.log(project);",
-  Python: "project = \"Grand-Lumen\"
-print(f\"Welcome to {project}\")",
-  C: "#include <stdio.h>
-
-int main(void) {
-    printf(\"Hello, Grand-Lumen!\
-\");
-    return 0;
-}",
-  "C++": "#include <iostream>
-
-int main() {
-    std::cout << \"Hello, Grand-Lumen!\
-\";
-    return 0;
-}",
-  Java: "public class Main {
-    public static void main(String[] args) {
-        System.out.println(\"Hello, Grand-Lumen!\");
-    }
-}",
-  "C#": "using System;
-
-class Program {
-    static void Main() {
-        Console.WriteLine(\"Hello, Grand-Lumen!\");
-    }
-}",
-  Go: "package main
-
-import \"fmt\"
-
-func main() {
-    fmt.Println(\"Hello, Grand-Lumen!\")
-}",
-  Rust: "fn main() {
-    println!(\"Hello, Grand-Lumen!\");
-}",
-  PHP: "<?php
-echo \"Hello, Grand-Lumen!\";
-",
+  HTML: "<!doctype html>\n<html>\n  <head>\n    <title>My Grand-Lumen Project</title>\n  </head>\n  <body>\n    <h1>Hello, Grand-Lumen!</h1>\n    <p>Build something remarkable.</p>\n  </body>\n</html>",
+  CSS: "body {\n  font-family: system-ui, sans-serif;\n  background: #080d1b;\n  color: white;\n  padding: 3rem;\n}",
+  JavaScript: "const vision = \"Build beyond limits\";\nconsole.log(vision);",
+  TypeScript: "type Project = {\n  name: string;\n  status: \"building\" | \"ready\";\n};\n\nconst project: Project = { name: \"Grand-Lumen\", status: \"building\" };\nconsole.log(project);",
+  Python: "project = \"Grand-Lumen\"\nprint(f\"Welcome to {project}\")",
+  C: "#include <stdio.h>\n\nint main(void) {\n    printf(\"Hello, Grand-Lumen!\\n\");\n    return 0;\n}",
+  "C++": "#include <iostream>\n\nint main() {\n    std::cout << \"Hello, Grand-Lumen!\\n\";\n    return 0;\n}",
+  Java: "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Hello, Grand-Lumen!\");\n    }\n}",
+  "C#": "using System;\n\nclass Program {\n    static void Main() {\n        Console.WriteLine(\"Hello, Grand-Lumen!\");\n    }\n}",
+  Go: "package main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"Hello, Grand-Lumen!\")\n}",
+  Rust: "fn main() {\n    println!(\"Hello, Grand-Lumen!\");\n}",
+  PHP: "<?php\necho \"Hello, Grand-Lumen!\";\n",
   Ruby: "puts \"Hello, Grand-Lumen!\"",
   SQL: "SELECT 'Hello, Grand-Lumen!' AS message;",
   Bash: "printf '%s\\n' 'Hello, Grand-Lumen!'"
