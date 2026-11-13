@@ -41,21 +41,76 @@ const apiCatalog = [
 ];
 const languages = ["HTML","CSS","JavaScript","TypeScript","Python","C","C++","Java","C#","Go","Rust","PHP","Ruby","SQL","Bash"];
 const starterCode: Record<string, string> = {
-  HTML: "<!doctype html>\n<html>\n  <head>\n    <title>My Grand-Lumen Project</title>\n  </head>\n  <body>\n    <h1>Hello, Grand-Lumen!</h1>\n    <p>Build something remarkable.</p>\n  </body>\n</html>",
-  CSS: "body {\n  font-family: system-ui, sans-serif;\n  background: #080d1b;\n  color: white;\n  padding: 3rem;\n}",
-  JavaScript: "const vision = \"Build beyond limits\";\nconsole.log(vision);",
-  TypeScript: "type Project = {\n  name: string;\n  status: \"building\" | \"ready\";\n};\n\nconst project: Project = { name: \"Grand-Lumen\", status: \"building\" };\nconsole.log(project);",
-  Python: "project = \"Grand-Lumen\"\nprint(f\"Welcome to {project}\")",
-  C: "#include <stdio.h>\n\nint main(void) {\n    printf(\"Hello, Grand-Lumen!\\n\");\n    return 0;\n}",
-  "C++": "#include <iostream>\n\nint main() {\n    std::cout << \"Hello, Grand-Lumen!\\n\";\n    return 0;\n}",
-  Java: "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Hello, Grand-Lumen!\");\n    }\n}",
-  "C#": "using System;\n\nclass Program {\n    static void Main() {\n        Console.WriteLine(\"Hello, Grand-Lumen!\");\n    }\n}",
-  Go: "package main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"Hello, Grand-Lumen!\")\n}",
-  Rust: "fn main() {\n    println!(\"Hello, Grand-Lumen!\");\n}",
-  PHP: "<?php\necho \"Hello, Grand-Lumen!\";\n",
+  HTML: "<!doctype html>
+<html>
+  <head>
+    <title>My Grand-Lumen Project</title>
+  </head>
+  <body>
+    <h1>Hello, Grand-Lumen!</h1>
+    <p>Build something remarkable.</p>
+  </body>
+</html>",
+  CSS: "body {
+  font-family: system-ui, sans-serif;
+  background: #080d1b;
+  color: white;
+  padding: 3rem;
+}",
+  JavaScript: "const vision = \"Build beyond limits\";
+console.log(vision);",
+  TypeScript: "type Project = {
+  name: string;
+  status: \"building\" | \"ready\";
+};
+
+const project: Project = { name: \"Grand-Lumen\", status: \"building\" };
+console.log(project);",
+  Python: "project = \"Grand-Lumen\"
+print(f\"Welcome to {project}\")",
+  C: "#include <stdio.h>
+
+int main(void) {
+    printf(\"Hello, Grand-Lumen!\
+\");
+    return 0;
+}",
+  "C++": "#include <iostream>
+
+int main() {
+    std::cout << \"Hello, Grand-Lumen!\
+\";
+    return 0;
+}",
+  Java: "public class Main {
+    public static void main(String[] args) {
+        System.out.println(\"Hello, Grand-Lumen!\");
+    }
+}",
+  "C#": "using System;
+
+class Program {
+    static void Main() {
+        Console.WriteLine(\"Hello, Grand-Lumen!\");
+    }
+}",
+  Go: "package main
+
+import \"fmt\"
+
+func main() {
+    fmt.Println(\"Hello, Grand-Lumen!\")
+}",
+  Rust: "fn main() {
+    println!(\"Hello, Grand-Lumen!\");
+}",
+  PHP: "<?php
+echo \"Hello, Grand-Lumen!\";
+",
   Ruby: "puts \"Hello, Grand-Lumen!\"",
   SQL: "SELECT 'Hello, Grand-Lumen!' AS message;",
-  Bash: "printf '%s\\n' 'Hello, Grand-Lumen!'"
+  Bash: "printf '%s\
+' 'Hello, Grand-Lumen!'"
 };
 const toolCards = [
   ["Calculator","A quick arithmetic workspace",Calculator],
@@ -72,7 +127,9 @@ function App() {
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("INITIALIZING GRAND-LUMEN");
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchItem[]>([]);\n  const [mediaResults, setMediaResults] = useState<SearchItem[]>([]);\n  const [mediaBusy, setMediaBusy] = useState(false);
+  const [results, setResults] = useState<SearchItem[]>([]);
+  const [mediaResults, setMediaResults] = useState<SearchItem[]>([]);
+  const [mediaBusy, setMediaBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState<SearchItem[]>(() => JSON.parse(localStorage.getItem("grandLumenSaved") || "[]"));
@@ -252,7 +309,8 @@ function App() {
             {section === "Research" && <section><PageTitle eyebrow="RESEARCH STUDIO" title={heading.Research} description="Create a research workspace, collect questions and develop structured notes." /><div className="research-grid"><div className="glass-card"><span className="eyebrow">START AN INQUIRY</span><h3>What are you investigating?</h3><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Enter a research topic..." /><button className="solid-button" onClick={() => { selectSection("Search"); runSearch("all"); }}>Find source material <ArrowRight size={15} /></button><div className="research-topics"><button onClick={() => setQuery("renewable energy")}>Renewable energy</button><button onClick={() => setQuery("neural networks")}>Neural networks</button><button onClick={() => setQuery("African history")}>African history</button></div></div><div className="glass-card"><span className="eyebrow">RESEARCH NOTEBOOK</span><h3>Working notes</h3><textarea value={researchNotes} onChange={e => setResearchNotes(e.target.value)} placeholder="Capture your questions, findings, hypotheses and references..." /><div className="note-footer"><span>Saved automatically in this session</span><button onClick={() => navigator.clipboard?.writeText(researchNotes)}><Copy size={14} /> Copy notes</button></div></div></div><div className="info-banner"><ShieldCheck size={18} /><span>Research results should be checked against original sources. Grand-Lumen keeps discovery and note-taking together; it does not replace source verification.</span></div></section>}
             {section === "Images" && <section><PageTitle eyebrow="VISUAL DISCOVERY" title={heading.Images} description="Search openly licensed image collections and view discoveries directly in Grand-Lumen." /><div className="search-panel"><Image size={18} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search images, places, science, design..." onKeyDown={e => e.key === "Enter" && runMediaSearch("images")} /><button onClick={() => runMediaSearch("images")} disabled={mediaBusy}>{mediaBusy ? "Searching..." : "Search images"}</button></div><div className="quick-tags">{["Nature","Architecture","Space","Technology","African art"].map(tag => <button key={tag} onClick={() => { setQuery(tag); runMediaSearch("images", tag); }}>{tag}</button>)}</div><MediaResults items={mediaResults} busy={mediaBusy} error={error} kind="images" onSave={toggleSave} /><div className="info-banner"><ShieldCheck size={18} /><span>Images are retrieved from Wikimedia Commons. Check each file page for its licence and attribution requirements before reuse.</span></div></section>}
             {section === "Videos" && <section><PageTitle eyebrow="VIDEO DISCOVERY" title={heading.Videos} description="Search public video collections and preview available items inside your workspace." /><div className="search-panel"><Video size={18} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search documentaries, tutorials, science..." onKeyDown={e => e.key === "Enter" && runMediaSearch("videos")} /><button onClick={() => runMediaSearch("videos")} disabled={mediaBusy}>{mediaBusy ? "Searching..." : "Search videos"}</button></div><div className="quick-tags">{["Science","Technology","History","Education"].map(tag => <button key={tag} onClick={() => { setQuery(tag); runMediaSearch("videos", tag); }}>{tag}</button>)}</div><MediaResults items={mediaResults} busy={mediaBusy} error={error} kind="videos" onSave={toggleSave} /></section>}
-            {section === "Code Lab" && <section className="code-section"><PageTitle eyebrow="MULTI-LANGUAGE DEVELOPMENT" title={heading["Code Lab"]} description="A growing coding space with language starters and a live browser preview for HTML." /><div className="code-toolbar"><div><Terminal size={16} /><select value={codeLanguage} onChange={e => changeLanguage(e.target.value)}>{languages.map(language => <option key={language}>{language}</option>)}</select></div><button className="solid-button" onClick={() => setPreview(!preview)}><Play size={14} /> {preview ? "Hide preview" : "Run preview"}</button><button className="quiet-button" onClick={() => navigator.clipboard?.writeText(code)}><Copy size={14} /> Copy</button></div><div className="editor-layout"><div className="editor-panel"><div className="editor-header"><span><span className="live-dot" /> {codeLanguage.toLowerCase()} / main</span><span>{code.split("\n").length} lines</span></div><textarea spellCheck={false} value={code} onChange={e => setCode(e.target.value)} aria-label={codeLanguage + " editor"} /></div>{preview && <div className="preview-panel"><div className="editor-header"><span>LIVE PREVIEW</span><button onClick={() => setPreview(false)}><X size={14} /></button></div>{codeLanguage === "HTML" || codeLanguage === "JavaScript" ? <iframe title="Code preview" sandbox="allow-scripts" srcDoc={codeLanguage === "HTML" ? code : "<script>" + code.replace(/<\/script/gi, "<\\/script") + "<\/script>"} /> : <div className="preview-placeholder"><Code2 size={25} /><b>{codeLanguage} workspace</b><p>Editing and language starter are available. Native execution for this language will be connected through a secure runtime service.</p></div>}</div>}</div><div className="language-rail">{languages.map(language => <button className={codeLanguage === language ? "selected" : ""} key={language} onClick={() => changeLanguage(language)}>{language}</button>)}</div></section>}
+            {section === "Code Lab" && <section className="code-section"><PageTitle eyebrow="MULTI-LANGUAGE DEVELOPMENT" title={heading["Code Lab"]} description="A growing coding space with language starters and a live browser preview for HTML." /><div className="code-toolbar"><div><Terminal size={16} /><select value={codeLanguage} onChange={e => changeLanguage(e.target.value)}>{languages.map(language => <option key={language}>{language}</option>)}</select></div><button className="solid-button" onClick={() => setPreview(!preview)}><Play size={14} /> {preview ? "Hide preview" : "Run preview"}</button><button className="quiet-button" onClick={() => navigator.clipboard?.writeText(code)}><Copy size={14} /> Copy</button></div><div className="editor-layout"><div className="editor-panel"><div className="editor-header"><span><span className="live-dot" /> {codeLanguage.toLowerCase()} / main</span><span>{code.split("
+").length} lines</span></div><textarea spellCheck={false} value={code} onChange={e => setCode(e.target.value)} aria-label={codeLanguage + " editor"} /></div>{preview && <div className="preview-panel"><div className="editor-header"><span>LIVE PREVIEW</span><button onClick={() => setPreview(false)}><X size={14} /></button></div>{codeLanguage === "HTML" || codeLanguage === "JavaScript" ? <iframe title="Code preview" sandbox="allow-scripts" srcDoc={codeLanguage === "HTML" ? code : "<script>" + code.replace(/<\/script/gi, "<\\/script") + "<\/script>"} /> : <div className="preview-placeholder"><Code2 size={25} /><b>{codeLanguage} workspace</b><p>Editing and language starter are available. Native execution for this language will be connected through a secure runtime service.</p></div>}</div>}</div><div className="language-rail">{languages.map(language => <button className={codeLanguage === language ? "selected" : ""} key={language} onClick={() => changeLanguage(language)}>{language}</button>)}</div></section>}
             {section === "Learn" && <section><PageTitle eyebrow="LEARNING HUB" title={heading.Learn} description="Explore guided learning paths across web development, programming and digital knowledge." /><div className="learning-grid">{[{name:"Web foundations",detail:"HTML, CSS, JavaScript and responsive interfaces",level:"BEGINNER",language:"HTML · CSS · JS"},{name:"Programming concepts",detail:"Variables, logic, functions and data structures",level:"FOUNDATION",language:"Python · C · Java"},{name:"Modern development",detail:"Types, components, APIs and application architecture",level:"INTERMEDIATE",language:"TypeScript · React · Node"},{name:"Data and databases",detail:"Queries, records, relationships and analysis",level:"PRACTICAL",language:"SQL · Python"}].map((item,index) => <div className="glass-card learning-card" key={item.name}><span className="learning-number">0{index+1}</span><span className="eyebrow">{item.level}</span><h3>{item.name}</h3><p>{item.detail}</p><span className="language-tags">{item.language}</span><button onClick={() => { setCodeLanguage(item.name === "Web foundations" ? "HTML" : item.name === "Data and databases" ? "SQL" : item.name === "Programming concepts" ? "Python" : "TypeScript"); setCode(starterCode[item.name === "Web foundations" ? "HTML" : item.name === "Data and databases" ? "SQL" : item.name === "Programming concepts" ? "Python" : "TypeScript"]); selectSection("Code Lab"); }}>Open learning workspace <ArrowRight size={14} /></button></div>)}</div></section>}
             {section === "API Library" && <section><PageTitle eyebrow="INTEGRATION DIRECTORY" title={heading["API Library"]} description="A curated catalogue of public APIs and developer services for in-app experiences." /><div className="api-search"><Search size={17} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Find an API or capability..." /></div><div className="api-categories">{["All","Knowledge","Technology","Environment","Finance","Development","Science","Images","Media","AI","Language","Geography","Food","Utilities","Entertainment","Research","News"].map(item => <button className={apiFilter === item ? "selected" : ""} key={item} onClick={() => setApiFilter(item)}>{item}</button>)}</div><div className="api-grid">{filteredApis.map(item => <div className="api-card" key={item[0]}><div className="api-card-top"><span className="api-symbol"><Database size={17} /></span><span className={item[3] === "No key" ? "keyless" : "key-needed"}>{item[3]}</span></div><h3>{item[0]}</h3><p>{item[1]}</p><div className="api-card-bottom"><span>{item[2]}</span><button onClick={() => { setQuery(item[0]); setToolInput(item[0]); selectSection("Tools"); }}>Explore <ArrowRight size={13} /></button></div></div>)}</div></section>}
             {section === "Tools" && <section><PageTitle eyebrow="UTILITY DECK" title={heading.Tools} description="A set of connected utilities that return useful information inside Grand-Lumen." /><div className="tool-layout"><div className="tool-list">{toolCards.map(([name,detail,Icon]) => <button className={tool === name ? "tool-option active" : "tool-option"} key={name} onClick={() => { setTool(name); setToolOutput(null); setError(""); }}><Icon size={17} /><span><b>{name}</b><small>{detail}</small></span><ChevronDown size={14} /></button>)}</div><div className="glass-card tool-workspace"><span className="eyebrow">ACTIVE UTILITY</span><h3>{tool}</h3>{tool === "Currency" && <div className="currency-row"><select value={currencyBase} onChange={e => setCurrencyBase(e.target.value)}>{["USD","GHS","EUR","GBP","NGN","CAD","JPY","INR","ZAR"].map(x => <option key={x}>{x}</option>)}</select><ArrowRight size={16} /><select value={currencyTarget} onChange={e => setCurrencyTarget(e.target.value)}>{["GHS","USD","EUR","GBP","NGN","CAD","JPY","INR","ZAR"].map(x => <option key={x}>{x}</option>)}</select></div>}<div className="tool-input-row"><input value={toolInput} onChange={e => setToolInput(e.target.value)} onKeyDown={e => e.key === "Enter" && runTool()} placeholder={tool === "Calculator" ? "Example: (25 * 4) / 2" : tool === "Weather" ? "Enter a city, e.g. Accra" : tool === "Pokédex" ? "Enter a Pokémon name" : tool === "Public Holidays" ? "Country code, e.g. GH" : "Enter a word"} /><button className="solid-button" onClick={runTool} disabled={busy}>{busy ? "Working..." : "Run tool"}</button></div>{error && <p className="error-text">{error}</p>}<ToolOutput output={toolOutput} tool={tool} /></div></div></section>}
