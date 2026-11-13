@@ -12,7 +12,8 @@ Grand-Lumen aims to preserve the useful experiences established in Lumen while e
 
 - Search across Wikipedia and Hacker News with results displayed in the workspace
 - Research notebook and source discovery
-- In-app image discovery powered by Wikimedia Commons\n- In-app public video discovery and embedded previews powered by Internet Archive
+- In-app image discovery powered by Wikimedia Commons
+- In-app public video discovery and embedded previews powered by Internet Archive
 - Multi-language Code Lab with HTML preview
 - Learning paths for web, programming and data fundamentals
 - API Library with 20 catalogued services
