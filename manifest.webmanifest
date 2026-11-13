@@ -1,0 +1,11 @@
+{
+  "name": "Grand-Lumen",
+  "short_name": "Grand-Lumen",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#06070d",
+  "theme_color": "#080a13",
+  "description": "An expanded digital workspace for curious minds.",
+  "icons": []
+}
