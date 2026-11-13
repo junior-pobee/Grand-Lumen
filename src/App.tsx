@@ -2,6 +2,15 @@ import { useEffect, useMemo, useState } from "react";
 import { Activity, ArrowDownToLine, ArrowLeft, ArrowRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, Menu, Moon, Play, Plus, Search, Settings, ShieldCheck, Sparkles, Sun, Terminal, Video, Wallet, X, Zap } from "lucide-react";
 import { getCurrency, getDictionary, getHoliday, getPokemon, getWeather, searchArchiveVideos, searchCommonsImages, searchHackerNews, searchWikipedia, type SearchItem } from "./api";
 
+function readWorkspaceData<T>(key: string, fallback: T): T {
+  try {
+    const value = localStorage.getItem(key);
+    return value ? JSON.parse(value) as T : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
 type Section = "Home" | "Search" | "Research" | "Images" | "Videos" | "Code Lab" | "Learn" | "API Library" | "Tools" | "Saved" | "Projects" | "Settings";
 const sections: { name: Section; icon: any; group: string }[] = [
   { name: "Home", icon: Compass, group: "Workspace" },
@@ -77,7 +86,7 @@ function App() {
   const [mediaBusy, setMediaBusy] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [saved, setSaved] = useState<SearchItem[]>(() => JSON.parse(localStorage.getItem("grandLumenSaved") || "[]"));
+  const [saved, setSaved] = useState<SearchItem[]>(() => readWorkspaceData("grandLumenSaved", []));
   const [theme, setTheme] = useState<"dark" | "light">("dark");
   const [apiFilter, setApiFilter] = useState("All");
   const [tool, setTool] = useState("Calculator");
@@ -91,7 +100,7 @@ function App() {
   const [researchNotes, setResearchNotes] = useState("");
   const [mobileMenu, setMobileMenu] = useState(false);
   const [projectName, setProjectName] = useState("");
-  const [projects, setProjects] = useState<string[]>(() => JSON.parse(localStorage.getItem("grandLumenProjects") || "[]"));
+  const [projects, setProjects] = useState<string[]>(() => readWorkspaceData("grandLumenProjects", []));
 
   useEffect(() => {
     const messages = ["INITIALIZING GRAND-LUMEN", "LOADING WORKSPACE MODULES", "CONNECTING KNOWLEDGE SYSTEMS", "PREPARING YOUR CREATIVE SPACE", "WELCOME TO GRAND-LUMEN"];
