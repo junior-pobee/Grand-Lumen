@@ -702,6 +702,7 @@ function App() {
     Share: "Send it across.",
     Saved: "Your knowledge vault.",
     Projects: "Your creation space.",
+    "Creative Studio": "Create beyond limits.",
     Settings: "Shape your workspace."
   };
 
