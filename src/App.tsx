@@ -495,6 +495,21 @@ function MessagesWorkspace({ session }: { session: Session | null }) {
     return btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
   };
 
+  const disconnectProvider = async () => {
+    if (!supabase || !linkedIdentity) return;
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.unlinkIdentity(linkedIdentity);
+      if (error) throw error;
+      sessionStorage.removeItem("grandLumenMailProviderToken");
+      setFeedback("Email account disconnected from Grand-Lumen.", "success");
+    } catch (reason) {
+      setFeedback(reason instanceof Error ? reason.message : "The email account could not be disconnected.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const sendEmail = async () => {
     if (!session || !supabase || !provider) {
       setFeedback("Connect Gmail or Outlook before sending an email.", "info");
@@ -513,9 +528,11 @@ function MessagesWorkspace({ session }: { session: Session | null }) {
       setFeedback("Add a subject and write your email before sending.", "error");
       return;
     }
-    const accessToken = session.provider_token;
+    let savedToken: any = null;
+    try { savedToken = JSON.parse(sessionStorage.getItem("grandLumenMailProviderToken") || "null"); } catch { savedToken = null; }
+    const accessToken = session.provider_token || (savedToken?.provider === provider && savedToken?.expiresAt > Date.now() ? savedToken.token : null);
     if (!accessToken) {
-      setFeedback("Your email connection needs refreshing. Reconnect the account to grant a fresh sending session.", "error");
+      setFeedback("Your email permission has expired. Disconnect and reconnect the account to authorize a fresh sending session.", "error");
       return;
     }
     setBusy(true);
@@ -603,7 +620,7 @@ function MessagesWorkspace({ session }: { session: Session | null }) {
       <div className="mail-account-row">
         <div className="mail-account-mark">{provider === "google" ? "G" : provider === "azure" ? "O" : <Mail size={19}/>}</div>
         <div className="mail-account-info"><strong>{providerName || "No email account connected"}</strong><span>{provider ? connectedEmail : "Connect an account to start sending"}</span></div>
-        {provider && <span className="mail-connected-status"><CheckCircle2 size={14}/> Connected</span>}
+        {provider && <><span className="mail-connected-status"><CheckCircle2 size={14}/> Connected</span><button className="mail-disconnect-button" onClick={() => void disconnectProvider()} disabled={busy}>Disconnect</button></>}
       </div>
       {!provider && <div className="mail-connect-options"><button className="mail-provider-button" onClick={() => void connectProvider("google")} disabled={busy}><span className="mail-google-mark">G</span><span><strong>Connect Gmail</strong><small>Authorize Grand-Lumen to send using Gmail</small></span><ArrowUpRight size={16}/></button><button className="mail-provider-button" onClick={() => void connectProvider("azure")} disabled={busy}><span className="mail-outlook-mark"><Mail size={18}/></span><span><strong>Connect Outlook</strong><small>Authorize Grand-Lumen to send using Outlook</small></span><ArrowUpRight size={16}/></button></div>}
       {provider && <div className="mail-connected-note"><ShieldCheck size={15}/> Your email password is never requested by Grand-Lumen. Sending uses the permission granted by {providerName}.</div>}
