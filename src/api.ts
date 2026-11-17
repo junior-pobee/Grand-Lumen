@@ -108,19 +108,77 @@ export async function researchTopic(query: string): Promise<{ title: string; ext
 
 export type NewsItem = SearchItem & { publishedAt: string; country: string };
 
-export async function searchGlobalNews(query: string, country = "all", period = "7d"): Promise<NewsItem[]> {
-  const params = new URLSearchParams({ query: query.trim() || "world", mode: "ArtList", format: "json", maxrecords: "50", sort: "DateDesc", timespan: period });
-  if (country !== "all") params.set("sourceCountry", country);
-  const response = await fetch("https://api.gdeltproject.org/api/v2/doc/doc?" + params.toString());
-  if (!response.ok) throw new Error("Global news search is temporarily unavailable. Please try again.");
-  const data = await response.json();
-  return (data.articles || []).map((item: any) => ({
+async function readJsonResponse(response: Response, source: string): Promise<any> {
+  const body = await response.text();
+  if (!response.ok) throw new Error(source + " returned HTTP " + response.status + ".");
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new Error(source + " returned an unreadable response. " + body.slice(0, 160).replace(/\s+/g, " "));
+  }
+}
+
+async function searchLiveNews(query: string, country: string): Promise<NewsItem[]> {
+  const searchTerm = query.trim() || "world";
+  const fullQuery = country === "all" ? searchTerm : searchTerm + " sourcecountry:" + country.toLowerCase();
+  const params = new URLSearchParams({ query: fullQuery, mode: "ArtList", format: "json", maxrecords: "75", sort: "DateDesc" });
+  const response = await fetch("https://api.gdeltproject.org/api/v2/doc/doc?" + params.toString(), { headers: { Accept: "application/json" } });
+  const data = await readJsonResponse(response, "Global news service");
+  if (!Array.isArray(data.articles)) throw new Error(typeof data === "string" ? data : "Global news service did not return an article list.");
+  return data.articles.map((item: any) => ({
     title: item.title || "Untitled report",
     description: [item.domain, item.language, item.sourcecountry].filter(Boolean).join(" · ") || "International news report",
-    url: item.url,
+    url: item.url || "",
     image: item.socialimage || undefined,
     source: item.domain || "News publisher",
     publishedAt: item.seendate || "",
     country: item.sourcecountry || "International"
   })).filter((item: NewsItem) => Boolean(item.url));
+}
+
+async function searchHistoricalNews(query: string, country: string): Promise<NewsItem[]> {
+  const terms = query.trim() || "world news";
+  const archiveQuery = "(" + terms.replace(/[():]/g, " ") + ") AND mediatype:texts";
+  const params = new URLSearchParams();
+  params.set("q", archiveQuery);
+  ["identifier", "title", "description", "date", "year", "creator"].forEach(field => params.append("fl[]", field));
+  params.set("rows", "50");
+  params.set("page", "1");
+  params.set("output", "json");
+  const response = await fetch("https://archive.org/advancedsearch.php?" + params.toString(), { headers: { Accept: "application/json" } });
+  const data = await readJsonResponse(response, "Historical archive");
+  const docs = data.response?.docs;
+  if (!Array.isArray(docs)) throw new Error("Historical archive returned an unexpected response.");
+  return docs.map((item: any) => {
+    const year = String(item.year || item.date || "").slice(0, 10);
+    return {
+      title: item.title || "Archived newspaper or historical publication",
+      description: [item.creator, typeof item.description === "string" ? item.description.replace(/<[^>]*>/g, "").slice(0, 260) : "", "Historical archive record"].filter(Boolean).join(" · "),
+      url: "https://archive.org/details/" + encodeURIComponent(item.identifier),
+      image: "https://archive.org/services/img/" + encodeURIComponent(item.identifier),
+      source: "Internet Archive",
+      publishedAt: year,
+      country: "Historical archive"
+    };
+  }).filter((item: NewsItem) => Boolean(item.url));
+}
+
+export async function searchGlobalNews(query: string, country = "all"): Promise<NewsItem[]> {
+  const attempts = await Promise.allSettled([
+    searchLiveNews(query, country),
+    searchHistoricalNews(query, country)
+  ]);
+  const live = attempts[0].status === "fulfilled" ? attempts[0].value : [];
+  const archive = attempts[1].status === "fulfilled" ? attempts[1].value : [];
+  const merged = [...live, ...archive];
+  const unique = new Map<string, NewsItem>();
+  merged.forEach(item => {
+    const key = item.url.toLowerCase();
+    if (key && !unique.has(key)) unique.set(key, item);
+  });
+  if (!unique.size) {
+    const errors = attempts.map((result, index) => result.status === "rejected" ? (index === 0 ? "Live news: " : "Historical archive: ") + (result.reason instanceof Error ? result.reason.message : String(result.reason)) : "").filter(Boolean);
+    throw new Error(errors.join(" "));
+  }
+  return Array.from(unique.values());
 }
