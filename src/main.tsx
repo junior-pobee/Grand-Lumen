@@ -30,6 +30,8 @@ class StartupBoundary extends React.Component<{ children: React.ReactNode }, { f
   }
 }
 
+document.documentElement.dataset.grandLumenStarted = "true";
+
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <StartupBoundary>
