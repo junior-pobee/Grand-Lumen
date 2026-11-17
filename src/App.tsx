@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Activity, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, CheckCircle2, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, Eye, EyeOff, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, LocateFixed, LockKeyhole, LogIn, LogOut, Mail, MapPin, Maximize2, Menu, Moon, MonitorSmartphone, Navigation, Play, Plus, Search, Settings, ShieldCheck, Sparkles, Sun, Terminal, UserRound, Video, Wallet, X, Zap, QrCode, ScanLine, Share2, Upload, Download, Smartphone } from "lucide-react";
+import { Activity, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, CheckCircle2, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, Eye, EyeOff, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, LocateFixed, LockKeyhole, LogIn, LogOut, Mail, MapPin, Maximize2, Menu, Moon, MonitorSmartphone, Navigation, Play, Plus, Search, Send, Settings, ShieldCheck, Sparkles, Sun, Terminal, UserRound, Video, Wallet, X, Zap, QrCode, ScanLine, Share2, Upload, Download, Smartphone } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import Peer from "peerjs";
 import { supabase, supabaseConfigured } from "./auth";
@@ -442,60 +442,185 @@ const academyCourses = [
 
 function MessagesWorkspace({ session }: { session: Session | null }) {
   const email = session?.user.email || "";
+  const identities = session?.user.identities || [];
+  const linkedIdentity = identities.find(identity => identity.provider === "google" || identity.provider === "azure");
+  const provider = linkedIdentity?.provider as "google" | "azure" | undefined;
+  const connectedEmail = String(linkedIdentity?.identity_data?.email || linkedIdentity?.identity_data?.preferred_username || email);
   const [recipient, setRecipient] = useState("");
+  const [cc, setCc] = useState("");
+  const [bcc, setBcc] = useState("");
+  const [subject, setSubject] = useState("");
   const [draft, setDraft] = useState("");
-  const [messages, setMessages] = useState<any[]>([]);
-  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [showCopies, setShowCopies] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
-  const [announcementTitle, setAnnouncementTitle] = useState("");
-  const [announcementBody, setAnnouncementBody] = useState("");
+  const [noticeType, setNoticeType] = useState<"success" | "error" | "info">("info");
+  const [announcements, setAnnouncements] = useState<any[]>([]);
   const isOwner = email.toLowerCase() === "emmanuelpobee112@gmail.com";
+  const providerName = provider === "google" ? "Gmail" : provider === "azure" ? "Outlook" : "";
 
-  const loadMessages = async (target = recipient) => {
-    if (!supabase || !email || !target.trim()) return;
-    const safeTarget = target.trim().replace(/[(),]/g, "");
-    const { data, error: loadError } = await supabase.from("grand_lumen_messages").select("*").or("and(sender_email.eq." + email + ",recipient_email.eq." + safeTarget + "),and(sender_email.eq." + safeTarget + ",recipient_email.eq." + email + ")").order("created_at", { ascending: true });
-    if (loadError) setNotice("Messaging setup is incomplete: " + loadError.message);
-    else setMessages(data || []);
+  const setFeedback = (message: string, type: "success" | "error" | "info" = "info") => {
+    setNotice(message);
+    setNoticeType(type);
+  };
+
+  const connectProvider = async (target: "google" | "azure") => {
+    if (!supabase || !session) {
+      setFeedback("Sign in to your Grand-Lumen account before connecting an email account.", "info");
+      return;
+    }
+    setBusy(true);
+    setFeedback("");
+    try {
+      const scopes = target === "google"
+        ? "https://www.googleapis.com/auth/gmail.send"
+        : "email profile openid offline_access https://graph.microsoft.com/Mail.Send";
+      const options: any = { scopes, redirectTo: window.location.origin + window.location.pathname };
+      if (target === "google") options.queryParams = { access_type: "offline", prompt: "consent" };
+      else options.queryParams = { prompt: "consent" };
+      const { error } = await supabase.auth.linkIdentity({ provider: target, options } as any);
+      if (error) throw error;
+    } catch (reason) {
+      setFeedback(reason instanceof Error ? reason.message : "The email account could not be connected.", "error");
+      setBusy(false);
+    }
+  };
+
+  const parseAddresses = (value: string) => value.split(/[;,]/).map(item => item.trim()).filter(Boolean);
+
+  const encodeMail = (value: string) => {
+    const bytes = new TextEncoder().encode(value);
+    let binary = "";
+    bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+    return btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+  };
+
+  const sendEmail = async () => {
+    if (!session || !supabase || !provider) {
+      setFeedback("Connect Gmail or Outlook before sending an email.", "info");
+      return;
+    }
+    const toList = parseAddresses(recipient);
+    const ccList = parseAddresses(cc);
+    const bccList = parseAddresses(bcc);
+    const allAddresses = [...toList, ...ccList, ...bccList];
+    const validAddress = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+    if (!toList.length || allAddresses.some(address => !validAddress.test(address))) {
+      setFeedback("Enter at least one valid recipient email address. Separate multiple addresses with commas.", "error");
+      return;
+    }
+    if (!subject.trim() || !draft.trim()) {
+      setFeedback("Add a subject and write your email before sending.", "error");
+      return;
+    }
+    const accessToken = session.provider_token;
+    if (!accessToken) {
+      setFeedback("Your email connection needs refreshing. Reconnect the account to grant a fresh sending session.", "error");
+      return;
+    }
+    setBusy(true);
+    setFeedback("Sending your email…");
+    try {
+      let response: Response;
+      if (provider === "google") {
+        const headers = ["To: " + toList.join(", ")];
+        if (ccList.length) headers.push("Cc: " + ccList.join(", "));
+        if (bccList.length) headers.push("Bcc: " + bccList.join(", "));
+        headers.push("Subject: " + subject.trim(), "MIME-Version: 1.0", "Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: 8bit");
+        const raw = headers.join("\\r\\n") + "\\r\\n\\r\\n" + draft.trim();
+        response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" },
+          body: JSON.stringify({ raw: encodeMail(raw) })
+        });
+      } else {
+        const message: any = {
+          subject: subject.trim(),
+          body: { contentType: "Text", content: draft.trim() },
+          toRecipients: toList.map(address => ({ emailAddress: { address } }))
+        };
+        if (ccList.length) message.ccRecipients = ccList.map(address => ({ emailAddress: { address } }));
+        if (bccList.length) message.bccRecipients = bccList.map(address => ({ emailAddress: { address } }));
+        response = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
+          method: "POST",
+          headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" },
+          body: JSON.stringify({ message, saveToSentItems: true })
+        });
+      }
+      if (!response.ok) {
+        const detail = await response.json().catch(() => ({}));
+        const providerMessage = detail?.error?.message || detail?.error_description || "The email provider rejected the request.";
+        throw new Error(providerMessage + " Reconnect your account if its permission has expired.");
+      }
+      setRecipient("");
+      setCc("");
+      setBcc("");
+      setSubject("");
+      setDraft("");
+      setShowCopies(false);
+      setFeedback("Email accepted by " + providerName + " for delivery.", "success");
+    } catch (reason) {
+      setFeedback(reason instanceof Error ? reason.message : "The email could not be sent. Please try again.", "error");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const loadAnnouncements = async () => {
     if (!supabase || !email) return;
-    const { data, error: loadError } = await supabase.from("grand_lumen_announcements").select("*").order("created_at", { ascending: false }).limit(30);
-    if (loadError) setNotice("Updates are not configured yet. Apply the Grand-Lumen database schema.");
-    else setAnnouncements(data || []);
+    const { data, error } = await supabase.from("grand_lumen_announcements").select("*").order("created_at", { ascending: false }).limit(30);
+    if (!error) setAnnouncements(data || []);
   };
 
   useEffect(() => {
     void loadAnnouncements();
     if (!supabase || !email) return;
-    const channel = supabase.channel("grand-lumen-messages-" + session?.user.id).on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_messages" }, () => void loadMessages()).on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_announcements" }, () => void loadAnnouncements()).subscribe();
+    const channel = supabase.channel("grand-lumen-mail-updates-" + session?.user.id).on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_announcements" }, () => void loadAnnouncements()).subscribe();
     return () => { void supabase?.removeChannel(channel); };
-  }, [email, recipient]);
-
-  const sendMessage = async () => {
-    if (!supabase || !email || !recipient.trim() || !draft.trim()) return;
-    setBusy(true);
-    setNotice("");
-    const { error: sendError } = await supabase.from("grand_lumen_messages").insert({ sender_id: session?.user.id, sender_email: email, recipient_email: recipient.trim().toLowerCase(), sender_name: session?.user.user_metadata?.full_name || email, body: draft.trim() });
-    if (sendError) setNotice(sendError.message);
-    else { setDraft(""); await loadMessages(); }
-    setBusy(false);
-  };
+  }, [email]);
 
   const publishAnnouncement = async () => {
     if (!supabase || !isOwner || !announcementTitle.trim() || !announcementBody.trim()) return;
     setBusy(true);
-    const { error: publishError } = await supabase.from("grand_lumen_announcements").insert({ title: announcementTitle.trim(), body: announcementBody.trim(), author_email: email });
-    setNotice(publishError ? publishError.message : "Your update has been published to Grand-Lumen.");
-    if (!publishError) { setAnnouncementTitle(""); setAnnouncementBody(""); await loadAnnouncements(); }
+    const { error } = await supabase.from("grand_lumen_announcements").insert({ title: announcementTitle.trim(), body: announcementBody.trim(), author_email: email });
+    setFeedback(error ? error.message : "Your update has been published to Grand-Lumen.", error ? "error" : "success");
+    if (!error) {
+      setAnnouncementTitle("");
+      setAnnouncementBody("");
+      await loadAnnouncements();
+    }
     setBusy(false);
   };
 
-  if (!supabaseConfigured || !supabase || !email) return <div className="glass-card messaging-setup"><Mail size={24}/><h3>Connect your account to use messages</h3><p>Cross-device messaging and app-wide updates need Grand-Lumen's shared Supabase authentication and database. A local guest account cannot receive messages on another device.</p></div>;
+  const [announcementTitle, setAnnouncementTitle] = useState("");
+  const [announcementBody, setAnnouncementBody] = useState("");
 
-  return <div className="messages-layout"><div className="glass-card messages-panel"><span className="eyebrow">DIRECT MESSAGES</span><h3>Start a conversation</h3><p>Enter the email address of another Grand-Lumen account.</p><div className="messages-recipient"><input type="email" value={recipient} onChange={event => setRecipient(event.target.value)} placeholder="person@example.com"/><button className="quiet-button" onClick={() => void loadMessages()} disabled={!recipient.includes("@")}>Open chat</button></div>{recipient && <div className="messages-thread">{messages.length ? messages.map(item => <article className={item.sender_email === email ? "message-bubble own" : "message-bubble"} key={item.id}><small>{item.sender_email} · {new Date(item.created_at).toLocaleString()}</small><p>{item.body}</p></article>) : <div className="messages-empty">No messages in this conversation yet.</div>}</div>}<div className="messages-compose"><textarea value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write a message…"/><button className="solid-button" onClick={() => void sendMessage()} disabled={busy || !recipient.includes("@") || !draft.trim()}><Mail size={14}/> Send message</button></div>{notice && <p className="messages-notice">{notice}</p>}</div><div className="glass-card messages-panel"><span className="eyebrow">GRAND-LUMEN UPDATES</span><h3>What's new</h3>{announcements.length ? announcements.map(item => <article className="announcement-card" key={item.id}><small>{new Date(item.created_at).toLocaleString()} · {item.author_email}</small><h4>{item.title}</h4><p>{item.body}</p></article>) : <p>No updates have been published yet.</p>}{isOwner && <div className="announcement-composer"><span className="eyebrow">OWNER BROADCAST</span><h4>Publish an app update</h4><input value={announcementTitle} onChange={event => setAnnouncementTitle(event.target.value)} placeholder="Update title"/><textarea value={announcementBody} onChange={event => setAnnouncementBody(event.target.value)} placeholder="Write an announcement for Grand-Lumen users…"/><button className="solid-button" onClick={() => void publishAnnouncement()} disabled={busy || !announcementTitle.trim() || !announcementBody.trim()}>Publish update to all users</button></div>}</div></div>;
+  if (!supabaseConfigured || !supabase || !email) return <div className="glass-card messaging-setup"><Mail size={24}/><h3>Sign in to use Grand-Lumen Mails</h3><p>Email connections are attached to a secure Grand-Lumen cloud account. Sign in first, then connect Gmail or Outlook.</p></div>;
+
+  return <div className="mail-workspace">
+    <section className="glass-card mail-compose-panel">
+      <div className="mail-heading"><div><span className="eyebrow">GRAND-LUMEN MAILS</span><h3>Compose email</h3><p>Send directly through your own email account.</p></div><Mail size={24}/></div>
+      <div className="mail-account-row">
+        <div className="mail-account-mark">{provider === "google" ? "G" : provider === "azure" ? "O" : <Mail size={19}/>}</div>
+        <div className="mail-account-info"><strong>{providerName || "No email account connected"}</strong><span>{provider ? connectedEmail : "Connect an account to start sending"}</span></div>
+        {provider && <span className="mail-connected-status"><CheckCircle2 size={14}/> Connected</span>}
+      </div>
+      {!provider && <div className="mail-connect-options"><button className="mail-provider-button" onClick={() => void connectProvider("google")} disabled={busy}><span className="mail-google-mark">G</span><span><strong>Connect Gmail</strong><small>Authorize Grand-Lumen to send using Gmail</small></span><ArrowUpRight size={16}/></button><button className="mail-provider-button" onClick={() => void connectProvider("azure")} disabled={busy}><span className="mail-outlook-mark"><Mail size={18}/></span><span><strong>Connect Outlook</strong><small>Authorize Grand-Lumen to send using Outlook</small></span><ArrowUpRight size={16}/></button></div>}
+      {provider && <div className="mail-connected-note"><ShieldCheck size={15}/> Your email password is never requested by Grand-Lumen. Sending uses the permission granted by {providerName}.</div>}
+      <div className="mail-fields">
+        <label>To<input type="text" value={recipient} onChange={event => setRecipient(event.target.value)} placeholder="recipient@example.com, another@example.com" disabled={!provider}/></label>
+        <div className="mail-copy-toggle"><button type="button" onClick={() => setShowCopies(value => !value)} disabled={!provider}>{showCopies ? "Hide Cc and Bcc" : "Add Cc / Bcc"}</button></div>
+        {showCopies && <><label>Cc<input type="text" value={cc} onChange={event => setCc(event.target.value)} placeholder="Copy recipients" disabled={!provider}/></label><label>Bcc<input type="text" value={bcc} onChange={event => setBcc(event.target.value)} placeholder="Blind copy recipients" disabled={!provider}/></label></>}
+        <label>Subject<input type="text" value={subject} onChange={event => setSubject(event.target.value)} placeholder="Email subject" disabled={!provider}/></label>
+        <label>Message<textarea value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write your email here…" disabled={!provider}/></label>
+        <div className="mail-compose-footer"><span>Sending from {provider ? connectedEmail : "no connected account"}</span><button className="solid-button" onClick={() => void sendEmail()} disabled={busy || !provider || !recipient.trim() || !subject.trim() || !draft.trim()}><Send size={15}/> {busy ? "Please wait…" : "Send email"}</button></div>
+      </div>
+      {notice && <div className={"mail-feedback " + noticeType}>{notice}</div>}
+    </section>
+    <aside className="glass-card mail-side-panel"><span className="eyebrow">EMAIL CONNECTIONS</span><h3>Your accounts</h3><p className="mail-side-copy">Connect one provider at a time. You can switch providers by disconnecting the current identity in your Grand-Lumen account settings.</p><div className="mail-provider-summary"><span className="mail-google-mark">G</span><div><strong>Google Gmail</strong><small>Gmail send permission</small></div><span>{provider === "google" ? "Active" : "Available"}</span></div><div className="mail-provider-summary"><span className="mail-outlook-mark"><Mail size={17}/></span><div><strong>Microsoft Outlook</strong><small>Microsoft Graph Mail.Send</small></div><span>{provider === "azure" ? "Active" : "Available"}</span></div><div className="mail-privacy-card"><LockKeyhole size={17}/><div><strong>Private by design</strong><p>Grand-Lumen requests sending permission only. It does not ask for your email password or read your inbox.</p></div></div><div className="mail-delivery-note">A successful response means Gmail or Outlook accepted the message for delivery. Final delivery depends on the recipient's mail service.</div>
+      <div className="mail-updates"><span className="eyebrow">GRAND-LUMEN UPDATES</span><h3>What's new</h3>{announcements.length ? announcements.map(item => <article className="announcement-card" key={item.id}><small>{new Date(item.created_at).toLocaleString()} · {item.author_email}</small><h4>{item.title}</h4><p>{item.body}</p></article>) : <p>No updates have been published yet.</p>}{isOwner && <div className="announcement-composer"><span className="eyebrow">OWNER BROADCAST</span><h4>Publish an app update</h4><input value={announcementTitle} onChange={event => setAnnouncementTitle(event.target.value)} placeholder="Update title"/><textarea value={announcementBody} onChange={event => setAnnouncementBody(event.target.value)} placeholder="Write an announcement for Grand-Lumen users…"/><button className="solid-button" onClick={() => void publishAnnouncement()} disabled={busy || !announcementTitle.trim() || !announcementBody.trim()}>Publish update to all users</button></div>}</div>
+    </aside>
+  </div>;
 }
 
 
