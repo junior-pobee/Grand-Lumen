@@ -98,7 +98,7 @@ const toolCards = [
 
 type PortalMode = "about" | "signin" | "signup";
 
-function PublicPortal() {
+function PublicPortal({ onGuest }: { onGuest: () => void }) {
   const [mode, setMode] = useState<PortalMode>("about");
   return <div className="public-portal">
     <div className="portal-ambient portal-ambient-one" />
@@ -118,11 +118,11 @@ function PublicPortal() {
       </div></section>
       <section className="portal-account-band"><div><span className="portal-kicker">YOUR WORKSPACE, YOUR ACCOUNT</span><h2>Pick up where you left off.</h2><p>Create an account and sign in from a phone, tablet or computer. Your authentication is managed securely through Supabase.</p></div><button className="portal-primary" onClick={() => setMode("signup")}>Get started <ArrowUpRight size={17}/></button></section>
       <footer className="portal-footer"><span>GRAND-LUMEN</span><span>EXPLORE BEYOND · BUILD WHAT COMES NEXT</span><button onClick={() => setMode("signin")}>Account access <ArrowRight size={14}/></button></footer>
-    </main> : <AuthPanel mode={mode} onModeChange={setMode} />}
+    </main> : <AuthPanel mode={mode} onModeChange={setMode} onGuest={onGuest} />}
   </div>;
 }
 
-function AuthPanel({ mode, onModeChange }: { mode: "signin" | "signup"; onModeChange: (mode: PortalMode) => void }) {
+function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup"; onModeChange: (mode: PortalMode) => void; onGuest: () => void }) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -193,7 +193,7 @@ function AuthPanel({ mode, onModeChange }: { mode: "signin" | "signup"; onModeCh
   return <main className="portal-auth-layout">
     <section className="portal-auth-story"><button className="portal-brand" onClick={() => onModeChange("about")}><span className="portal-brand-mark">L</span><span><b>GRAND-LUMEN</b><small>EXPLORE BEYOND</small></span></button><div className="portal-story-copy"><span className="portal-kicker">YOUR NEXT CHAPTER STARTS HERE</span><h1>{isSignup ? "Create space for your next idea." : "Your world of discovery awaits."}</h1><p>Research, learn, explore and build from one connected digital workspace.</p><div className="portal-story-points"><span><CheckCircle2 size={17}/> One account across your devices</span><span><CheckCircle2 size={17}/> A workspace built for curiosity</span><span><CheckCircle2 size={17}/> Secure email and password access</span></div></div><div className="portal-story-footer">GRAND-LUMEN · EXPLORE BEYOND</div></section>
     <section className="portal-auth-side"><div className="portal-auth-card"><button className="portal-back-link" onClick={() => onModeChange("about")}><ArrowLeft size={15}/> Back to overview</button><div className="portal-auth-tabs"><button className={!isSignup ? "active" : ""} onClick={() => { onModeChange("signin"); setNotice(""); }}>Sign in</button><button className={isSignup ? "active" : ""} onClick={() => { onModeChange("signup"); setNotice(""); }}>Create account</button></div><span className="portal-kicker">{isSignup ? "JOIN GRAND-LUMEN" : "WELCOME BACK"}</span><h2>{isSignup ? "Start exploring." : "Good to see you."}</h2><p className="portal-auth-intro">{isSignup ? "Create your account to enter your personal workspace." : "Sign in to continue to your Grand-Lumen workspace."}</p>
-      {!supabaseConfigured && <div className="portal-config-notice"><LockKeyhole size={17}/><span>Account service setup is still required before sign-in and registration can work.</span></div>}
+      {!supabaseConfigured && <div className="portal-config-notice"><LockKeyhole size={17}/><span>Account service setup is still required before sign-in and registration can work.</span></div><button className="portal-guest-button" type="button" onClick={onGuest}>Continue in this browser for now <ArrowRight size={14}/></button>}
       <form onSubmit={submit}>
         {isSignup && <label>Full name<div className="portal-input"><UserRound size={17}/><input value={fullName} onChange={event => setFullName(event.target.value)} placeholder="Your name" autoComplete="name" required/></div></label>}
         <label>Email address<div className="portal-input"><Mail size={17}/><input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" required/></div></label>
@@ -212,6 +212,7 @@ function App() {
   const [section, setSection] = useState<Section>("Home");
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [guestMode, setGuestMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("INITIALIZING GRAND-LUMEN");
@@ -376,7 +377,7 @@ function App() {
   };
 
   if (!authReady) return <div className="auth-boot"><div className="portal-brand-mark">L</div><span>SECURING YOUR WORKSPACE</span></div>;
-  if (!session) return <PublicPortal />;
+  if (!session && !guestMode) return <PublicPortal onGuest={() => setGuestMode(true)} />;
 
   return (
     <>
@@ -397,13 +398,13 @@ function App() {
               return <button key={item.name} className={section === item.name ? "nav-item active" : "nav-item"} onClick={() => selectSection(item.name)}><Icon size={17} /><span>{item.name}</span>{item.name === "Saved" && saved.length > 0 && <i>{saved.length}</i>}</button>;
             })}
           </nav>
-          <div className="sidebar-bottom"><div className="creator-chip"><span>{(session.user.email || "GL").slice(0,2).toUpperCase()}</span><div><b>{session.user.user_metadata?.full_name || "Grand-Lumen member"}</b><small>{session.user.email}</small></div></div><span className="version">FOUNDATION 1.0</span></div>
+          <div className="sidebar-bottom"><div className="creator-chip"><span>{(session?.user.email || "GL").slice(0,2).toUpperCase()}</span><div><b>{session?.user.user_metadata?.full_name || "Grand-Lumen member"}</b><small>{session?.user.email || "Local browser session"}</small></div></div><span className="version">FOUNDATION 1.0</span></div>
         </aside>
         <main className="main-area">
           <header className="topbar">
             <button className="icon-button mobile-only" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle navigation"><Menu size={19} /></button>
             <div className="breadcrumb"><span>GRAND-LUMEN</span><ArrowRight size={13} /><b>{section.toUpperCase()}</b></div>
-            <div className="top-actions"><span className="system-status"><i /> SYSTEM READY</span><span className="signed-in-email">{session.user.email}</span><button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => supabase?.auth.signOut()} aria-label="Sign out"><LogOut size={16} /></button></div>
+            <div className="top-actions"><span className="system-status"><i /> SYSTEM READY</span><span className="signed-in-email">{session?.user.email || "LOCAL WORKSPACE"}</span><button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => session ? supabase?.auth.signOut() : setGuestMode(false)} aria-label="Sign out"><LogOut size={16} /></button></div>
           </header>
           <div className="content-wrap">
             {section === "Home" && <section>
