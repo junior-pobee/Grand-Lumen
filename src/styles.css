@@ -382,3 +382,12 @@ html,body{touch-action:pan-x pan-y}
 .received-item-info b{overflow-wrap:anywhere}
 @media(max-width:1050px){.studio-editor-focused .studio-main{grid-template-columns:175px minmax(0,1fr)}}
 @media(max-width:650px){.studio-editor-focused .studio-main{grid-template-columns:1fr;min-height:0}.studio-editor-focused .studio-editor-area{min-height:600px}.studio-editor-focused .studio-editor-wrap{min-height:420px}.studio-editor-focused .studio-code-layer,.studio-editor-focused .studio-code-input{min-height:420px}.camera-capture-panel{padding:10px}}
+
+.studio-preview-expanded .studio-main{grid-template-columns:minmax(0,1fr)}
+.studio-preview-expanded .studio-explorer,.studio-preview-expanded .studio-editor-area{display:none}
+.studio-preview-expanded .studio-preview{display:flex;min-height:78vh;grid-column:1/-1}
+.studio-preview-expanded .studio-preview iframe{min-height:72vh}
+.studio-preview-controls{display:flex;align-items:center;gap:7px}
+.studio-preview-controls button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:6px 9px;background:transparent;color:inherit;font-size:12px}
+.camera-capture-panel video{max-height:58vh}
+.camera-capture-panel small{color:var(--muted)}
