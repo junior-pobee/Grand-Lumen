@@ -299,7 +299,7 @@ function BarcodeScanner({ onDetected }: { onDetected?: (value: string) => void }
     <div className="scanner-controls"><button className="solid-button" onClick={() => { setError(""); setScanning(value => !value); }}>{scanning ? "Stop camera" : "Start camera scanner"}</button><button className="quiet-button" onClick={() => { setValue(""); setError(""); }}>Clear result</button></div>
     {!supported && <p className="error-text">{error}</p>}
     {error && supported && <p className="error-text">{error}</p>}
-    {value && <div className="scanner-result"><span className="eyebrow">SCANNED CONTENT</span><strong>{value}</strong><div><button className="quiet-button" onClick={() => navigator.clipboard?.writeText(value)}><Copy size={14}/> Copy result</button><button className="quiet-button" onClick={() => onDetected?.(value)}>Use result</button></div></div>}
+    {value && <div className="scanner-result">{/^https?:\/\//i.test(value) ? <><span className="eyebrow">LINK QR CODE DETECTED</span><strong>This code contains a web link, not the picture files themselves.</strong><p>To receive pictures, connect both devices through Lumen Share and send the image files from the other device.</p><div><button className="quiet-button" onClick={() => navigator.clipboard?.writeText(value)}><Copy size={14}/> Copy link</button><button className="quiet-button" onClick={() => window.open(value, "_blank", "noopener,noreferrer")}>Open link</button></div></> : <><span className="eyebrow">SCANNED DEVICE CODE</span><strong>{value}</strong><div><button className="quiet-button" onClick={() => navigator.clipboard?.writeText(value)}><Copy size={14}/> Copy result</button><button className="quiet-button" onClick={() => onDetected?.(value)}>Use result</button></div></>}</div>}
     <p className="scanner-note">Camera access requires HTTPS and your permission. Scanning happens in this browser; camera frames are not uploaded by Grand-Lumen.</p>
   </div>;
 }
@@ -313,7 +313,7 @@ function ShareWorkspace() {
   const [targetId, setTargetId] = useState("");
   const [connected, setConnected] = useState(false);
   const [status, setStatus] = useState("Starting secure connection service…");
-  const [received, setReceived] = useState<{ name: string; url: string; size: number }[]>([]);
+  const [received, setReceived] = useState<{ name: string; url: string; size: number; type: string }[]>([]);
   const [sending, setSending] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
 
@@ -342,7 +342,7 @@ function ShareWorkspace() {
             const info = incomingRef.current;
             const blob = new Blob(chunksRef.current, { type: info.type });
             const url = URL.createObjectURL(blob);
-            setReceived(items => [{ name: info.name, url, size: blob.size }, ...items]);
+            setReceived(items => [{ name: info.name, url, size: blob.size, type: info.type }, ...items]);
             incomingRef.current = null;
             chunksRef.current = [];
             setStatus("File received: " + info.name);
@@ -397,7 +397,7 @@ function ShareWorkspace() {
       <article className="glass-card share-card"><span className="eyebrow">RECEIVE FILES</span><h3>Your device QR code</h3><p>Open Lumen Share on the other device and scan this code, or enter the ID manually.</p>{qrUrl ? <img className="share-qr" src={qrUrl} alt="Your device connection QR code"/> : <div className="share-qr-loading">Preparing QR code…</div>}<code className="share-peer-id">{peerId || "Connecting…"}</code><button className="quiet-button" onClick={() => navigator.clipboard?.writeText(peerId)} disabled={!peerId}><Copy size={14}/> Copy device ID</button></article>
       <article className="glass-card share-card"><span className="eyebrow">SEND FILES</span><h3>Connect to another device</h3><p>Scan the other device's QR code or enter its connection ID.</p><input value={targetId} onChange={event => setTargetId(event.target.value)} placeholder="Paste device ID here"/><div className="share-actions"><button className="solid-button" onClick={connectToDevice} disabled={!targetId.trim() || connected}>Connect</button><button className="quiet-button" onClick={() => setScanOpen(value => !value)}><ScanLine size={14}/> {scanOpen ? "Close scanner" : "Scan QR"}</button></div>{scanOpen && <BarcodeScanner onDetected={value => { setTargetId(value); setScanOpen(false); }}/>}<div className={connected ? "share-status connected" : "share-status"}><i/>{status}</div><label className="share-file-button"><Upload size={16}/> {sending ? "Sending files…" : "Choose files to send"}<input type="file" multiple disabled={!connected || sending} onChange={event => { void sendFiles(event.target.files); event.currentTarget.value = ""; }}/></label></article>
     </div>
-    <div className="glass-card share-received"><span className="eyebrow">INCOMING FILES</span><h3>Received on this device</h3>{received.length ? received.map((file,index) => <div className="received-file" key={file.url}><div><b>{file.name}</b><small>{(file.size / 1024 / 1024).toFixed(2)} MB</small></div><a href={file.url} download={file.name}><Download size={15}/> Save file</a></div>) : <p>No files received in this session yet.</p>}</div>
+    <div className="glass-card share-received"><span className="eyebrow">INCOMING FILES</span><h3>Received on this device</h3>{received.length ? <div className="received-gallery">{received.map(file => <article className="received-item" key={file.url}>{file.type.startsWith("image/") ? <a className="received-preview" href={file.url} target="_blank" rel="noreferrer"><img src={file.url} alt={file.name}/></a> : file.type.startsWith("video/") ? <video className="received-preview" src={file.url} controls/> : <div className="received-file-icon"><FileText size={30}/></div>}<div className="received-item-info"><b>{file.name}</b><small>{(file.size / 1024 / 1024).toFixed(2)} MB</small><a href={file.url} download={file.name}><Download size={15}/> Save file</a></div></article>)}</div> : <p>No files received in this session yet. Images sent from the connected device will appear here as picture previews.</p>}</div>
     <div className="share-disclaimer"><ShieldCheck size={16}/> Transfers are peer-to-peer after pairing. A public PeerJS signalling service helps devices find each other; both devices need an internet connection. Keep the connection ID private and only pair with people you trust.</div>
   </div>;
 }
