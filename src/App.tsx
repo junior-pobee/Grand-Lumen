@@ -30,6 +30,12 @@ function readWorkspaceData<T>(key: string, fallback: T): T {
   }
 }
 
+async function hashLocalPassword(password: string, salt: string): Promise<string> {
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", salt: Uint8Array.from(salt.match(/.{1,2}/g) || [], value => parseInt(value, 16)), iterations: 180000, hash: "SHA-256" }, key, 256);
+  return Array.from(new Uint8Array(bits)).map(value => value.toString(16).padStart(2, "0")).join("");
+}
+
 type Section = "Home" | "Search" | "Research" | "Images" | "Videos" | "Maps" | "Code Lab" | "Learn" | "API Library" | "Tools" | "Saved" | "Projects" | "Settings";
 const sections: { name: Section; icon: any; group: string }[] = [
   { name: "Home", icon: Compass, group: "Workspace" },
@@ -162,20 +168,20 @@ function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup";
           if (error) throw error;
         }
       } else {
-        const accounts = JSON.parse(localStorage.getItem("grandLumenLocalAccounts") || "[]") as { fullName: string; email: string; passwordHash: string }[];
+        const accounts = JSON.parse(localStorage.getItem("grandLumenLocalAccounts") || "[]") as { fullName: string; email: string; salt: string; passwordHash: string }[];
         const normalizedEmail = email.trim().toLowerCase();
-        const passwordHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
-        const hash = Array.from(new Uint8Array(passwordHash)).map(value => value.toString(16).padStart(2, "0")).join("");
         if (isSignup) {
           if (accounts.some(account => account.email === normalizedEmail)) throw new Error("An account with this email already exists. Sign in instead.");
-          accounts.push({ fullName: fullName.trim(), email: normalizedEmail, passwordHash: hash });
+          const salt = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(value => value.toString(16).padStart(2, "0")).join("");
+          const passwordHash = await hashLocalPassword(password, salt);
+          accounts.push({ fullName: fullName.trim(), email: normalizedEmail, salt, passwordHash });
           localStorage.setItem("grandLumenLocalAccounts", JSON.stringify(accounts));
           localStorage.setItem("grandLumenLocalSession", JSON.stringify({ fullName: fullName.trim(), email: normalizedEmail }));
           setNotice("Your local account is ready. Opening Grand-Lumen…", "success");
           window.setTimeout(() => onGuest({ fullName: fullName.trim(), email: normalizedEmail }), 250);
         } else {
-          const account = accounts.find(item => item.email === normalizedEmail && item.passwordHash === hash);
-          if (!account) throw new Error("Email or password is incorrect.");
+          const account = accounts.find(item => item.email === normalizedEmail);
+          if (!account || await hashLocalPassword(password, account.salt) !== account.passwordHash) throw new Error("Email or password is incorrect.");
           localStorage.setItem("grandLumenLocalSession", JSON.stringify({ fullName: account.fullName, email: account.email }));
           setNotice("Signed in. Opening Grand-Lumen…", "success");
           window.setTimeout(() => onGuest({ fullName: account.fullName, email: account.email }), 250);
