@@ -845,6 +845,17 @@ function App() {
   const [interfaceScale, setInterfaceScale] = useState(() => Number(localStorage.getItem("grandLumenInterfaceScale") || "1"));
   const [fontFamily, setFontFamily] = useState(() => localStorage.getItem("grandLumenFontFamily") || "Manrope, sans-serif");
   const [fontWeight, setFontWeight] = useState(() => localStorage.getItem("grandLumenFontWeight") || "normal");
+
+  useEffect(() => {
+    localStorage.setItem("grandLumenFontScale", String(fontScale));
+    localStorage.setItem("grandLumenInterfaceScale", String(interfaceScale));
+    localStorage.setItem("grandLumenFontFamily", fontFamily);
+    localStorage.setItem("grandLumenFontWeight", fontWeight);
+    document.documentElement.style.setProperty("--gl-font-scale", String(fontScale));
+    document.documentElement.style.setProperty("--gl-interface-scale", String(interfaceScale));
+    document.documentElement.style.setProperty("--gl-font-family", fontFamily);
+    document.documentElement.style.setProperty("--gl-font-weight", fontWeight);
+  }, [fontScale, interfaceScale, fontFamily, fontWeight]);
   const [apiFilter, setApiFilter] = useState("All");
   const [tool, setTool] = useState("Calculator");
   const [toolInput, setToolInput] = useState("");
@@ -1104,7 +1115,7 @@ function App() {
         <div className="ls-status-text">{status}</div>
         <div className="ls-credit">A NEW WORLD OF POSSIBILITIES</div>
       </div>}
-      <div className="app-shell">
+      <div className={theme === "light" ? "app-shell theme-light" : "app-shell theme-dark"} style={{ "--gl-font-scale": fontScale, "--gl-interface-scale": interfaceScale, "--gl-font-family": fontFamily, "--gl-font-weight": fontWeight } as React.CSSProperties}>
         <aside className={mobileMenu ? "sidebar open" : "sidebar"}>
           <div className="brand"><span className="brand-mark">L</span><div><strong>GRAND-LUMEN</strong><small>EXPLORE BEYOND</small></div></div>
           <div className="workspace-label">WORKSPACE</div>
