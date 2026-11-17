@@ -138,31 +138,48 @@ function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup";
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage("");
-    if (!supabase) {
-      setNotice("Authentication is not connected yet. Add the Grand-Lumen Supabase project URL and public anon key to the repository settings to activate accounts.", "error");
-      return;
-    }
     if (password.length < 8) {
       setNotice("Use a password with at least 8 characters.", "error");
       return;
     }
     setBusy(true);
     try {
-      if (isSignup) {
-        const { data, error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-          options: {
-            data: { full_name: fullName.trim() },
-            emailRedirectTo: window.location.origin + window.location.pathname
-          }
-        });
-        if (error) throw error;
-        if (data.session) setNotice("Your account is ready. Opening your workspace…", "success");
-        else setNotice("Account created. Check your email for the confirmation link, then sign in.", "success");
+      if (supabase) {
+        if (isSignup) {
+          const { data, error } = await supabase.auth.signUp({
+            email: email.trim(),
+            password,
+            options: {
+              data: { full_name: fullName.trim() },
+              emailRedirectTo: window.location.origin + window.location.pathname
+            }
+          });
+          if (error) throw error;
+          if (data.session) setNotice("Your account is ready. Opening your workspace…", "success");
+          else setNotice("Account created. Check your email for the confirmation link, then sign in.", "success");
+        } else {
+          const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+          if (error) throw error;
+        }
       } else {
-        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
-        if (error) throw error;
+        const accounts = JSON.parse(localStorage.getItem("grandLumenLocalAccounts") || "[]") as { fullName: string; email: string; passwordHash: string }[];
+        const normalizedEmail = email.trim().toLowerCase();
+        const passwordHash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(password));
+        const hash = Array.from(new Uint8Array(passwordHash)).map(value => value.toString(16).padStart(2, "0")).join("");
+        if (isSignup) {
+          if (accounts.some(account => account.email === normalizedEmail)) throw new Error("An account with this email already exists. Sign in instead.");
+          accounts.push({ fullName: fullName.trim(), email: normalizedEmail, passwordHash: hash });
+          localStorage.setItem("grandLumenLocalAccounts", JSON.stringify(accounts));
+          localStorage.setItem("grandLumenLocalSession", JSON.stringify({ fullName: fullName.trim(), email: normalizedEmail }));
+          setNotice("Your local account is ready. Opening Grand-Lumen…", "success");
+          window.setTimeout(onGuest, 250);
+        } else {
+          const account = accounts.find(item => item.email === normalizedEmail && item.passwordHash === hash);
+          if (!account) throw new Error("Email or password is incorrect.");
+          localStorage.setItem("grandLumenLocalSession", JSON.stringify({ fullName: account.fullName, email: account.email }));
+          setNotice("Signed in. Opening Grand-Lumen…", "success");
+          window.setTimeout(onGuest, 250);
+        }
       }
     } catch (reason) {
       setNotice(reason instanceof Error ? reason.message : "Authentication could not be completed.", "error");
@@ -176,7 +193,7 @@ function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup";
       return;
     }
     if (!supabase) {
-      setNotice("Password recovery will be available after Supabase is connected.", "error");
+      setNotice("Local accounts do not use email recovery. Create a new account if you no longer have access to this one.", "info");
       return;
     }
     setBusy(true);
@@ -193,7 +210,7 @@ function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup";
   return <main className="portal-auth-layout">
     <section className="portal-auth-story"><button className="portal-brand" onClick={() => onModeChange("about")}><span className="portal-brand-mark">L</span><span><b>GRAND-LUMEN</b><small>EXPLORE BEYOND</small></span></button><div className="portal-story-copy"><span className="portal-kicker">YOUR NEXT CHAPTER STARTS HERE</span><h1>{isSignup ? "Create space for your next idea." : "Your world of discovery awaits."}</h1><p>Research, learn, explore and build from one connected digital workspace.</p><div className="portal-story-points"><span><CheckCircle2 size={17}/> One account across your devices</span><span><CheckCircle2 size={17}/> A workspace built for curiosity</span><span><CheckCircle2 size={17}/> Secure email and password access</span></div></div><div className="portal-story-footer">GRAND-LUMEN · EXPLORE BEYOND</div></section>
     <section className="portal-auth-side"><div className="portal-auth-card"><button className="portal-back-link" onClick={() => onModeChange("about")}><ArrowLeft size={15}/> Back to overview</button><div className="portal-auth-tabs"><button className={!isSignup ? "active" : ""} onClick={() => { onModeChange("signin"); setNotice(""); }}>Sign in</button><button className={isSignup ? "active" : ""} onClick={() => { onModeChange("signup"); setNotice(""); }}>Create account</button></div><span className="portal-kicker">{isSignup ? "JOIN GRAND-LUMEN" : "WELCOME BACK"}</span><h2>{isSignup ? "Start exploring." : "Good to see you."}</h2><p className="portal-auth-intro">{isSignup ? "Create your account to enter your personal workspace." : "Sign in to continue to your Grand-Lumen workspace."}</p>
-      {!supabaseConfigured && <div className="portal-config-notice"><LockKeyhole size={17}/><span>Account service setup is still required before sign-in and registration can work.</span></div><button className="portal-guest-button" type="button" onClick={onGuest}>Continue in this browser for now <ArrowRight size={14}/></button>}
+      {!supabaseConfigured && <div className="portal-config-notice"><LockKeyhole size={17}/><span>Temporary local accounts are active. Your account works in this browser only; cross-device sync will be enabled when cloud authentication is added.</span></div>}
       <form onSubmit={submit}>
         {isSignup && <label>Full name<div className="portal-input"><UserRound size={17}/><input value={fullName} onChange={event => setFullName(event.target.value)} placeholder="Your name" autoComplete="name" required/></div></label>}
         <label>Email address<div className="portal-input"><Mail size={17}/><input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" required/></div></label>
@@ -203,7 +220,7 @@ function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup";
       </form>
       {message && <div className={"portal-auth-message " + messageType}>{message}</div>}
       <div className="portal-auth-switch">{isSignup ? "Already have an account?" : "New to Grand-Lumen?"} <button onClick={() => { onModeChange(isSignup ? "signin" : "signup"); setNotice(""); }}>{isSignup ? "Sign in" : "Create an account"}</button></div>
-      <div className="portal-security-note"><ShieldCheck size={15}/> Your password is handled by the authentication provider and is never stored in Grand-Lumen code.</div>
+      <div className="portal-security-note"><ShieldCheck size={15}/> {supabaseConfigured ? "Your password is handled by the authentication provider." : "Your password is stored as a one-way hash in this browser. This temporary account is not synced across devices."}</div>
     </div></section>
   </main>;
 }
@@ -213,6 +230,7 @@ function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [guestMode, setGuestMode] = useState(false);
+  const [localProfile, setLocalProfile] = useState<{ fullName: string; email: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("INITIALIZING GRAND-LUMEN");
@@ -240,6 +258,16 @@ function App() {
 
   useEffect(() => {
     if (!supabase) {
+      try {
+        const localSession = localStorage.getItem("grandLumenLocalSession");
+        if (localSession) {
+          const profile = JSON.parse(localSession) as { fullName: string; email: string };
+          setLocalProfile(profile);
+          setGuestMode(true);
+        }
+      } catch {
+        localStorage.removeItem("grandLumenLocalSession");
+      }
       setAuthReady(true);
       return;
     }
@@ -398,13 +426,13 @@ function App() {
               return <button key={item.name} className={section === item.name ? "nav-item active" : "nav-item"} onClick={() => selectSection(item.name)}><Icon size={17} /><span>{item.name}</span>{item.name === "Saved" && saved.length > 0 && <i>{saved.length}</i>}</button>;
             })}
           </nav>
-          <div className="sidebar-bottom"><div className="creator-chip"><span>{(session?.user.email || "GL").slice(0,2).toUpperCase()}</span><div><b>{session?.user.user_metadata?.full_name || "Grand-Lumen member"}</b><small>{session?.user.email || "Local browser session"}</small></div></div><span className="version">FOUNDATION 1.0</span></div>
+          <div className="sidebar-bottom"><div className="creator-chip"><span>{(session?.user.email || localProfile?.email || "GL").slice(0,2).toUpperCase()}</span><div><b>{session?.user.user_metadata?.full_name || localProfile?.fullName || "Grand-Lumen member"}</b><small>{session?.user.email || localProfile?.email || "Local browser session"}</small></div></div><span className="version">FOUNDATION 1.0</span></div>
         </aside>
         <main className="main-area">
           <header className="topbar">
             <button className="icon-button mobile-only" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle navigation"><Menu size={19} /></button>
             <div className="breadcrumb"><span>GRAND-LUMEN</span><ArrowRight size={13} /><b>{section.toUpperCase()}</b></div>
-            <div className="top-actions"><span className="system-status"><i /> SYSTEM READY</span><span className="signed-in-email">{session?.user.email || "LOCAL WORKSPACE"}</span><button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => session ? supabase?.auth.signOut() : setGuestMode(false)} aria-label="Sign out"><LogOut size={16} /></button></div>
+            <div className="top-actions"><span className="system-status"><i /> SYSTEM READY</span><span className="signed-in-email">{session?.user.email || localProfile?.email || "LOCAL WORKSPACE"}</span><button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => { if (session) supabase?.auth.signOut(); else { localStorage.removeItem("grandLumenLocalSession"); setLocalProfile(null); setGuestMode(false); } }} aria-label="Sign out"><LogOut size={16} /></button></div>
           </header>
           <div className="content-wrap">
             {section === "Home" && <section>
