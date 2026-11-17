@@ -606,16 +606,16 @@ function CodeStudioWorkspace() {
 
   const projectTemplates: Record<string, StudioFile[]> = {
     html: [
-      { id: "tpl-html", name: "index.html", content: "<!doctype html>\\n<html lang=\\"en\\">\\n<head>\\n<meta charset=\\"UTF-8\\">\\n<meta name=\\"viewport\\" content=\\"width=device-width,initial-scale=1\\">\\n<title>My Website</title>\\n<link rel=\\"stylesheet\\" href=\\"style.css\\">\\n</head>\\n<body>\\n<main><h1>Hello, Grand-Lumen!</h1><p>Your project starts here.</p><button id=\\"action\\">Try it</button></main>\\n<script src=\\"main.js\\"></script>\\n</body>\\n</html>" },
+      { id: "tpl-html", name: "index.html", content: "<!doctype html>\n<html lang=\"en\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">\n<title>My Website</title>\n<link rel=\"stylesheet\" href=\"style.css\">\n</head>\n<body>\n<main><h1>Hello, Grand-Lumen!</h1><p>Your project starts here.</p><button id=\"action\">Try it</button></main>\n<script src=\"main.js\"></script>\n</body>\n</html>" },
       { id: "tpl-css", name: "style.css", content: "body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui;background:#101827;color:white}main{padding:2rem;border-radius:1.5rem;background:#1e293b;text-align:center}button{padding:.8rem 1.2rem;border:0;border-radius:.7rem;cursor:pointer}" },
       { id: "tpl-js", name: "main.js", content: "document.querySelector('#action').addEventListener('click',()=>{document.querySelector('p').textContent='Your project is running!'});" }
     ],
     python: [
-      { id: "tpl-py", name: "main.py", content: "name = 'Grand-Lumen'\\nprint(f'Hello from {name}!')\\nfor number in range(1, 6):\\n    print(f'Number: {number}')\\n" },
-      { id: "tpl-py-readme", name: "README.md", content: "# Python Starter\\n\\nRun main.py with the python terminal command.\\n" }
+      { id: "tpl-py", name: "main.py", content: "name = 'Grand-Lumen'\nprint(f'Hello from {name}!')\nfor number in range(1, 6):\n    print(f'Number: {number}')\n" },
+      { id: "tpl-py-readme", name: "README.md", content: "# Python Starter\n\nRun main.py with the python terminal command.\n" }
     ],
     portfolio: [
-      { id: "tpl-port-html", name: "index.html", content: "<!doctype html>\\n<html><head><meta charset=\\"UTF-8\\"><meta name=\\"viewport\\" content=\\"width=device-width,initial-scale=1\\"><title>My Portfolio</title><link rel=\\"stylesheet\\" href=\\"style.css\\"></head><body><header><h1>Your Name</h1><p>Developer · Creator · Learner</p></header><main><section><h2>About me</h2><p>Write your introduction here.</p></section><section><h2>Projects</h2><article><h3>Project One</h3><p>Describe what you built.</p></article></section></main></body></html>" },
+      { id: "tpl-port-html", name: "index.html", content: "<!doctype html>\n<html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\"><title>My Portfolio</title><link rel=\"stylesheet\" href=\"style.css\"></head><body><header><h1>Your Name</h1><p>Developer · Creator · Learner</p></header><main><section><h2>About me</h2><p>Write your introduction here.</p></section><section><h2>Projects</h2><article><h3>Project One</h3><p>Describe what you built.</p></article></section></main></body></html>" },
       { id: "tpl-port-css", name: "style.css", content: "body{margin:0;padding:3rem;font-family:system-ui;background:#0b1220;color:#eef4ff}header{padding:3rem 0;border-bottom:1px solid #334155}h1{font-size:clamp(2.5rem,8vw,5rem);margin:0}main{max-width:800px;margin:2rem auto}section{padding:1.5rem 0}article{padding:1.2rem;background:#172338;border-radius:1rem}" }
     ]
   };
