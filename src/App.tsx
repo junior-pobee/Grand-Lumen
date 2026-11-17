@@ -470,6 +470,24 @@ function MessagesWorkspace({ session }: { session: Session | null }) {
 
 
 type StudioFile = { id: string; name: string; content: string };
+let pyodideLoader: Promise<any> | null = null;
+async function loadPythonRuntime() {
+  if (!(window as any).loadPyodide) {
+    if (!pyodideLoader) pyodideLoader = new Promise((resolve, reject) => {
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/pyodide.js";
+      script.async = true;
+      script.onload = () => resolve((window as any).loadPyodide);
+      script.onerror = () => reject(new Error("Python runtime download failed. Check your connection."));
+      document.head.appendChild(script);
+    });
+    await pyodideLoader;
+  }
+  const loader = (window as any).loadPyodide;
+  if (!loader) throw new Error("Python runtime did not initialise.");
+  return loader({ indexURL: "https://cdn.jsdelivr.net/pyodide/v0.27.7/full/" });
+}
+
 
 const studioStarterFiles: StudioFile[] = [
   { id: "index-html", name: "index.html", content: "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>My Project</title>\n</head>\n<body>\n  <main class=\"card\">\n    <span class=\"eyebrow\">GRAND-LUMEN STUDIO</span>\n    <h1>Hello, world.</h1>\n    <p>Your next idea starts here.</p>\n    <button id=\"action\">Test interaction</button>\n    <p id=\"message\"></p>\n  </main>\n</body>\n</html>" },
@@ -493,6 +511,8 @@ function CodeStudioWorkspace() {
   });
   const [newName, setNewName] = useState("");
   const [command, setCommand] = useState("");
+  const [selectedTemplate, setSelectedTemplate] = useState("html");
+  const [pythonBusy, setPythonBusy] = useState(false);
   const [terminalLines, setTerminalLines] = useState<string[]>(["Grand-Lumen Terminal · Workspace ready", "Type help to see available commands."]);
   const [showTerminal, setShowTerminal] = useState(true);
   const [showPreview, setShowPreview] = useState(true);
@@ -583,30 +603,91 @@ function CodeStudioWorkspace() {
     return /<\/body>/i.test(withStyle) ? withStyle.replace(/<\/body>/i, script + "</body>") : withStyle + script;
   }, [files, previewKey]);
 
-  const runCommand = () => {
+
+  const projectTemplates: Record<string, StudioFile[]> = {
+    html: [
+      { id: "tpl-html", name: "index.html", content: "<!doctype html>\\n<html lang=\\"en\\">\\n<head>\\n<meta charset=\\"UTF-8\\">\\n<meta name=\\"viewport\\" content=\\"width=device-width,initial-scale=1\\">\\n<title>My Website</title>\\n<link rel=\\"stylesheet\\" href=\\"style.css\\">\\n</head>\\n<body>\\n<main><h1>Hello, Grand-Lumen!</h1><p>Your project starts here.</p><button id=\\"action\\">Try it</button></main>\\n<script src=\\"main.js\\"></script>\\n</body>\\n</html>" },
+      { id: "tpl-css", name: "style.css", content: "body{margin:0;min-height:100vh;display:grid;place-items:center;font-family:system-ui;background:#101827;color:white}main{padding:2rem;border-radius:1.5rem;background:#1e293b;text-align:center}button{padding:.8rem 1.2rem;border:0;border-radius:.7rem;cursor:pointer}" },
+      { id: "tpl-js", name: "main.js", content: "document.querySelector('#action').addEventListener('click',()=>{document.querySelector('p').textContent='Your project is running!'});" }
+    ],
+    python: [
+      { id: "tpl-py", name: "main.py", content: "name = 'Grand-Lumen'\\nprint(f'Hello from {name}!')\\nfor number in range(1, 6):\\n    print(f'Number: {number}')\\n" },
+      { id: "tpl-py-readme", name: "README.md", content: "# Python Starter\\n\\nRun main.py with the python terminal command.\\n" }
+    ],
+    portfolio: [
+      { id: "tpl-port-html", name: "index.html", content: "<!doctype html>\\n<html><head><meta charset=\\"UTF-8\\"><meta name=\\"viewport\\" content=\\"width=device-width,initial-scale=1\\"><title>My Portfolio</title><link rel=\\"stylesheet\\" href=\\"style.css\\"></head><body><header><h1>Your Name</h1><p>Developer · Creator · Learner</p></header><main><section><h2>About me</h2><p>Write your introduction here.</p></section><section><h2>Projects</h2><article><h3>Project One</h3><p>Describe what you built.</p></article></section></main></body></html>" },
+      { id: "tpl-port-css", name: "style.css", content: "body{margin:0;padding:3rem;font-family:system-ui;background:#0b1220;color:#eef4ff}header{padding:3rem 0;border-bottom:1px solid #334155}h1{font-size:clamp(2.5rem,8vw,5rem);margin:0}main{max-width:800px;margin:2rem auto}section{padding:1.5rem 0}article{padding:1.2rem;background:#172338;border-radius:1rem}" }
+    ]
+  };
+
+  const applyTemplate = () => {
+    const next = projectTemplates[selectedTemplate] || projectTemplates.html;
+    setFiles(next);
+    setActiveId(next[0].id);
+    setTerminalLines(lines => [...lines, "Loaded " + selectedTemplate + " template with " + next.length + " files."]);
+    setShowPreview(selectedTemplate !== "python");
+  };
+
+  const runPython = async () => {
+    const pythonFile = files.find(file => file.id === activeId && file.name.toLowerCase().endsWith(".py")) || files.find(file => file.name.toLowerCase().endsWith(".py"));
+    if (!pythonFile) {
+      setTerminalLines(lines => [...lines, "$ python", "No Python file found. Create or open a .py file first."]);
+      return;
+    }
+    setPythonBusy(true);
+    setTerminalLines(lines => [...lines, "$ python " + pythonFile.name, "Starting browser Python runtime. The first launch may take a little while..."]);
+    try {
+      const runtime = await loadPythonRuntime();
+      let output = "";
+      runtime.setStdout({ batched: (value: string) => { output += value; } });
+      runtime.setStderr({ batched: (value: string) => { output += value; } });
+      const result = await runtime.runPythonAsync(pythonFile.content);
+      const outputLines = output.trimEnd().split("\\n").filter(Boolean);
+      if (result !== undefined && result !== null) outputLines.push(String(result));
+      setTerminalLines(lines => [...lines, ...(outputLines.length ? outputLines : ["Python finished successfully with no printed output."])]);
+    } catch (error) {
+      setTerminalLines(lines => [...lines, "Python error: " + (error instanceof Error ? error.message : String(error))]);
+    } finally {
+      setPythonBusy(false);
+    }
+  };
+
+  const runCommand = async () => {
     const raw = command.trim();
     if (!raw) return;
     const [verb, ...rest] = raw.split(" ");
     const argument = rest.join(" ").trim();
     let output = "";
-    if (verb === "help") output = "help · ls · pwd · cat filename · clear · run · echo text";
+    if (verb === "help") output = "help · ls · pwd · cat filename · clear · run · python · template html|python|portfolio · echo text";
     else if (verb === "ls") output = files.map(file => file.name).join("    ") || "No files in this workspace.";
     else if (verb === "pwd") output = "/grand-lumen/workspace";
     else if (verb === "cat") output = files.find(file => file.name === argument)?.content || "File not found: " + argument;
     else if (verb === "echo") output = argument;
-    else if (verb === "run") { setShowPreview(true); setPreviewKey(value => value + 1); output = "Browser preview refreshed. Only HTML, CSS and JavaScript execute in this browser workspace."; }
+    else if (verb === "run") { setShowPreview(true); setPreviewKey(value => value + 1); output = "Browser preview refreshed. HTML, CSS and JavaScript execute in the browser preview."; }
+    else if (verb === "python") { setCommand(""); await runPython(); return; }
+    else if (verb === "template") {
+      if (projectTemplates[argument]) {
+        const next = projectTemplates[argument];
+        setSelectedTemplate(argument);
+        setFiles(next);
+        setActiveId(next[0].id);
+        setShowPreview(argument !== "python");
+        output = "Loaded " + argument + " project template.";
+      } else output = "Choose a template: template html, template python, or template portfolio.";
+    }
     else if (verb === "clear") { setTerminalLines([]); setCommand(""); return; }
-    else output = "Command not available in the browser terminal. Type help for supported workspace commands.";
+    else output = "Command not available yet. Type help for supported commands.";
     setTerminalLines(lines => [...lines, "$ " + raw, output]);
     setCommand("");
   };
 
+
   return <div className="studio-shell">
-    <div className="studio-topbar"><div className="studio-brand"><span className="studio-brand-mark"><Code2 size={17}/></span><div><b>GRAND-LUMEN STUDIO</b><small>WORKSPACE / LOCAL PROJECT</small></div></div><div className="studio-actions"><span className="studio-save-state"><span/> Auto-saved</span><button onClick={() => setShowTerminal(value => !value)}><Terminal size={14}/> Terminal</button><button onClick={() => { setShowPreview(true); setPreviewKey(value => value + 1); }}><Play size={14}/> Run</button><button onClick={exportWorkspace}><Download size={14}/> JSON backup</button><button className="studio-export" onClick={exportZip}><Boxes size={14}/> Export ZIP</button></div></div>
+    <div className="studio-topbar"><div className="studio-brand"><span className="studio-brand-mark"><Code2 size={17}/></span><div><b>GRAND-LUMEN STUDIO</b><small>WORKSPACE / LOCAL PROJECT</small></div></div><div className="studio-actions"><span className="studio-save-state"><span/> Auto-saved</span><button onClick={() => setShowTerminal(value => !value)}><Terminal size={14}/> Terminal</button><button onClick={() => { setShowPreview(true); setPreviewKey(value => value + 1); }}><Play size={14}/> Run</button><select className="studio-template-select" aria-label="Project template" value={selectedTemplate} onChange={event => setSelectedTemplate(event.target.value)}><option value="html">HTML starter</option><option value="python">Python starter</option><option value="portfolio">Portfolio starter</option></select><button onClick={applyTemplate}><Plus size={14}/> New template</button><button onClick={exportWorkspace}><Download size={14}/> JSON backup</button><button className="studio-export" onClick={exportZip}><Boxes size={14}/> Export ZIP</button></div></div>
     <div className="studio-main">
       <aside className="studio-explorer"><div className="studio-pane-title"><span>EXPLORER</span><button title="Import files" onClick={() => importRef.current?.click()}><Upload size={14}/></button></div><div className="studio-project-name"><Boxes size={15}/> GRAND-LUMEN-PROJECT</div><div className="studio-file-list">{files.map(file => <div key={file.id} className={file.id === activeId ? "studio-file active" : "studio-file"}><button onClick={() => setActiveId(file.id)}><FileText size={14}/><span>{file.name}</span></button><button className="studio-file-remove" title={"Remove " + file.name} onClick={() => { const next = files.filter(item => item.id !== file.id); setFiles(next); if (activeId === file.id && next[0]) setActiveId(next[0].id); }}><X size={12}/></button></div>)}</div><div className="studio-new-file"><input value={newName} onChange={event => setNewName(event.target.value)} onKeyDown={event => event.key === "Enter" && addFile()} placeholder="src/new-file.js"/><button onClick={addFile} disabled={!newName.trim()} title="Create file"><Plus size={15}/></button></div><input ref={importRef} type="file" multiple hidden onChange={importFiles}/><div className="studio-explorer-foot">FOLDERS · FILES · LOCAL AUTOSAVE</div></aside>
       <div className="studio-editor-area"><div className="studio-tabs">{files.map(file => <button key={file.id} className={file.id === activeId ? "active" : ""} onClick={() => setActiveId(file.id)}><FileText size={13}/>{file.name}{file.id === activeId && <span/>}</button>)}</div><div className="studio-editor-meta"><span>{activeFile?.name || "No file selected"}</span><span>{extensionLanguage(activeFile?.name || "")} · {activeFile?.content.split("\n").length || 0} lines</span></div><div className="studio-editor-wrap">{activeFile ? <><div className="studio-line-numbers">{activeFile.content.split("\n").map((_, index) => <span key={index}>{index + 1}</span>)}</div><div className="studio-code-layer"><pre className="studio-code-highlight" aria-hidden="true" dangerouslySetInnerHTML={{ __html: highlightCode(activeFile.content) + "\n" }}/><textarea className="studio-code-input" spellCheck={false} autoCapitalize="off" autoCorrect="off" value={activeFile.content} onChange={event => updateActive(event.target.value)} aria-label="Code editor" /></div></> : <div className="studio-no-file">Create or import a file to begin.</div>}</div><div className="studio-statusbar"><span><span className="studio-status-dot"/> Ready</span><span>{extensionLanguage(activeFile?.name || "")}</span><span>UTF-8</span><span>Grand-Lumen Studio</span></div>
-      {showTerminal && <div className="studio-terminal"><div className="studio-terminal-head"><span><Terminal size={13}/> TERMINAL</span><button onClick={() => setShowTerminal(false)}><X size={13}/></button></div><div className="studio-terminal-output">{terminalLines.map((line, index) => <pre key={index}>{line}</pre>)}</div><form className="studio-terminal-command" onSubmit={event => { event.preventDefault(); runCommand(); }}><span>$</span><input ref={commandRef} value={command} onChange={event => setCommand(event.target.value)} placeholder="Type a command (try help)"/><button type="submit"><ArrowRight size={14}/></button></form></div>}</div>
+      {showTerminal && <div className="studio-terminal"><div className="studio-terminal-head"><span><Terminal size={13}/> TERMINAL</span><button onClick={() => setShowTerminal(false)}><X size={13}/></button></div><div className="studio-terminal-output">{terminalLines.map((line, index) => <pre key={index}>{line}</pre>)}</div><form className="studio-terminal-command" onSubmit={event => { event.preventDefault(); void runCommand(); }}><span>$</span><input ref={commandRef} value={command} onChange={event => setCommand(event.target.value)} placeholder={pythonBusy ? "Python is starting..." : "Try help, python, template html"}/><button type="submit" disabled={pythonBusy}><ArrowRight size={14}/></button></form></div>}</div>
       {showPreview && <aside className="studio-preview"><div className="studio-preview-head"><span><MonitorSmartphone size={14}/> LIVE PREVIEW</span><button onClick={() => setShowPreview(false)}><X size={13}/></button></div><iframe key={previewKey} title="Grand-Lumen project preview" sandbox="allow-scripts" srcDoc={previewDocument}/><div className="studio-preview-foot">SANDBOXED BROWSER PREVIEW · HTML / CSS / JS</div></aside>}
     </div>
     <div className="studio-footer-note">Folder paths are supported, such as src/app.js. Export a ZIP to move the complete project.</div>
