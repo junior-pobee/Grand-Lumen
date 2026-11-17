@@ -7,5 +7,12 @@
   "background_color": "#06070d",
   "theme_color": "#080a13",
   "description": "An expanded digital workspace for curious minds.",
-  "icons": []
+  "icons": [
+    {
+      "src": "./icons/grand-lumen-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
