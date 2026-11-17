@@ -98,7 +98,7 @@ const toolCards = [
 
 type PortalMode = "about" | "signin" | "signup";
 
-function PublicPortal({ onGuest }: { onGuest: () => void }) {
+function PublicPortal({ onGuest }: { onGuest: (profile?: { fullName: string; email: string }) => void }) {
   const [mode, setMode] = useState<PortalMode>("about");
   return <div className="public-portal">
     <div className="portal-ambient portal-ambient-one" />
@@ -122,7 +122,7 @@ function PublicPortal({ onGuest }: { onGuest: () => void }) {
   </div>;
 }
 
-function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup"; onModeChange: (mode: PortalMode) => void; onGuest: () => void }) {
+function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup"; onModeChange: (mode: PortalMode) => void; onGuest: (profile?: { fullName: string; email: string }) => void }) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -172,13 +172,13 @@ function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup";
           localStorage.setItem("grandLumenLocalAccounts", JSON.stringify(accounts));
           localStorage.setItem("grandLumenLocalSession", JSON.stringify({ fullName: fullName.trim(), email: normalizedEmail }));
           setNotice("Your local account is ready. Opening Grand-Lumen…", "success");
-          window.setTimeout(onGuest, 250);
+          window.setTimeout(() => onGuest({ fullName: fullName.trim(), email: normalizedEmail }), 250);
         } else {
           const account = accounts.find(item => item.email === normalizedEmail && item.passwordHash === hash);
           if (!account) throw new Error("Email or password is incorrect.");
           localStorage.setItem("grandLumenLocalSession", JSON.stringify({ fullName: account.fullName, email: account.email }));
           setNotice("Signed in. Opening Grand-Lumen…", "success");
-          window.setTimeout(onGuest, 250);
+          window.setTimeout(() => onGuest({ fullName: account.fullName, email: account.email }), 250);
         }
       }
     } catch (reason) {
@@ -405,7 +405,7 @@ function App() {
   };
 
   if (!authReady) return <div className="auth-boot"><div className="portal-brand-mark">L</div><span>SECURING YOUR WORKSPACE</span></div>;
-  if (!session && !guestMode) return <PublicPortal onGuest={() => setGuestMode(true)} />;
+  if (!session && !guestMode) return <PublicPortal onGuest={(profile) => { if (profile) setLocalProfile(profile); setGuestMode(true); }} />;
 
   return (
     <>
