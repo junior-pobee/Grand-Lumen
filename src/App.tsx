@@ -81,17 +81,42 @@ const apiCatalog = [
 ];
 const languages = ["HTML","CSS","JavaScript","TypeScript","Python","C","C++","Java","C#","Go","Rust","PHP","Ruby","SQL","Bash"];
 const starterCode: Record<string, string> = {
-  HTML: "<!doctype html>\n<html>\n  <head>\n    <title>My Grand-Lumen Project</title>\n  </head>\n  <body>\n    <h1>Hello, Grand-Lumen!</h1>\n    <p>Build something remarkable.</p>\n  </body>\n</html>",
-  CSS: "body {\n  font-family: system-ui, sans-serif;\n  background: #080d1b;\n  color: white;\n  padding: 3rem;\n}",
+  HTML: "<!doctype html>\n<html>
+  <head>
+    <title>My Grand-Lumen Project</title>
+  </head>
+  <body>
+    <h1>Hello, Grand-Lumen!</h1>
+    <p>Build something remarkable.</p>
+  </body>\n</html>",
+  CSS: "body {
+  font-family: system-ui, sans-serif;
+  background: #080d1b;
+  color: white;
+  padding: 3rem;\n}",
   JavaScript: "const vision = \"Build beyond limits\";\nconsole.log(vision);",
-  TypeScript: "type Project = {\n  name: string;\n  status: \"building\" | \"ready\";\n};\n\nconst project: Project = { name: \"Grand-Lumen\", status: \"building\" };\nconsole.log(project);",
+  TypeScript: "type Project = {
+  name: string;
+  status: \"building\" | \"ready\";\n};\n\nconst project: Project = { name: \"Grand-Lumen\", status: \"building\" };\nconsole.log(project);",
   Python: "project = \"Grand-Lumen\"\nprint(f\"Welcome to {project}\")",
-  C: "#include <stdio.h>\n\nint main(void) {\n    printf(\"Hello, Grand-Lumen!\\n\");\n    return 0;\n}",
-  "C++": "#include <iostream>\n\nint main() {\n    std::cout << \"Hello, Grand-Lumen!\\n\";\n    return 0;\n}",
-  Java: "public class Main {\n    public static void main(String[] args) {\n        System.out.println(\"Hello, Grand-Lumen!\");\n    }\n}",
-  "C#": "using System;\n\nclass Program {\n    static void Main() {\n        Console.WriteLine(\"Hello, Grand-Lumen!\");\n    }\n}",
-  Go: "package main\n\nimport \"fmt\"\n\nfunc main() {\n    fmt.Println(\"Hello, Grand-Lumen!\")\n}",
-  Rust: "fn main() {\n    println!(\"Hello, Grand-Lumen!\");\n}",
+  C: "#include <stdio.h>\n\nint main(void) {
+    printf(\"Hello, Grand-Lumen!\\n\");
+    return 0;\n}",
+  "C++": "#include <iostream>\n\nint main() {
+    std::cout << \"Hello, Grand-Lumen!\\n\";
+    return 0;\n}",
+  Java: "public class Main {
+    public static void main(String[] args) {
+        System.out.println(\"Hello, Grand-Lumen!\");
+    }\n}",
+  "C#": "using System;\n\nclass Program {
+    static void Main() {
+        Console.WriteLine(\"Hello, Grand-Lumen!\");
+    }\n}",
+  Go: "package main\n\nimport \"fmt\"\n\nfunc main() {
+    fmt.Println(\"Hello, Grand-Lumen!\")\n}",
+  Rust: "fn main() {
+    println!(\"Hello, Grand-Lumen!\");\n}",
   PHP: "<?php\necho \"Hello, Grand-Lumen!\";\n",
   Ruby: "puts \"Hello, Grand-Lumen!\"",
   SQL: "SELECT 'Hello, Grand-Lumen!' AS message;",
@@ -357,7 +382,23 @@ function CreativeStudio() {
       window.setTimeout(() => { if (cameraVideoRef.current) { cameraVideoRef.current.srcObject = stream; void cameraVideoRef.current.play(); } }, 100);
     } catch { setCameraError("Camera permission was unavailable. Allow camera access and try again."); }
   };
-  const closeCamera = () => { if (recorderRef.current?.state === "recording") recorderRef.current.stop(); cameraStreamRef.current?.getTracks().forEach(track => track.stop()); cameraStreamRef.current = null; setCameraOpen(false); setRecording(false); };\n  const startVideoRecording = () => {\n    const stream = cameraStreamRef.current;\n    if (!stream || typeof MediaRecorder === "undefined") { setCameraError("Video recording is not supported by this browser."); return; }\n    try {\n      recordingChunksRef.current = [];\n      const mime = ["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm"].find(type => MediaRecorder.isTypeSupported(type));\n      const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);\n      recorderRef.current = recorder;\n      recorder.ondataavailable = event => { if (event.data.size) recordingChunksRef.current.push(event.data); };\n      recorder.onstop = () => { const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || "video/webm" }); if (blob.size) { const url = URL.createObjectURL(blob); setRecordedPreview(url); } setRecording(false); };\n      recorder.start(); setRecording(true); setCameraError("");\n    } catch { setCameraError("Could not start video recording on this device."); }\n  };\n  const stopVideoRecording = () => { if (recorderRef.current?.state === "recording") recorderRef.current.stop(); };\n  const acceptRecordedVideo = async () => { if (!recordedPreview) return; const response = await fetch(recordedPreview); const blob = await response.blob(); chooseFile(new File([blob], "grand-lumen-video-" + Date.now() + ".webm", { type: blob.type || "video/webm" })); URL.revokeObjectURL(recordedPreview); setRecordedPreview(""); closeCamera(); };\n  const discardRecordedVideo = () => { if (recordedPreview) URL.revokeObjectURL(recordedPreview); setRecordedPreview(""); };
+  const closeCamera = () => { if (recorderRef.current?.state === "recording") recorderRef.current.stop(); cameraStreamRef.current?.getTracks().forEach(track => track.stop()); cameraStreamRef.current = null; setCameraOpen(false); setRecording(false); };
+  const startVideoRecording = () => {
+    const stream = cameraStreamRef.current;
+    if (!stream || typeof MediaRecorder === "undefined") { setCameraError("Video recording is not supported by this browser."); return; }
+    try {
+      recordingChunksRef.current = [];
+      const mime = ["video/webm;codecs=vp9","video/webm;codecs=vp8","video/webm"].find(type => MediaRecorder.isTypeSupported(type));
+      const recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      recorderRef.current = recorder;
+      recorder.ondataavailable = event => { if (event.data.size) recordingChunksRef.current.push(event.data); };
+      recorder.onstop = () => { const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || "video/webm" }); if (blob.size) { const url = URL.createObjectURL(blob); setRecordedPreview(url); } setRecording(false); };
+      recorder.start(); setRecording(true); setCameraError("");
+    } catch { setCameraError("Could not start video recording on this device."); }
+  };
+  const stopVideoRecording = () => { if (recorderRef.current?.state === "recording") recorderRef.current.stop(); };
+  const acceptRecordedVideo = async () => { if (!recordedPreview) return; const response = await fetch(recordedPreview); const blob = await response.blob(); chooseFile(new File([blob], "grand-lumen-video-" + Date.now() + ".webm", { type: blob.type || "video/webm" })); URL.revokeObjectURL(recordedPreview); setRecordedPreview(""); closeCamera(); };
+  const discardRecordedVideo = () => { if (recordedPreview) URL.revokeObjectURL(recordedPreview); setRecordedPreview(""); };
   const capturePhoto = () => {
     const video = cameraVideoRef.current;
     if (!video || !video.videoWidth || !video.videoHeight) return;
@@ -684,9 +725,32 @@ async function loadPythonRuntime() {
 
 
 const studioStarterFiles: StudioFile[] = [
-  { id: "index-html", name: "index.html", content: "<!doctype html>\n<html lang=\"en\">\n<head>\n  <meta charset=\"UTF-8\">\n  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n  <title>My Project</title>\n</head>\n<body>\n  <main class=\"card\">\n    <span class=\"eyebrow\">GRAND-LUMEN STUDIO</span>\n    <h1>Hello, world.</h1>\n    <p>Your next idea starts here.</p>\n    <button id=\"action\">Test interaction</button>\n    <p id=\"message\"></p>\n  </main>\n</body>\n</html>" },
-  { id: "styles-css", name: "styles.css", content: "body {\n  margin: 0;\n  min-height: 100vh;\n  display: grid;\n  place-items: center;\n  background: #0b1222;\n  color: #edf4ff;\n  font-family: Inter, system-ui, sans-serif;\n}\n.card {\n  width: min(520px, calc(100% - 48px));\n  padding: 36px;\n  border: 1px solid #273a59;\n  border-radius: 24px;\n  background: #111d32;\n}\n.eyebrow { color: #80b9ff; letter-spacing: .18em; font-size: 11px; }\nbutton { padding: 12px 18px; border: 0; border-radius: 10px; background: #8abfff; color: #081326; font-weight: 700; cursor: pointer; }" },
-  { id: "app-js", name: "app.js", content: "const action = document.querySelector(\"#action\");\nconst message = document.querySelector(\"#message\");\naction?.addEventListener(\"click\", () => {\n  message.textContent = \"Your project is running inside Grand-Lumen.\";\n});" },
+  { id: "index-html", name: "index.html", content: "<!doctype html>\n<html lang=\"en\">\n<head>
+  <meta charset=\"UTF-8\">
+  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+  <title>My Project</title>\n</head>\n<body>
+  <main class=\"card\">
+    <span class=\"eyebrow\">GRAND-LUMEN STUDIO</span>
+    <h1>Hello, world.</h1>
+    <p>Your next idea starts here.</p>
+    <button id=\"action\">Test interaction</button>
+    <p id=\"message\"></p>
+  </main>\n</body>\n</html>" },
+  { id: "styles-css", name: "styles.css", content: "body {
+  margin: 0;
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #0b1222;
+  color: #edf4ff;
+  font-family: Inter, system-ui, sans-serif;\n}\n.card {
+  width: min(520px, calc(100% - 48px));
+  padding: 36px;
+  border: 1px solid #273a59;
+  border-radius: 24px;
+  background: #111d32;\n}\n.eyebrow { color: #80b9ff; letter-spacing: .18em; font-size: 11px; }\nbutton { padding: 12px 18px; border: 0; border-radius: 10px; background: #8abfff; color: #081326; font-weight: 700; cursor: pointer; }" },
+  { id: "app-js", name: "app.js", content: "const action = document.querySelector(\"#action\");\nconst message = document.querySelector(\"#message\");\naction?.addEventListener(\"click\", () => {
+  message.textContent = \"Your project is running inside Grand-Lumen.\";\n});" },
   { id: "readme-md", name: "README.md", content: "# My Project\n\nCreated in Grand-Lumen Code Lab.\n\nEdit the files, then choose Run preview." }
 ];
 
@@ -709,7 +773,8 @@ function CodeStudioWorkspace() {
   const [pythonBusy, setPythonBusy] = useState(false);
   const [terminalLines, setTerminalLines] = useState<string[]>(["Grand-Lumen Terminal · Workspace ready", "Type help to see available commands."]);
   const [showTerminal, setShowTerminal] = useState(true);
-  const [showPreview, setShowPreview] = useState(false);\n  const [previewExpanded, setPreviewExpanded] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
+  const [previewExpanded, setPreviewExpanded] = useState(false);
   const [previewKey, setPreviewKey] = useState(0);
   const importRef = useRef<HTMLInputElement>(null);
   const commandRef = useRef<HTMLInputElement>(null);
@@ -805,7 +870,8 @@ function CodeStudioWorkspace() {
       { id: "tpl-js", name: "main.js", content: "document.querySelector('#action').addEventListener('click',()=>{document.querySelector('p').textContent='Your project is running!'});" }
     ],
     python: [
-      { id: "tpl-py", name: "main.py", content: "name = 'Grand-Lumen'\nprint(f'Hello from {name}!')\nfor number in range(1, 6):\n    print(f'Number: {number}')\n" },
+      { id: "tpl-py", name: "main.py", content: "name = 'Grand-Lumen'\nprint(f'Hello from {name}!')\nfor number in range(1, 6):
+    print(f'Number: {number}')\n" },
       { id: "tpl-py-readme", name: "README.md", content: "# Python Starter\n\nRun main.py with the python terminal command.\n" }
     ],
     portfolio: [
