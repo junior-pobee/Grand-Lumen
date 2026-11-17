@@ -495,6 +495,26 @@ function MessagesWorkspace({ session }: { session: Session | null }) {
     return btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
   };
 
+  const reconnectProvider = async () => {
+    if (!supabase || !linkedIdentity || !provider) return;
+    setBusy(true);
+    try {
+      const { error: unlinkError } = await supabase.auth.unlinkIdentity(linkedIdentity);
+      if (unlinkError) throw unlinkError;
+      sessionStorage.removeItem("grandLumenMailProviderToken");
+      const scopes = provider === "google"
+        ? "https://www.googleapis.com/auth/gmail.send"
+        : "email profile openid offline_access https://graph.microsoft.com/Mail.Send";
+      const options: any = { scopes, redirectTo: window.location.origin + window.location.pathname };
+      options.queryParams = provider === "google" ? { access_type: "offline", prompt: "consent" } : { prompt: "consent" };
+      const { error } = await supabase.auth.linkIdentity({ provider, options } as any);
+      if (error) throw error;
+    } catch (reason) {
+      setFeedback(reason instanceof Error ? reason.message : "The email permission could not be refreshed.", "error");
+      setBusy(false);
+    }
+  };
+
   const disconnectProvider = async () => {
     if (!supabase || !linkedIdentity) return;
     setBusy(true);
@@ -530,7 +550,9 @@ function MessagesWorkspace({ session }: { session: Session | null }) {
     }
     let savedToken: any = null;
     try { savedToken = JSON.parse(sessionStorage.getItem("grandLumenMailProviderToken") || "null"); } catch { savedToken = null; }
-    const accessToken = session.provider_token || (savedToken?.provider === provider && savedToken?.expiresAt > Date.now() ? savedToken.token : null);
+    const accessToken = savedToken
+      ? (savedToken.provider === provider && savedToken.expiresAt > Date.now() ? savedToken.token : null)
+      : session.provider_token;
     if (!accessToken) {
       setFeedback("Your email permission has expired. Disconnect and reconnect the account to authorize a fresh sending session.", "error");
       return;
@@ -620,7 +642,7 @@ function MessagesWorkspace({ session }: { session: Session | null }) {
       <div className="mail-account-row">
         <div className="mail-account-mark">{provider === "google" ? "G" : provider === "azure" ? "O" : <Mail size={19}/>}</div>
         <div className="mail-account-info"><strong>{providerName || "No email account connected"}</strong><span>{provider ? connectedEmail : "Connect an account to start sending"}</span></div>
-        {provider && <><span className="mail-connected-status"><CheckCircle2 size={14}/> Connected</span><button className="mail-disconnect-button" onClick={() => void disconnectProvider()} disabled={busy}>Disconnect</button></>}
+        {provider && <><span className="mail-connected-status"><CheckCircle2 size={14}/> Connected</span><button className="mail-disconnect-button" onClick={() => void reconnectProvider()} disabled={busy}>Refresh access</button><button className="mail-disconnect-button" onClick={() => void disconnectProvider()} disabled={busy}>Disconnect</button></>}
       </div>
       {!provider && <div className="mail-connect-options"><button className="mail-provider-button" onClick={() => void connectProvider("google")} disabled={busy}><span className="mail-google-mark">G</span><span><strong>Connect Gmail</strong><small>Authorize Grand-Lumen to send using Gmail</small></span><ArrowUpRight size={16}/></button><button className="mail-provider-button" onClick={() => void connectProvider("azure")} disabled={busy}><span className="mail-outlook-mark"><Mail size={18}/></span><span><strong>Connect Outlook</strong><small>Authorize Grand-Lumen to send using Outlook</small></span><ArrowUpRight size={16}/></button></div>}
       {provider && <div className="mail-connected-note"><ShieldCheck size={15}/> Your email password is never requested by Grand-Lumen. Sending uses the permission granted by {providerName}.</div>}
