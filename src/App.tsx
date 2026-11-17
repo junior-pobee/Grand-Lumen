@@ -1136,36 +1136,34 @@ function NewsWorkspace() {
   const [items, setItems] = useState<NewsItem[]>([]);
   const [term, setTerm] = useState("");
   const [country, setCountry] = useState("all");
-  const [period, setPeriod] = useState("7d");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<NewsItem | null>(null);
-  const load = async (search = term, selectedCountry = country, selectedPeriod = period) => {
+  const load = async (search = term, selectedCountry = country) => {
     setBusy(true);
     setError("");
     try {
-      const result = await searchGlobalNews(search, selectedCountry, selectedPeriod);
+      const result = await searchGlobalNews(search, selectedCountry);
       setItems(result);
-      if (!result.length) setError("No matching reports were found. Try another phrase, country or time range.");
+      if (!result.length) setError("No matching reports were found. Try a different topic, date, country or publisher.");
     } catch (reason) {
+      setItems([]);
       setError(reason instanceof Error ? reason.message : "News could not be loaded.");
     } finally {
       setBusy(false);
     }
   };
-  useEffect(() => { void load("", "all", "7d"); }, []);
+  useEffect(() => { void load("", "all"); }, []);
   const countries = [["all","All countries"],["GH","Ghana"],["NG","Nigeria"],["ZA","South Africa"],["KE","Kenya"],["US","United States"],["GB","United Kingdom"],["CA","Canada"],["IN","India"],["AU","Australia"],["DE","Germany"],["FR","France"],["JP","Japan"],["BR","Brazil"],["EG","Egypt"],["AE","United Arab Emirates"]];
-  const timeLabels: Record<string,string> = {"24h":"Past 24 hours","7d":"Past 7 days","30d":"Past 30 days","90d":"Past 90 days","365d":"Past year"};
   return <div className="news-workspace">
-    <div className="news-search-panel"><div className="news-search-input"><Search size={18}/><input value={term} onChange={event=>setTerm(event.target.value)} onKeyDown={event=>event.key==="Enter" && void load()} placeholder="Search current and previous news worldwide..."/><button onClick={()=>void load()} disabled={busy}>{busy?"Searching…":"Search news"}</button></div><div className="news-filters"><label>Country<select value={country} onChange={event=>{setCountry(event.target.value);void load(term,event.target.value,period);}}>{countries.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label><label>News period<select value={period} onChange={event=>{setPeriod(event.target.value);void load(term,country,event.target.value);}}>{Object.entries(timeLabels).map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label></div><p className="news-source-note">Global news index · Search by topic, country, publisher or keyword. Full reports remain credited to their original publishers.</p></div>
-    {busy && <div className="news-loading">Gathering reports from across the world…</div>}
+    <div className="news-search-panel"><div className="news-search-input"><Search size={18}/><input value={term} onChange={event=>setTerm(event.target.value)} onKeyDown={event=>event.key==="Enter" && void load()} placeholder="Search worldwide news, past events, years or historical topics..."/><button onClick={()=>void load()} disabled={busy}>{busy?"Searching…":"Search news"}</button></div><div className="news-filters"><label>Country<select value={country} onChange={event=>{setCountry(event.target.value);void load(term,event.target.value);}}>{countries.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label></div><p className="news-source-note">Search current worldwide coverage and indexed historical newspaper collections. Try a year, historical event, country, publisher or keyword. Search availability depends on each archive's digitised records.</p></div>
+    {busy && <div className="news-loading">Searching live coverage and historical collections…</div>}
     {error && <div className="news-error">{error}</div>}
-    <div className="news-results-heading"><div><span className="eyebrow">WORLDWIDE COVERAGE</span><h2>{term.trim()?"Search results":"Latest reports"}</h2></div><span>{items.length} reports</span></div>
-    <div className="news-grid">{items.map((item,index)=><article className="news-card" key={item.url+index}>{item.image?<img className="news-card-image" src={item.image} alt="" loading="lazy" onError={event=>{event.currentTarget.style.display="none";}}/>:<div className="news-card-placeholder"><Newspaper size={28}/></div>}<div className="news-card-body"><div className="news-meta"><span>{item.country}</span><span>{item.source}</span></div><h3>{item.title}</h3><p>{item.publishedAt||"Recent report"}</p><div className="news-card-actions"><button className="quiet-button" onClick={()=>setSelected(item)}>Read more <ArrowRight size={14}/></button><a href={item.url} target="_blank" rel="noreferrer">Publisher <ExternalLink size={13}/></a></div></div></article>)}</div>
-    {selected && <div className="news-detail-backdrop" onClick={()=>setSelected(null)}><article className="news-detail" onClick={event=>event.stopPropagation()}><button className="news-detail-close" onClick={()=>setSelected(null)} aria-label="Close"><X size={18}/></button>{selected.image&&<img src={selected.image} alt=""/>}<span className="eyebrow">{selected.country} · {selected.source}</span><h2>{selected.title}</h2><p>{selected.description}</p><div className="news-publisher-note">This news index provides the headline, publisher details and available preview media. Open the original publisher to read the complete report and view any video or additional images supplied with it.</div><a className="solid-button news-open-publisher" href={selected.url} target="_blank" rel="noreferrer">Read complete report <ExternalLink size={15}/></a></article></div>}
+    <div className="news-results-heading"><div><span className="eyebrow">WORLDWIDE NEWS & ARCHIVES</span><h2>{term.trim()?"Search results":"Latest and archived reports"}</h2></div><span>{items.length} reports</span></div>
+    <div className="news-grid">{items.map((item,index)=><article className="news-card" key={item.url+index}>{item.image?<img className="news-card-image" src={item.image} alt="" loading="lazy" onError={event=>{event.currentTarget.style.display="none";}}/>:<div className="news-card-placeholder"><Newspaper size={28}/></div>}<div className="news-card-body"><div className="news-meta"><span>{item.country}</span><span>{item.source}</span></div><h3>{item.title}</h3><p>{item.publishedAt||"Date not supplied"}</p><div className="news-card-actions"><button className="quiet-button" onClick={()=>setSelected(item)}>Read more <ArrowRight size={14}/></button><a href={item.url} target="_blank" rel="noreferrer">Open source <ExternalLink size={13}/></a></div></div></article>)}</div>
+    {selected && <div className="news-detail-backdrop" onClick={()=>setSelected(null)}><article className="news-detail" onClick={event=>event.stopPropagation()}><button className="news-detail-close" onClick={()=>setSelected(null)} aria-label="Close"><X size={18}/></button>{selected.image&&<img src={selected.image} alt=""/>}<span className="eyebrow">{selected.country} · {selected.source}</span><h2>{selected.title}</h2><p>{selected.description}</p><div className="news-publisher-note">This result is indexed from its original publisher or digitised archive. The full article, newspaper scan, images and any available video are provided by the source.</div><a className="solid-button news-open-publisher" href={selected.url} target="_blank" rel="noreferrer">Open complete source <ExternalLink size={15}/></a></article></div>}
   </div>;
 }
-
 function App() {
   const [section, setSection] = useState<Section>("Home");
   const [session, setSession] = useState<Session | null>(null);
