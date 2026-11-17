@@ -16,11 +16,37 @@
     <div id="root"><div style="min-height:100vh;background:#06070d;color:#f4f6ff;display:grid;place-items:center;font:600 14px system-ui;letter-spacing:.12em">STARTING GRAND-LUMEN</div></div>
     <script type="module" src="./src/main.tsx"></script>
     <script>
-      window.setTimeout(() => {
+      let grandLumenStartupError = "";
+      window.addEventListener("error", event => {
+        const target = event.target;
+        if (target && target !== window) {
+          grandLumenStartupError = "Resource failed: " + (target.src || target.href || target.tagName || "unknown resource");
+        } else {
+          grandLumenStartupError = [event.message, event.filename, event.lineno].filter(Boolean).join(" | ");
+        }
+      }, true);
+      window.addEventListener("unhandledrejection", event => {
+        const reason = event.reason;
+        grandLumenStartupError = "Unhandled rejection: " + (reason && reason.message ? reason.message : String(reason));
+      });
+      window.setTimeout(async () => {
         if (document.documentElement.dataset.grandLumenStarted === "true") return;
         const root = document.getElementById("root");
         if (!root) return;
-        root.innerHTML = '<main style="min-height:100vh;background:#06070d;color:#f4f6ff;display:grid;place-items:center;padding:24px;font-family:system-ui"><section style="width:min(100%,560px);padding:28px;border:1px solid #ffffff22;border-radius:18px;background:#11182a"><div style="color:#9acbff;font-size:12px;letter-spacing:3px;font-weight:800">GRAND-LUMEN</div><h1 style="font-size:25px">The app could not start</h1><p style="color:#aab6ca;line-height:1.7">The page loaded, but its application bundle did not start. This usually means GitHub Pages is serving the wrong folder or an outdated deployment.</p><p style="color:#aab6ca;line-height:1.7">Open repository Settings → Pages and make sure Build and deployment uses GitHub Actions. Then check that the latest Deploy Grand-Lumen workflow completed successfully.</p><button onclick="window.location.reload()" style="border:0;border-radius:9px;padding:12px 18px;background:#9acbff;color:#07101e;font-weight:800">Reload Grand-Lumen</button></section></main>';
+        const moduleScript = document.querySelector('script[type="module"][src]');
+        let assetStatus = "Not checked";
+        if (moduleScript) {
+          try {
+            const response = await fetch(moduleScript.src, { cache: "no-store" });
+            assetStatus = response.status + " " + response.statusText + " · " + (response.headers.get("content-type") || "unknown content type");
+          } catch (error) {
+            assetStatus = error instanceof Error ? error.message : String(error);
+          }
+        }
+        root.innerHTML = '<main style="min-height:100vh;background:#06070d;color:#f4f6ff;display:grid;place-items:center;padding:24px;font-family:system-ui"><section style="width:min(100%,620px);padding:28px;border:1px solid #ffffff22;border-radius:18px;background:#11182a"><div style="color:#9acbff;font-size:12px;letter-spacing:3px;font-weight:800">GRAND-LUMEN DIAGNOSTICS</div><h1 style="font-size:25px">The application bundle did not start</h1><p style="color:#aab6ca;line-height:1.7">The production page is present, but the browser did not execute its application entry point.</p><p style="color:#aab6ca;line-height:1.7">Asset response: <strong id="grand-lumen-asset"></strong></p><p style="color:#aab6ca;line-height:1.7">Browser error: <strong id="grand-lumen-error"></strong></p><p style="color:#aab6ca;line-height:1.7">Bundle: <strong id="grand-lumen-url" style="overflow-wrap:anywhere"></strong></p><button onclick="window.location.reload()" style="border:0;border-radius:9px;padding:12px 18px;background:#9acbff;color:#07101e;font-weight:800">Reload Grand-Lumen</button></section></main>';
+        document.getElementById("grand-lumen-asset").textContent = assetStatus;
+        document.getElementById("grand-lumen-error").textContent = grandLumenStartupError || "No browser error was captured";
+        document.getElementById("grand-lumen-url").textContent = moduleScript ? moduleScript.src : "No module script found";
       }, 10000);
     </script>
   </body>
