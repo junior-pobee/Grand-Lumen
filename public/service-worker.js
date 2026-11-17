@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "grand-lumen-pwa-";
-const CACHE_NAME = CACHE_PREFIX + "v4";
+const CACHE_NAME = CACHE_PREFIX + "v5";
 const SCOPE_URL = new URL(self.registration.scope);
 const BASE_PATH = SCOPE_URL.pathname.endsWith("/") ? SCOPE_URL.pathname : SCOPE_URL.pathname + "/";
 const APP_SHELL = [
