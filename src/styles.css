@@ -366,3 +366,19 @@ html,body{touch-action:pan-x pan-y}
 .theme-light .modal,.theme-light .popover,.theme-light .dropdown-menu{background:#fff;color:#172033;border-color:#cbd5e1}
 .theme-light .error-text{color:#b42318}
 @media(prefers-reduced-motion:reduce){.app-shell *{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+
+.studio-editor-focused .studio-main{grid-template-columns:210px minmax(0,1fr);min-height:790px}
+.studio-editor-focused .studio-editor-area{min-height:790px}
+.studio-editor-focused .studio-editor-wrap{min-height:540px}
+.studio-editor-focused .studio-code-layer,.studio-editor-focused .studio-code-input{min-height:540px}
+.studio-editor-focused .studio-code-input{resize:vertical}
+.studio-has-preview .studio-main{grid-template-columns:210px minmax(0,1fr) minmax(250px,34%)}
+.camera-capture-panel{display:grid;gap:12px;padding:16px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.camera-capture-panel video{width:100%;max-height:65vh;aspect-ratio:4/3;object-fit:contain;border-radius:12px;background:#050a12}
+.camera-capture-panel>div,.received-item-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.received-item-actions a{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid var(--line);border-radius:9px;text-decoration:none;font-size:12px}
+.received-item-actions .quiet-button{display:inline-flex;align-items:center;gap:6px}
+.received-item-info{min-width:0}
+.received-item-info b{overflow-wrap:anywhere}
+@media(max-width:1050px){.studio-editor-focused .studio-main{grid-template-columns:175px minmax(0,1fr)}}
+@media(max-width:650px){.studio-editor-focused .studio-main{grid-template-columns:1fr;min-height:0}.studio-editor-focused .studio-editor-area{min-height:600px}.studio-editor-focused .studio-editor-wrap{min-height:420px}.studio-editor-focused .studio-code-layer,.studio-editor-focused .studio-code-input{min-height:420px}.camera-capture-panel{padding:10px}}
