@@ -1,10 +1,11 @@
-const CACHE_NAME = "grand-lumen-shell-v2";
+const CACHE_NAME = "grand-lumen-shell-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
   "./manifest.webmanifest",
-  "./icons/grand-lumen-icon.svg",
-  "./icons/grand-lumen-maskable.svg"
+  "./icons/grand-lumen-192.png",
+  "./icons/grand-lumen-512.png",
+  "./icons/grand-lumen-maskable-512.png"
 ];
 
 self.addEventListener("install", event => {
@@ -43,7 +44,7 @@ self.addEventListener("fetch", event => {
     );
     return;
   }
-  if (url.pathname.includes("/assets/") || url.pathname.endsWith(".svg") || url.pathname.endsWith(".webmanifest")) {
+  if (url.pathname.includes("/assets/") || url.pathname.endsWith(".png") || url.pathname.endsWith(".svg") || url.pathname.endsWith(".webmanifest")) {
     event.respondWith(
       caches.match(request).then(cached => {
         const update = fetch(request).then(response => {

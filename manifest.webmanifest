@@ -13,21 +13,21 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "./icons/grand-lumen-icon.svg",
+      "src": "./icons/grand-lumen-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icons/grand-lumen-icon.svg",
+      "src": "./icons/grand-lumen-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "./icons/grand-lumen-maskable.svg",
+      "src": "./icons/grand-lumen-maskable-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "maskable"
     }
   ]
