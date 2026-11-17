@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, ArrowDownToLine, ArrowLeft, ArrowRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, LocateFixed, MapPin, Menu, Moon, Navigation, Play, Plus, Search, Settings, ShieldCheck, Sparkles, Sun, Terminal, Video, Wallet, X, Zap } from "lucide-react";
+import { Activity, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, CheckCircle2, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, Eye, EyeOff, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, LocateFixed, LockKeyhole, LogIn, LogOut, Mail, MapPin, Menu, Moon, MonitorSmartphone, Navigation, Play, Plus, Search, ShieldCheck, Sparkles, Sun, Terminal, UserRound, Video, Wallet, X, Zap } from "lucide-react";
+import type { Session } from "@supabase/supabase-js";
+import { supabase, supabaseConfigured } from "./auth";
 import { getCurrency, getDictionary, getHoliday, getPokemon, getWeather, searchArchiveVideos, searchCommonsImages, searchHackerNews, searchWikipedia, type SearchItem } from "./api";
 
 function escapeCode(value: string): string {
@@ -92,8 +94,123 @@ const toolCards = [
   ["Public Holidays","Explore national holiday calendars",Activity]
 ] as const;
 
+
+type PortalMode = "about" | "signin" | "signup";
+
+function PublicPortal() {
+  const [mode, setMode] = useState<PortalMode>("about");
+  return <div className="public-portal">
+    <div className="portal-ambient portal-ambient-one" />
+    <div className="portal-ambient portal-ambient-two" />
+    <header className="portal-nav">
+      <button className="portal-brand" onClick={() => setMode("about")}><span className="portal-brand-mark">L</span><span><b>GRAND-LUMEN</b><small>EXPLORE BEYOND</small></span></button>
+      <nav><button className={mode === "about" ? "portal-nav-active" : ""} onClick={() => setMode("about")}>Overview</button><button onClick={() => setMode("signin")}>Sign in</button><button className="portal-nav-cta" onClick={() => setMode("signup")}>Create account <ArrowUpRight size={15} /></button></nav>
+    </header>
+    {mode === "about" ? <main className="portal-about">
+      <section className="portal-hero">
+        <div className="portal-copy"><span className="portal-kicker"><span /> A UNIVERSE FOR THE CURIOUS</span><h1>Think wider.<br /><span>Build beyond.</span></h1><p>Grand-Lumen is a connected digital environment for discovering knowledge, researching ideas, learning skills and creating things that matter.</p><div className="portal-actions"><button className="portal-primary" onClick={() => setMode("signup")}>Create your account <ArrowUpRight size={17} /></button><button className="portal-secondary" onClick={() => setMode("signin")}>Sign in <ArrowRight size={16} /></button></div><div className="portal-trust"><ShieldCheck size={16} /><span>One account. Access your workspace across your devices.</span></div></div>
+        <div className="portal-visual"><div className="portal-orbit orbit-one" /><div className="portal-orbit orbit-two" /><div className="portal-orbit orbit-three" /><div className="portal-core"><span>L</span><small>GRAND<br />LUMEN</small></div><div className="portal-float portal-float-search"><Search size={16} /><span>Discovery</span></div><div className="portal-float portal-float-code"><Code2 size={16} /><span>Creation</span></div><div className="portal-float portal-float-learn"><BookOpen size={16} /><span>Learning</span></div></div>
+      </section>
+      <section className="portal-manifesto"><div><span className="portal-kicker">THE GRAND-LUMEN IDEA</span><h2>More than a search page.<br /><span>A place to make progress.</span></h2></div><p>Grand-Lumen brings useful digital capabilities into one organised workspace. Move from a question to a source, from a concept to a lesson, and from an idea to a working project without losing your direction.</p></section>
+      <section className="portal-feature-section"><div className="portal-section-heading"><span className="portal-kicker">INSIDE THE UNIVERSE</span><h2>One environment.<br /><span>Many ways to explore.</span></h2></div><div className="portal-feature-grid">
+        {[{icon:Search,title:"Discovery engine",detail:"Explore knowledge and technology sources in one search experience."},{icon:FlaskConical,title:"Research studio",detail:"Investigate topics, collect source material and organise your thinking."},{icon:Code2,title:"Multi-language Code Lab",detail:"Experiment with programming languages and preview web projects."},{icon:GraduationCap,title:"Learning hub",detail:"Build practical knowledge through guided learning paths."},{icon:Image,title:"Visual universe",detail:"Discover images and public video collections."},{icon:MapPin,title:"Maps and location",detail:"Explore places, use device GPS and plan directions."},{icon:Calculator,title:"Smart utilities",detail:"Use a scientific calculator, dictionary, weather and conversion tools."},{icon:Database,title:"API library",detail:"Discover services and open data for future integrations."}].map((item,index)=>{const Icon=item.icon;return <article className="portal-feature" key={item.title}><span className="portal-feature-index">0{index+1}</span><span className="portal-feature-icon"><Icon size={20}/></span><h3>{item.title}</h3><p>{item.detail}</p></article>;})}
+      </div></section>
+      <section className="portal-account-band"><div><span className="portal-kicker">YOUR WORKSPACE, YOUR ACCOUNT</span><h2>Pick up where you left off.</h2><p>Create an account and sign in from a phone, tablet or computer. Your authentication is managed securely through Supabase.</p></div><button className="portal-primary" onClick={() => setMode("signup")}>Get started <ArrowUpRight size={17}/></button></section>
+      <footer className="portal-footer"><span>GRAND-LUMEN</span><span>EXPLORE BEYOND · BUILD WHAT COMES NEXT</span><button onClick={() => setMode("signin")}>Account access <ArrowRight size={14}/></button></footer>
+    </main> : <AuthPanel mode={mode} onModeChange={setMode} />}
+  </div>;
+}
+
+function AuthPanel({ mode, onModeChange }: { mode: "signin" | "signup"; onModeChange: (mode: PortalMode) => void }) {
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"error" | "success" | "info">("info");
+  const isSignup = mode === "signup";
+  const setNotice = (value: string, type: "error" | "success" | "info" = "info") => {
+    setMessage(value);
+    setMessageType(type);
+  };
+  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setMessage("");
+    if (!supabase) {
+      setNotice("Authentication is not connected yet. Add the Grand-Lumen Supabase project URL and public anon key to the repository settings to activate accounts.", "error");
+      return;
+    }
+    if (password.length < 8) {
+      setNotice("Use a password with at least 8 characters.", "error");
+      return;
+    }
+    setBusy(true);
+    try {
+      if (isSignup) {
+        const { data, error } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            data: { full_name: fullName.trim() },
+            emailRedirectTo: window.location.origin + window.location.pathname
+          }
+        });
+        if (error) throw error;
+        if (data.session) setNotice("Your account is ready. Opening your workspace…", "success");
+        else setNotice("Account created. Check your email for the confirmation link, then sign in.", "success");
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
+        if (error) throw error;
+      }
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : "Authentication could not be completed.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const resetPassword = async () => {
+    if (!email.trim()) {
+      setNotice("Enter your email address first, then request a reset link.", "info");
+      return;
+    }
+    if (!supabase) {
+      setNotice("Password recovery will be available after Supabase is connected.", "error");
+      return;
+    }
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: window.location.origin + window.location.pathname });
+      if (error) throw error;
+      setNotice("Password reset instructions have been sent to your email.", "success");
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : "Could not send the reset email.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <main className="portal-auth-layout">
+    <section className="portal-auth-story"><button className="portal-brand" onClick={() => onModeChange("about")}><span className="portal-brand-mark">L</span><span><b>GRAND-LUMEN</b><small>EXPLORE BEYOND</small></span></button><div className="portal-story-copy"><span className="portal-kicker">YOUR NEXT CHAPTER STARTS HERE</span><h1>{isSignup ? "Create space for your next idea." : "Your world of discovery awaits."}</h1><p>Research, learn, explore and build from one connected digital workspace.</p><div className="portal-story-points"><span><CheckCircle2 size={17}/> One account across your devices</span><span><CheckCircle2 size={17}/> A workspace built for curiosity</span><span><CheckCircle2 size={17}/> Secure email and password access</span></div></div><div className="portal-story-footer">GRAND-LUMEN · EXPLORE BEYOND</div></section>
+    <section className="portal-auth-side"><div className="portal-auth-card"><button className="portal-back-link" onClick={() => onModeChange("about")}><ArrowLeft size={15}/> Back to overview</button><div className="portal-auth-tabs"><button className={!isSignup ? "active" : ""} onClick={() => { onModeChange("signin"); setNotice(""); }}>Sign in</button><button className={isSignup ? "active" : ""} onClick={() => { onModeChange("signup"); setNotice(""); }}>Create account</button></div><span className="portal-kicker">{isSignup ? "JOIN GRAND-LUMEN" : "WELCOME BACK"}</span><h2>{isSignup ? "Start exploring." : "Good to see you."}</h2><p className="portal-auth-intro">{isSignup ? "Create your account to enter your personal workspace." : "Sign in to continue to your Grand-Lumen workspace."}</p>
+      {!supabaseConfigured && <div className="portal-config-notice"><LockKeyhole size={17}/><span>Account service setup is still required before sign-in and registration can work.</span></div>}
+      <form onSubmit={submit}>
+        {isSignup && <label>Full name<div className="portal-input"><UserRound size={17}/><input value={fullName} onChange={event => setFullName(event.target.value)} placeholder="Your name" autoComplete="name" required/></div></label>}
+        <label>Email address<div className="portal-input"><Mail size={17}/><input type="email" value={email} onChange={event => setEmail(event.target.value)} placeholder="you@example.com" autoComplete="email" required/></div></label>
+        <label>Password<div className="portal-input"><LockKeyhole size={17}/><input type={showPassword ? "text" : "password"} value={password} onChange={event => setPassword(event.target.value)} placeholder="At least 8 characters" autoComplete={isSignup ? "new-password" : "current-password"} minLength={8} required/><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? "Hide password" : "Show password"}>{showPassword ? <EyeOff size={17}/> : <Eye size={17}/>}</button></div></label>
+        {!isSignup && <button className="portal-forgot" type="button" onClick={resetPassword} disabled={busy}>Forgot password?</button>}
+        <button className="portal-primary portal-submit" type="submit" disabled={busy}>{busy ? "Please wait…" : isSignup ? "Create account" : "Sign in"} <ArrowRight size={17}/></button>
+      </form>
+      {message && <div className={"portal-auth-message " + messageType}>{message}</div>}
+      <div className="portal-auth-switch">{isSignup ? "Already have an account?" : "New to Grand-Lumen?"} <button onClick={() => { onModeChange(isSignup ? "signin" : "signup"); setNotice(""); }}>{isSignup ? "Sign in" : "Create an account"}</button></div>
+      <div className="portal-security-note"><ShieldCheck size={15}/> Your password is handled by the authentication provider and is never stored in Grand-Lumen code.</div>
+    </div></section>
+  </main>;
+}
+
 function App() {
   const [section, setSection] = useState<Section>("Home");
+  const [session, setSession] = useState<Session | null>(null);
+  const [authReady, setAuthReady] = useState(false);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("INITIALIZING GRAND-LUMEN");
@@ -118,6 +235,28 @@ function App() {
   const [mobileMenu, setMobileMenu] = useState(false);
   const [projectName, setProjectName] = useState("");
   const [projects, setProjects] = useState<string[]>(() => readWorkspaceData("grandLumenProjects", []));
+
+  useEffect(() => {
+    if (!supabase) {
+      setAuthReady(true);
+      return;
+    }
+    let active = true;
+    supabase.auth.getSession().then(({ data }) => {
+      if (active) {
+        setSession(data.session);
+        setAuthReady(true);
+      }
+    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setSession(nextSession);
+      setAuthReady(true);
+    });
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     setProgress(100);
@@ -235,6 +374,9 @@ function App() {
     Settings: "Shape your workspace."
   };
 
+  if (!authReady) return <div className="auth-boot"><div className="portal-brand-mark">L</div><span>SECURING YOUR WORKSPACE</span></div>;
+  if (!session) return <PublicPortal />;
+
   return (
     <>
       {loading && <div id="lumen-loading-screen">
@@ -254,13 +396,13 @@ function App() {
               return <button key={item.name} className={section === item.name ? "nav-item active" : "nav-item"} onClick={() => selectSection(item.name)}><Icon size={17} /><span>{item.name}</span>{item.name === "Saved" && saved.length > 0 && <i>{saved.length}</i>}</button>;
             })}
           </nav>
-          <div className="sidebar-bottom"><div className="creator-chip"><span>EP</span><div><b>Grand-Lumen</b><small>Personal workspace</small></div></div><span className="version">FOUNDATION 1.0</span></div>
+          <div className="sidebar-bottom"><div className="creator-chip"><span>{(session.user.email || "GL").slice(0,2).toUpperCase()}</span><div><b>{session.user.user_metadata?.full_name || "Grand-Lumen member"}</b><small>{session.user.email}</small></div></div><span className="version">FOUNDATION 1.0</span></div>
         </aside>
         <main className="main-area">
           <header className="topbar">
             <button className="icon-button mobile-only" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle navigation"><Menu size={19} /></button>
             <div className="breadcrumb"><span>GRAND-LUMEN</span><ArrowRight size={13} /><b>{section.toUpperCase()}</b></div>
-            <div className="top-actions"><span className="system-status"><i /> SYSTEM READY</span><button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button></div>
+            <div className="top-actions"><span className="system-status"><i /> SYSTEM READY</span><span className="signed-in-email">{session.user.email}</span><button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => supabase?.auth.signOut()} aria-label="Sign out"><LogOut size={16} /></button></div>
           </header>
           <div className="content-wrap">
             {section === "Home" && <section>
