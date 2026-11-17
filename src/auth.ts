@@ -14,3 +14,19 @@ export const supabase = supabaseConfigured
       }
     })
   : null;
+
+if (supabase && typeof window !== "undefined") {
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (session?.provider_token) {
+      const identity = session.user.identities?.find(item => item.provider === "google" || item.provider === "azure");
+      if (identity) {
+        sessionStorage.setItem("grandLumenMailProviderToken", JSON.stringify({
+          provider: identity.provider,
+          token: session.provider_token,
+          expiresAt: Date.now() + 50 * 60 * 1000
+        }));
+      }
+    }
+    if (event === "SIGNED_OUT") sessionStorage.removeItem("grandLumenMailProviderToken");
+  });
+}
