@@ -573,7 +573,7 @@ function CodeStudioWorkspace() {
     else if (verb === "pwd") output = "/grand-lumen/workspace";
     else if (verb === "cat") output = files.find(file => file.name === argument)?.content || "File not found: " + argument;
     else if (verb === "echo") output = argument;
-    else if (verb === "run") { setPreview(true); setPreviewKey(value => value + 1); output = "Browser preview refreshed. Only HTML, CSS and JavaScript execute in this browser workspace."; }
+    else if (verb === "run") { setShowPreview(true); setPreviewKey(value => value + 1); output = "Browser preview refreshed. Only HTML, CSS and JavaScript execute in this browser workspace."; }
     else if (verb === "clear") { setTerminalLines([]); setCommand(""); return; }
     else output = "Command not available in the browser terminal. Type help for supported workspace commands.";
     setTerminalLines(lines => [...lines, "$ " + raw, output]);
