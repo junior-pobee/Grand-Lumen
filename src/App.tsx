@@ -81,46 +81,73 @@ const apiCatalog = [
 ];
 const languages = ["HTML","CSS","JavaScript","TypeScript","Python","C","C++","Java","C#","Go","Rust","PHP","Ruby","SQL","Bash"];
 const starterCode: Record<string, string> = {
-  HTML: "<!doctype html>\n<html>
+  HTML: `<!doctype html>
+<html>
   <head>
     <title>My Grand-Lumen Project</title>
   </head>
   <body>
     <h1>Hello, Grand-Lumen!</h1>
     <p>Build something remarkable.</p>
-  </body>\n</html>",
-  CSS: "body {
+  </body>
+</html>`,
+  CSS: `body {
   font-family: system-ui, sans-serif;
   background: #080d1b;
   color: white;
-  padding: 3rem;\n}",
-  JavaScript: "const vision = \"Build beyond limits\";\nconsole.log(vision);",
-  TypeScript: "type Project = {
+  padding: 3rem;
+}`,
+  JavaScript: `const vision = "Build beyond limits";
+console.log(vision);`,
+  TypeScript: `type Project = {
   name: string;
-  status: \"building\" | \"ready\";\n};\n\nconst project: Project = { name: \"Grand-Lumen\", status: \"building\" };\nconsole.log(project);",
-  Python: "project = \"Grand-Lumen\"\nprint(f\"Welcome to {project}\")",
-  C: "#include <stdio.h>\n\nint main(void) {
-    printf(\"Hello, Grand-Lumen!\\n\");
-    return 0;\n}",
-  "C++": "#include <iostream>\n\nint main() {
-    std::cout << \"Hello, Grand-Lumen!\\n\";
-    return 0;\n}",
-  Java: "public class Main {
+  status: "building" | "ready";
+};
+
+const project: Project = { name: "Grand-Lumen", status: "building" };
+console.log(project);`,
+  Python: `project = "Grand-Lumen"
+print(f"Welcome to {project}")`,
+  C: `#include <stdio.h>
+
+int main(void) {
+    printf("Hello, Grand-Lumen!\\n");
+    return 0;
+}`,
+  "C++": `#include <iostream>
+
+int main() {
+    std::cout << "Hello, Grand-Lumen!\\n";
+    return 0;
+}`,
+  Java: `public class Main {
     public static void main(String[] args) {
-        System.out.println(\"Hello, Grand-Lumen!\");
-    }\n}",
-  "C#": "using System;\n\nclass Program {
+        System.out.println("Hello, Grand-Lumen!");
+    }
+}`,
+  "C#": `using System;
+
+class Program {
     static void Main() {
-        Console.WriteLine(\"Hello, Grand-Lumen!\");
-    }\n}",
-  Go: "package main\n\nimport \"fmt\"\n\nfunc main() {
-    fmt.Println(\"Hello, Grand-Lumen!\")\n}",
-  Rust: "fn main() {
-    println!(\"Hello, Grand-Lumen!\");\n}",
-  PHP: "<?php\necho \"Hello, Grand-Lumen!\";\n",
-  Ruby: "puts \"Hello, Grand-Lumen!\"",
-  SQL: "SELECT 'Hello, Grand-Lumen!' AS message;",
-  Bash: "printf '%s\\n' 'Hello, Grand-Lumen!'"
+        Console.WriteLine("Hello, Grand-Lumen!");
+    }
+}`,
+  Go: `package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello, Grand-Lumen!")
+}`,
+  Rust: `fn main() {
+    println!("Hello, Grand-Lumen!");
+}`,
+  PHP: `<?php
+echo "Hello, Grand-Lumen!";
+`,
+  Ruby: `puts "Hello, Grand-Lumen!"`,
+  SQL: `SELECT 'Hello, Grand-Lumen!' AS message;`,
+  Bash: `printf '%s\\n' 'Hello, Grand-Lumen!'`
 };
 const toolCards = [
   ["Calculator","A quick arithmetic workspace",Calculator],
@@ -725,33 +752,51 @@ async function loadPythonRuntime() {
 
 
 const studioStarterFiles: StudioFile[] = [
-  { id: "index-html", name: "index.html", content: "<!doctype html>\n<html lang=\"en\">\n<head>
-  <meta charset=\"UTF-8\">
-  <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
-  <title>My Project</title>\n</head>\n<body>
-  <main class=\"card\">
-    <span class=\"eyebrow\">GRAND-LUMEN STUDIO</span>
+  { id: "index-html", name: "index.html", content: `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Project</title>
+</head>
+<body>
+  <main class="card">
+    <span class="eyebrow">GRAND-LUMEN STUDIO</span>
     <h1>Hello, world.</h1>
     <p>Your next idea starts here.</p>
-    <button id=\"action\">Test interaction</button>
-    <p id=\"message\"></p>
-  </main>\n</body>\n</html>" },
-  { id: "styles-css", name: "styles.css", content: "body {
+    <button id="action">Test interaction</button>
+    <p id="message"></p>
+  </main>
+</body>
+</html>` },
+  { id: "styles-css", name: "styles.css", content: `body {
   margin: 0;
   min-height: 100vh;
   display: grid;
   place-items: center;
   background: #0b1222;
   color: #edf4ff;
-  font-family: Inter, system-ui, sans-serif;\n}\n.card {
+  font-family: Inter, system-ui, sans-serif;
+}
+.card {
   width: min(520px, calc(100% - 48px));
   padding: 36px;
   border: 1px solid #273a59;
   border-radius: 24px;
-  background: #111d32;\n}\n.eyebrow { color: #80b9ff; letter-spacing: .18em; font-size: 11px; }\nbutton { padding: 12px 18px; border: 0; border-radius: 10px; background: #8abfff; color: #081326; font-weight: 700; cursor: pointer; }" },
-  { id: "app-js", name: "app.js", content: "const action = document.querySelector(\"#action\");\nconst message = document.querySelector(\"#message\");\naction?.addEventListener(\"click\", () => {
-  message.textContent = \"Your project is running inside Grand-Lumen.\";\n});" },
-  { id: "readme-md", name: "README.md", content: "# My Project\n\nCreated in Grand-Lumen Code Lab.\n\nEdit the files, then choose Run preview." }
+  background: #111d32;
+}
+.eyebrow { color: #80b9ff; letter-spacing: .18em; font-size: 11px; }
+button { padding: 12px 18px; border: 0; border-radius: 10px; background: #8abfff; color: #081326; font-weight: 700; cursor: pointer; }` },
+  { id: "app-js", name: "app.js", content: `const action = document.querySelector("#action");
+const message = document.querySelector("#message");
+action?.addEventListener("click", () => {
+  message.textContent = "Your project is running inside Grand-Lumen.";
+});` },
+  { id: "readme-md", name: "README.md", content: `# My Project
+
+Created in Grand-Lumen Code Lab.
+
+Edit the files, then choose Run preview.` }
 ];
 
 function CodeStudioWorkspace() {
@@ -870,8 +915,10 @@ function CodeStudioWorkspace() {
       { id: "tpl-js", name: "main.js", content: "document.querySelector('#action').addEventListener('click',()=>{document.querySelector('p').textContent='Your project is running!'});" }
     ],
     python: [
-      { id: "tpl-py", name: "main.py", content: "name = 'Grand-Lumen'\nprint(f'Hello from {name}!')\nfor number in range(1, 6):
-    print(f'Number: {number}')\n" },
+      { id: "tpl-py", name: "main.py", content: `name = 'Grand-Lumen'
+print(f'Hello from {name}!')
+for number in range(1, 6):
+    print(f'Number: {number}')` },
       { id: "tpl-py-readme", name: "README.md", content: "# Python Starter\n\nRun main.py with the python terminal command.\n" }
     ],
     portfolio: [
