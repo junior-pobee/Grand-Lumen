@@ -37,7 +37,7 @@ async function hashLocalPassword(password: string, salt: string): Promise<string
   return Array.from(new Uint8Array(bits)).map(value => value.toString(16).padStart(2, "0")).join("");
 }
 
-type Section = "Home" | "Search" | "Research" | "Images" | "Videos" | "Maps" | "Code Lab" | "Learn" | "API Library" | "Tools" | "Scanner" | "Share" | "Saved" | "Projects" | "Settings";
+type Section = "Home" | "Search" | "Research" | "Images" | "Videos" | "Maps" | "Code Lab" | "Learn" | "API Library" | "Tools" | "Scanner" | "Share" | "Saved" | "Projects" | "Creative Studio" | "Settings";
 const sections: { name: Section; icon: any; group: string }[] = [
   { name: "Home", icon: Compass, group: "Workspace" },
   { name: "Search", icon: Search, group: "Workspace" },
@@ -53,6 +53,7 @@ const sections: { name: Section; icon: any; group: string }[] = [
   { name: "Share", icon: Share2, group: "Discover" },
   { name: "Saved", icon: Bookmark, group: "Personal" },
   { name: "Projects", icon: Boxes, group: "Personal" },
+  { name: "Creative Studio", icon: Image, group: "Create" },
   { name: "Settings", icon: Settings, group: "Personal" }
 ];
 const apiCatalog = [
@@ -304,6 +305,90 @@ function BarcodeScanner({ onDetected }: { onDetected?: (value: string) => void }
   </div>;
 }
 
+function CreativeStudio() {
+  const [file, setFile] = useState<File | null>(null);
+  const [source, setSource] = useState("");
+  const [kind, setKind] = useState<"image" | "video" | "">("");
+  const [brightness, setBrightness] = useState(100);
+  const [contrast, setContrast] = useState(100);
+  const [saturation, setSaturation] = useState(100);
+  const [blur, setBlur] = useState(0);
+  const [rotation, setRotation] = useState(0);
+  const [flip, setFlip] = useState(false);
+  const [effect, setEffect] = useState("none");
+  const [overlayText, setOverlayText] = useState("");
+  const [videoStart, setVideoStart] = useState(0);
+  const [videoEnd, setVideoEnd] = useState(0);
+  const [speed, setSpeed] = useState(1);
+  const [muted, setMuted] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const imageFilter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%) blur(${blur}px) ${effect === "mono" ? "grayscale(1)" : effect === "warm" ? "sepia(.35)" : effect === "cool" ? "hue-rotate(18deg) saturate(1.15)" : effect === "vintage" ? "sepia(.45) contrast(1.1)" : ""}`;
+  const chooseFile = (next: File | undefined) => {
+    if (!next) return;
+    if (!next.type.startsWith("image/") && !next.type.startsWith("video/")) return;
+    if (source) URL.revokeObjectURL(source);
+    const url = URL.createObjectURL(next);
+    setFile(next);
+    setSource(url);
+    setKind(next.type.startsWith("image/") ? "image" : "video");
+    setBrightness(100); setContrast(100); setSaturation(100); setBlur(0); setRotation(0); setFlip(false); setEffect("none"); setOverlayText("");
+  };
+  useEffect(() => () => { if (source) URL.revokeObjectURL(source); }, [source]);
+  const exportImage = async () => {
+    if (!source || kind !== "image") return;
+    const image = new window.Image();
+    image.src = source;
+    await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error("Image could not be loaded.")); });
+    const canvas = canvasRef.current || document.createElement("canvas");
+    const sideways = Math.abs(rotation % 180) === 90;
+    canvas.width = sideways ? image.naturalHeight : image.naturalWidth;
+    canvas.height = sideways ? image.naturalWidth : image.naturalHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(rotation * Math.PI / 180);
+    ctx.scale(flip ? -1 : 1, 1);
+    ctx.filter = imageFilter;
+    const width = sideways ? canvas.height : canvas.width;
+    const height = sideways ? canvas.width : canvas.height;
+    ctx.drawImage(image, -width / 2, -height / 2, width, height);
+    ctx.filter = "none";
+    if (overlayText.trim()) { ctx.font = `bold ${Math.max(24, Math.round(canvas.width / 28))}px sans-serif`; ctx.textAlign = "center"; ctx.lineWidth = Math.max(3, canvas.width / 300); ctx.strokeStyle = "#101522"; ctx.fillStyle = "#ffffff"; ctx.strokeText(overlayText, 0, canvas.height * .38); ctx.fillText(overlayText, 0, canvas.height * .38); }
+    ctx.restore();
+    const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png"));
+    if (!blob) return;
+    const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "grand-lumen-edited.png"; link.click(); URL.revokeObjectURL(link.href);
+  };
+  const exportVideo = async () => {
+    const video = videoRef.current;
+    if (!video || !source || !("MediaRecorder" in window)) return;
+    setExporting(true);
+    try {
+      const stream = (video as any).captureStream?.() || (video as any).mozCaptureStream?.();
+      if (!stream) throw new Error("Video export is not supported by this browser.");
+      const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ? "video/webm;codecs=vp9" : "video/webm";
+      const recorder = new MediaRecorder(stream, { mimeType: mime });
+      const chunks: BlobPart[] = [];
+      recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+      const stopped = new Promise<void>(resolve => { recorder.onstop = () => resolve(); });
+      video.pause(); video.currentTime = videoStart; video.playbackRate = speed; video.muted = muted;
+      await new Promise<void>(resolve => { const ready = () => { video.removeEventListener("seeked", ready); resolve(); }; video.addEventListener("seeked", ready); if (Math.abs(video.currentTime - videoStart) < .05) resolve(); });
+      recorder.start();
+      await video.play();
+      await new Promise<void>(resolve => { const tick = () => { if (video.currentTime >= videoEnd || video.ended) { video.pause(); resolve(); } else requestAnimationFrame(tick); }; tick(); });
+      recorder.stop();
+      await stopped;
+      const blob = new Blob(chunks, { type: mime });
+      const link = document.createElement("a"); link.href = URL.createObjectURL(blob); link.download = "grand-lumen-edited.webm"; link.click(); URL.revokeObjectURL(link.href);
+    } catch (error) { alert(error instanceof Error ? error.message : "Video export failed."); }
+    finally { setExporting(false); }
+  };
+  return <div className="creative-studio"><div className="studio-upload"><label className="solid-button"><Upload size={16}/> Import photo or video<input type="file" accept="image/*,video/*" onChange={event => { chooseFile(event.target.files?.[0]); event.currentTarget.value = ""; }}/></label><span>{file ? file.name : "Choose an image or video from your device"}</span></div>{!file ? <EmptyState title="Your creative workspace is ready." detail="Import a photo or video to access the editing tools."/> : <><div className="studio-preview">{kind === "image" ? <img src={source} alt="Editing preview" style={{filter:imageFilter,transform:`rotate(${rotation}deg) scaleX(${flip ? -1 : 1})`}}/> : <video ref={videoRef} src={source} controls playsInline onLoadedMetadata={event => { setVideoEnd(event.currentTarget.duration); }} style={{filter:imageFilter}}/>}</div><div className="studio-tools"><div className="studio-tool-head"><b>{kind === "image" ? "PHOTO LAB" : "VIDEO LAB"}</b><button className="quiet-button" onClick={() => { setBrightness(100); setContrast(100); setSaturation(100); setBlur(0); setRotation(0); setFlip(false); setEffect("none"); setOverlayText(""); setSpeed(1); setMuted(false); }}>Reset edits</button></div><div className="studio-controls"><label>Brightness <output>{brightness}%</output><input type="range" min="0" max="200" value={brightness} onChange={event => setBrightness(Number(event.target.value))}/></label><label>Contrast <output>{contrast}%</output><input type="range" min="0" max="200" value={contrast} onChange={event => setContrast(Number(event.target.value))}/></label><label>Saturation <output>{saturation}%</output><input type="range" min="0" max="200" value={saturation} onChange={event => setSaturation(Number(event.target.value))}/></label><label>Soft focus <output>{blur}px</output><input type="range" min="0" max="12" value={blur} onChange={event => setBlur(Number(event.target.value))}/></label></div><div className="studio-actions"><label>Creative filter<select value={effect} onChange={event => setEffect(event.target.value)}><option value="none">Original</option><option value="mono">Monochrome</option><option value="warm">Warm film</option><option value="cool">Cool tone</option><option value="vintage">Vintage</option></select></label>{kind === "image" ? <><label>Add text overlay<input value={overlayText} onChange={event => setOverlayText(event.target.value)} placeholder="Type a caption"/></label><button className="quiet-button" onClick={() => setRotation(value => (value + 90) % 360)}>Rotate 90°</button><button className="quiet-button" onClick={() => setFlip(value => !value)}>Flip horizontal</button><button className="solid-button" onClick={() => void exportImage()}>Export edited image</button></> : <><label>Trim start <output>{videoStart.toFixed(1)}s</output><input type="range" min="0" max={Math.max(0,videoEnd)} step=".1" value={videoStart} onChange={event => setVideoStart(Math.min(Number(event.target.value),Math.max(0,videoEnd-.1)))}/></label><label>Trim end <output>{videoEnd.toFixed(1)}s</output><input type="range" min="0" max={videoRef.current?.duration || videoEnd || 1} step=".1" value={videoEnd} onChange={event => setVideoEnd(Math.max(Number(event.target.value),videoStart+.1))}/></label><label>Playback speed<select value={speed} onChange={event => { setSpeed(Number(event.target.value)); if(videoRef.current) videoRef.current.playbackRate=Number(event.target.value); }}><option value="0.5">0.5× slow</option><option value="0.75">0.75×</option><option value="1">1× normal</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2× fast</option></select></label><button className="quiet-button" onClick={() => {setMuted(value => !value); if(videoRef.current) videoRef.current.muted=!muted;}}>{muted ? "Unmute audio" : "Mute audio"}</button><button className="solid-button" disabled={exporting} onClick={() => void exportVideo()}>{exporting ? "Rendering clip…" : "Export trimmed video"}</button></>}</div></div></>}</div>;
+}
+
 function ShareWorkspace() {
   const peerRef = useRef<Peer | null>(null);
   const connectionRef = useRef<any>(null);
@@ -409,7 +494,7 @@ function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authReady, setAuthReady] = useState(false);
   const [guestMode, setGuestMode] = useState(false);
-  const [localProfile, setLocalProfile] = useState<{ fullName: string; email: string } | null>(null);
+  const [localProfile, setLocalProfile] = useState<{ fullName: string; email: string; profileImage?: string } | null>(null);
   const [loading, setLoading] = useState(true);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("INITIALIZING GRAND-LUMEN");
@@ -440,7 +525,7 @@ function App() {
       try {
         const localSession = localStorage.getItem("grandLumenLocalSession");
         if (localSession) {
-          const profile = JSON.parse(localSession) as { fullName: string; email: string };
+          const profile = JSON.parse(localSession) as { fullName: string; email: string; profileImage?: string };
           setLocalProfile(profile);
           setGuestMode(true);
         }
@@ -607,7 +692,7 @@ function App() {
               return <button key={item.name} className={section === item.name ? "nav-item active" : "nav-item"} onClick={() => selectSection(item.name)}><Icon size={17} /><span>{item.name}</span>{item.name === "Saved" && saved.length > 0 && <i>{saved.length}</i>}</button>;
             })}
           </nav>
-          <div className="sidebar-bottom"><div className="creator-chip"><span>{(session?.user.email || localProfile?.email || "GL").slice(0,2).toUpperCase()}</span><div><b>{session?.user.user_metadata?.full_name || localProfile?.fullName || "Grand-Lumen member"}</b><small>{session?.user.email || localProfile?.email || "Local browser session"}</small></div></div><span className="version">FOUNDATION 1.0</span></div>
+          <div className="sidebar-bottom"><div className="creator-chip">{(session?.user.user_metadata?.avatar_url || localProfile?.profileImage) ? <img className="creator-avatar" src={session?.user.user_metadata?.avatar_url || localProfile?.profileImage} alt="Profile"/> : <span>{(session?.user.email || localProfile?.email || "GL").slice(0,2).toUpperCase()}</span>}<div><b>{session?.user.user_metadata?.full_name || localProfile?.fullName || "Grand-Lumen member"}</b><small>{session?.user.email || localProfile?.email || "Local browser session"}</small></div></div><span className="version">FOUNDATION 1.0</span></div>
         </aside>
         <main className="main-area">
           <header className="topbar">
@@ -634,8 +719,8 @@ function App() {
             {section === "API Library" && <section><PageTitle eyebrow="INTEGRATION DIRECTORY" title={heading["API Library"]} description="A curated catalogue of public APIs and developer services for in-app experiences." /><div className="api-search"><Search size={17} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Find an API or capability..." /></div><div className="api-categories">{["All","Knowledge","Technology","Environment","Finance","Development","Science","Images","Media","AI","Language","Geography","Food","Utilities","Entertainment","Research","News"].map(item => <button className={apiFilter === item ? "selected" : ""} key={item} onClick={() => setApiFilter(item)}>{item}</button>)}</div><div className="api-grid">{filteredApis.map(item => <div className="api-card" key={item[0]}><div className="api-card-top"><span className="api-symbol"><Database size={17} /></span><span className={item[3] === "No key" ? "keyless" : "key-needed"}>{item[3]}</span></div><h3>{item[0]}</h3><p>{item[1]}</p><div className="api-card-bottom"><span>{item[2]}</span><button onClick={() => { setQuery(item[0]); setToolInput(item[0]); selectSection("Tools"); }}>Explore <ArrowRight size={13} /></button></div></div>)}</div></section>}
             {section === "Tools" && <section><PageTitle eyebrow="UTILITY DECK" title={heading.Tools} description="A set of connected utilities that return useful information inside Grand-Lumen." /><div className="tool-layout"><div className="tool-list">{toolCards.map(([name,detail,Icon]) => <button className={tool === name ? "tool-option active" : "tool-option"} key={name} onClick={() => { setTool(name); setToolOutput(null); setError(""); }}><Icon size={17} /><span><b>{name}</b><small>{detail}</small></span><ChevronDown size={14} /></button>)}</div><div className="glass-card tool-workspace">{tool === "Calculator" ? <CalculatorWorkspace /> : <><span className="eyebrow">ACTIVE UTILITY</span><h3>{tool}</h3>{tool === "Currency" && <div className="currency-row"><select value={currencyBase} onChange={e => setCurrencyBase(e.target.value)}>{["USD","GHS","EUR","GBP","NGN","CAD","JPY","INR","ZAR"].map(x => <option key={x}>{x}</option>)}</select><ArrowRight size={16} /><select value={currencyTarget} onChange={e => setCurrencyTarget(e.target.value)}>{["GHS","USD","EUR","GBP","NGN","CAD","JPY","INR","ZAR"].map(x => <option key={x}>{x}</option>)}</select></div>}<div className="tool-input-row"><input value={toolInput} onChange={e => setToolInput(e.target.value)} onKeyDown={e => e.key === "Enter" && runTool()} placeholder={tool === "Calculator" ? "Example: (25 * 4) / 2" : tool === "Weather" ? "Enter a city, e.g. Accra" : tool === "Pokédex" ? "Enter a Pokémon name" : tool === "Public Holidays" ? "Country code, e.g. GH" : "Enter a word"} /><button className="solid-button" onClick={runTool} disabled={busy}>{busy ? "Working..." : "Run tool"}</button></div>{error && <p className="error-text">{error}</p>}<ToolOutput output={toolOutput} tool={tool} /></>}</div></div></section>}
             {section === "Saved" && <section><PageTitle eyebrow="PERSONAL KNOWLEDGE VAULT" title={heading.Saved} description="Keep useful discoveries close. Saved items remain in this browser." /><div className="saved-list"><Results items={saved} saved={saved} onSave={toggleSave} busy={false} error="" /></div>{!saved.length && <EmptyState title="Your vault is ready." detail="Save search results to build your personal knowledge collection." />}</section>}
-            {section === "Projects" && <section><PageTitle eyebrow="PROJECT MANAGEMENT" title={heading.Projects} description="Keep track of ideas and projects you are developing." /><div className="project-create"><input value={projectName} onChange={e => setProjectName(e.target.value)} onKeyDown={e => e.key === "Enter" && projectName.trim() && (setProjects([projectName.trim(), ...projects]), setProjectName(""))} placeholder="Name a project or idea..." /><button className="solid-button" onClick={() => { if (projectName.trim()) { setProjects([projectName.trim(), ...projects]); setProjectName(""); } }}><Plus size={15} /> Add project</button></div><div className="project-grid">{projects.map((name,index) => <div className="glass-card project-card" key={name + index}><span className="feature-icon"><Layers3 size={19} /></span><h3>{name}</h3><span className="muted">PERSONAL PROJECT</span><button onClick={() => setProjects(projects.filter((_,i) => i !== index))}>Remove <X size={13} /></button></div>)}</div>{!projects.length && <EmptyState title="A space for your next big idea." detail="Create your first project to start organising your work." />}</section>}
-            {section === "Settings" && <section><PageTitle eyebrow="PREFERENCES" title={heading.Settings} description="Configure the appearance and local workspace preferences." /><div className="settings-card"><div><b>Appearance</b><p>Choose the interface theme.</p></div><div className="theme-switch"><button className={theme === "dark" ? "selected" : ""} onClick={() => setTheme("dark")}><Moon size={15} /> Dark</button><button className={theme === "light" ? "selected" : ""} onClick={() => setTheme("light")}><Sun size={15} /> Light</button></div></div><div className="settings-card"><div><b>Local workspace data</b><p>Saved items and projects are stored in this browser.</p></div><button className="quiet-button" onClick={() => { if (confirm("Clear saved items and projects from this browser?")) { setSaved([]); setProjects([]); } }}>Clear local data</button></div><div className="settings-card"><div><b>About Grand-Lumen</b><p>Foundation build · Modular React and TypeScript architecture.</p></div><span className="version">v1.0.0</span></div></section>}
+            {section === "Creative Studio" && <section><PageTitle eyebrow="LUMEN CREATIVE" title="Creative Studio" description="Edit photographs and video clips with detailed controls, then export your finished work."/><CreativeStudio/></section>}{section === "Projects" && <section><PageTitle eyebrow="PROJECT MANAGEMENT" title={heading.Projects} description="Keep track of ideas and projects you are developing." /><div className="project-create"><input value={projectName} onChange={e => setProjectName(e.target.value)} onKeyDown={e => e.key === "Enter" && projectName.trim() && (setProjects([projectName.trim(), ...projects]), setProjectName(""))} placeholder="Name a project or idea..." /><button className="solid-button" onClick={() => { if (projectName.trim()) { setProjects([projectName.trim(), ...projects]); setProjectName(""); } }}><Plus size={15} /> Add project</button></div><div className="project-grid">{projects.map((name,index) => <div className="glass-card project-card" key={name + index}><span className="feature-icon"><Layers3 size={19} /></span><h3>{name}</h3><span className="muted">PERSONAL PROJECT</span><button onClick={() => setProjects(projects.filter((_,i) => i !== index))}>Remove <X size={13} /></button></div>)}</div>{!projects.length && <EmptyState title="A space for your next big idea." detail="Create your first project to start organising your work." />}</section>}
+            {section === "Settings" && <section><PageTitle eyebrow="PREFERENCES" title={heading.Settings} description="Manage your profile, appearance and local workspace preferences." /><div className="settings-card profile-settings-card"><div className="profile-settings-preview">{localProfile?.profileImage ? <img src={localProfile.profileImage} alt="Your profile"/> : <span>{(localProfile?.fullName || session?.user.email || "GL").slice(0,2).toUpperCase()}</span>}</div><div className="profile-settings-copy"><b>Profile photograph</b><p>Choose a picture to represent your Grand-Lumen account on this device.</p><label className="quiet-button profile-upload-button"><Upload size={14}/> Upload profile picture<input type="file" accept="image/*" onChange={event => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 3 * 1024 * 1024) { alert("Choose an image smaller than 3 MB."); return; } const reader = new FileReader(); reader.onload = () => { const image = String(reader.result || ""); if (localProfile) { const updated = { ...localProfile, profileImage: image }; setLocalProfile(updated); localStorage.setItem("grandLumenLocalSession", JSON.stringify(updated)); } else if (session) { localStorage.setItem("grandLumenProfileImage", image); } }; reader.readAsDataURL(file); event.currentTarget.value = ""; }}/></label>{localProfile?.profileImage && <button className="quiet-button" onClick={() => { const updated = { ...localProfile, profileImage: undefined }; setLocalProfile(updated); localStorage.setItem("grandLumenLocalSession", JSON.stringify(updated)); }}>Remove picture</button>}</div></div><div className="settings-card"><div><b>Appearance</b><p>Choose the interface theme.</p></div><div className="theme-switch"><button className={theme === "dark" ? "selected" : ""} onClick={() => setTheme("dark")}><Moon size={15} /> Dark</button><button className={theme === "light" ? "selected" : ""} onClick={() => setTheme("light")}><Sun size={15} /> Light</button></div></div><div className="settings-card"><div><b>Local workspace data</b><p>Saved items and projects are stored in this browser.</p></div><button className="quiet-button" onClick={() => { if (confirm("Clear saved items and projects from this browser?")) { setSaved([]); setProjects([]); } }}>Clear local data</button></div><div className="settings-card"><div><b>About Grand-Lumen</b><p>Foundation build · Modular React and TypeScript architecture.</p></div><span className="version">v1.0.0</span></div></section>}
           </div>
           <footer className="app-footer"><span>GRAND-LUMEN</span><span>EXPLORE BEYOND · BUILD WHAT COMES NEXT</span><span>FOUNDATION 1.0</span></footer>
         </main>
