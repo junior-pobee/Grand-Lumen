@@ -409,6 +409,65 @@ const academyCourses = [
   {title:"AI and Data Literacy",level:"Foundation",summary:"Understand AI, datasets, patterns and responsible use.",lessons:[["What AI means","Artificial intelligence describes computer systems designed to perform tasks that normally need human-like abilities, such as recognising patterns or understanding language."],["Data and patterns","A dataset is a collection of information. Models learn patterns from examples, but poor-quality or biased data can lead to unreliable results."],["Using AI responsibly","Check important claims, protect personal information, respect copyright and remember that AI can make mistakes. Human judgement remains important."]],practice:[["What is a dataset?","A collection of information","A computer cable","A password manager",0],["What can biased data cause?","Unfair or unreliable results","Perfect accuracy","More battery life",0],["What should you do with important AI claims?","Trust all automatically","Verify them","Hide the source",1]]}
 ];
 
+
+function MessagesWorkspace({ session }: { session: Session | null }) {
+  const email = session?.user.email || "";
+  const [recipient, setRecipient] = useState("");
+  const [draft, setDraft] = useState("");
+  const [messages, setMessages] = useState<any[]>([]);
+  const [announcements, setAnnouncements] = useState<any[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [announcementTitle, setAnnouncementTitle] = useState("");
+  const [announcementBody, setAnnouncementBody] = useState("");
+  const isOwner = email.toLowerCase() === "emmanuelpobee112@gmail.com";
+
+  const loadMessages = async (target = recipient) => {
+    if (!supabase || !email || !target.trim()) return;
+    const safeTarget = target.trim().replace(/[(),]/g, "");
+    const { data, error: loadError } = await supabase.from("grand_lumen_messages").select("*").or("and(sender_email.eq." + email + ",recipient_email.eq." + safeTarget + "),and(sender_email.eq." + safeTarget + ",recipient_email.eq." + email + ")").order("created_at", { ascending: true });
+    if (loadError) setNotice("Messaging setup is incomplete: " + loadError.message);
+    else setMessages(data || []);
+  };
+
+  const loadAnnouncements = async () => {
+    if (!supabase || !email) return;
+    const { data, error: loadError } = await supabase.from("grand_lumen_announcements").select("*").order("created_at", { ascending: false }).limit(30);
+    if (loadError) setNotice("Updates are not configured yet. Apply the Grand-Lumen database schema.");
+    else setAnnouncements(data || []);
+  };
+
+  useEffect(() => {
+    void loadAnnouncements();
+    if (!supabase || !email) return;
+    const channel = supabase.channel("grand-lumen-messages-" + session?.user.id).on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_messages" }, () => void loadMessages()).on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_announcements" }, () => void loadAnnouncements()).subscribe();
+    return () => { void supabase?.removeChannel(channel); };
+  }, [email, recipient]);
+
+  const sendMessage = async () => {
+    if (!supabase || !email || !recipient.trim() || !draft.trim()) return;
+    setBusy(true);
+    setNotice("");
+    const { error: sendError } = await supabase.from("grand_lumen_messages").insert({ sender_id: session?.user.id, sender_email: email, recipient_email: recipient.trim().toLowerCase(), sender_name: session?.user.user_metadata?.full_name || email, body: draft.trim() });
+    if (sendError) setNotice(sendError.message);
+    else { setDraft(""); await loadMessages(); }
+    setBusy(false);
+  };
+
+  const publishAnnouncement = async () => {
+    if (!supabase || !isOwner || !announcementTitle.trim() || !announcementBody.trim()) return;
+    setBusy(true);
+    const { error: publishError } = await supabase.from("grand_lumen_announcements").insert({ title: announcementTitle.trim(), body: announcementBody.trim(), author_email: email });
+    setNotice(publishError ? publishError.message : "Your update has been published to Grand-Lumen.");
+    if (!publishError) { setAnnouncementTitle(""); setAnnouncementBody(""); await loadAnnouncements(); }
+    setBusy(false);
+  };
+
+  if (!supabaseConfigured || !supabase || !email) return <div className="glass-card messaging-setup"><Mail size={24}/><h3>Connect your account to use messages</h3><p>Cross-device messaging and app-wide updates need Grand-Lumen's shared Supabase authentication and database. A local guest account cannot receive messages on another device.</p></div>;
+
+  return <div className="messages-layout"><div className="glass-card messages-panel"><span className="eyebrow">DIRECT MESSAGES</span><h3>Start a conversation</h3><p>Enter the email address of another Grand-Lumen account.</p><div className="messages-recipient"><input type="email" value={recipient} onChange={event => setRecipient(event.target.value)} placeholder="person@example.com"/><button className="quiet-button" onClick={() => void loadMessages()} disabled={!recipient.includes("@")}>Open chat</button></div>{recipient && <div className="messages-thread">{messages.length ? messages.map(item => <article className={item.sender_email === email ? "message-bubble own" : "message-bubble"} key={item.id}><small>{item.sender_email} · {new Date(item.created_at).toLocaleString()}</small><p>{item.body}</p></article>) : <div className="messages-empty">No messages in this conversation yet.</div>}</div>}<div className="messages-compose"><textarea value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write a message…"/><button className="solid-button" onClick={() => void sendMessage()} disabled={busy || !recipient.includes("@") || !draft.trim()}><Mail size={14}/> Send message</button></div>{notice && <p className="messages-notice">{notice}</p>}</div><div className="glass-card messages-panel"><span className="eyebrow">GRAND-LUMEN UPDATES</span><h3>What's new</h3>{announcements.length ? announcements.map(item => <article className="announcement-card" key={item.id}><small>{new Date(item.created_at).toLocaleString()} · {item.author_email}</small><h4>{item.title}</h4><p>{item.body}</p></article>) : <p>No updates have been published yet.</p>}{isOwner && <div className="announcement-composer"><span className="eyebrow">OWNER BROADCAST</span><h4>Publish an app update</h4><input value={announcementTitle} onChange={event => setAnnouncementTitle(event.target.value)} placeholder="Update title"/><textarea value={announcementBody} onChange={event => setAnnouncementBody(event.target.value)} placeholder="Write an announcement for Grand-Lumen users…"/><button className="solid-button" onClick={() => void publishAnnouncement()} disabled={busy || !announcementTitle.trim() || !announcementBody.trim()}>Publish update to all users</button></div>}</div></div>;
+}
+
 function LearnWorkspace() {
   const [courseIndex, setCourseIndex] = useState(0);
   const [lessonIndex, setLessonIndex] = useState(0);
@@ -417,8 +476,8 @@ function LearnWorkspace() {
   const [checked, setChecked] = useState(false);
   const course = academyCourses[courseIndex];
   const questions = course.practice;
-  const score = questions.reduce((total, question, index) => total + (answers[index] === question[3] ? 1 : 0), 0);
-  return <div className="academy-layout"><aside className="academy-course-list"><span className="eyebrow">10 LEARNING PATHS</span>{academyCourses.map((item,index) => <button className={courseIndex === index ? "active" : ""} key={item.title} onClick={() => { setCourseIndex(index); setLessonIndex(0); setMode("course"); setAnswers({}); setChecked(false); }}><span>{String(index+1).padStart(2,"0")}</span><div><b>{item.title}</b><small>{item.level}</small></div></button>)}</aside><div className="academy-content"><div className="academy-course-heading"><span className="eyebrow">COURSE {String(courseIndex+1).padStart(2,"0")} / 10</span><h2>{course.title}</h2><p>{course.summary}</p></div><div className="academy-tabs"><button className={mode === "course" ? "active" : ""} onClick={() => { setMode("course"); setChecked(false); }}>Course lessons</button><button className={mode === "practice" ? "active" : ""} onClick={() => { setMode("practice"); setChecked(false); }}>Separate practice</button></div>{mode === "course" ? <article className="academy-lesson"><span className="eyebrow">LESSON {lessonIndex+1} / {course.lessons.length}</span><h3>{course.lessons[lessonIndex][0]}</h3><p>{course.lessons[lessonIndex][1]}</p><div className="academy-lesson-nav"><button className="quiet-button" disabled={lessonIndex===0} onClick={() => setLessonIndex(value => value-1)}>Previous lesson</button><button className="solid-button" onClick={() => setLessonIndex(value => value === course.lessons.length-1 ? 0 : value+1)}>{lessonIndex===course.lessons.length-1 ? "Review course" : "Next lesson"} <ArrowRight size={14}/></button></div></article> : <article className="academy-practice"><span className="eyebrow">CHECK YOUR UNDERSTANDING</span><h3>Practice questions</h3>{questions.map((question,index) => <div className="academy-question" key={question[0]}><b>{index+1}. {question[0]}</b>{question.slice(1,4).map((option,optionIndex) => <label key={optionIndex}><input type="radio" name={"academy-"+courseIndex+"-"+index} checked={answers[index]===optionIndex} onChange={() => { setAnswers(current => ({...current,[index]:optionIndex})); setChecked(false); }}/>{option}</label>)}{checked && <small className={answers[index]===question[3] ? "correct" : "incorrect"}>{answers[index]===question[3] ? "Correct" : "Review this lesson and try again."}</small>}</div>)}<button className="solid-button" onClick={() => setChecked(true)} disabled={Object.keys(answers).length!==questions.length}>Check my answers</button>{checked && <div className="academy-score">You scored {score} out of {questions.length}.</div>}</article>}</div></div>;
+  const score = questions.reduce((total, question, index) => total + (answers[index] === Number(question[4]) ? 1 : 0), 0);
+  return <div className="academy-layout"><aside className="academy-course-list"><span className="eyebrow">10 LEARNING PATHS</span>{academyCourses.map((item,index) => <button className={courseIndex === index ? "active" : ""} key={item.title} onClick={() => { setCourseIndex(index); setLessonIndex(0); setMode("course"); setAnswers({}); setChecked(false); }}><span>{String(index+1).padStart(2,"0")}</span><div><b>{item.title}</b><small>{item.level}</small></div></button>)}</aside><div className="academy-content"><div className="academy-course-heading"><span className="eyebrow">COURSE {String(courseIndex+1).padStart(2,"0")} / 10</span><h2>{course.title}</h2><p>{course.summary}</p></div><div className="academy-tabs"><button className={mode === "course" ? "active" : ""} onClick={() => { setMode("course"); setChecked(false); }}>Course lessons</button><button className={mode === "practice" ? "active" : ""} onClick={() => { setMode("practice"); setChecked(false); }}>Separate practice</button></div>{mode === "course" ? <article className="academy-lesson"><span className="eyebrow">LESSON {lessonIndex+1} / {course.lessons.length}</span><h3>{course.lessons[lessonIndex][0]}</h3><p>{course.lessons[lessonIndex][1]}</p><div className="academy-lesson-nav"><button className="quiet-button" disabled={lessonIndex===0} onClick={() => setLessonIndex(value => value-1)}>Previous lesson</button><button className="solid-button" onClick={() => setLessonIndex(value => value === course.lessons.length-1 ? 0 : value+1)}>{lessonIndex===course.lessons.length-1 ? "Review course" : "Next lesson"} <ArrowRight size={14}/></button></div></article> : <article className="academy-practice"><span className="eyebrow">CHECK YOUR UNDERSTANDING</span><h3>Practice questions</h3>{questions.map((question,index) => <div className="academy-question" key={question[0]}><b>{index+1}. {question[0]}</b>{question.slice(1,4).map((option,optionIndex) => <label key={optionIndex}><input type="radio" name={"academy-"+courseIndex+"-"+index} checked={answers[index]===optionIndex} onChange={() => { setAnswers(current => ({...current,[index]:optionIndex})); setChecked(false); }}/>{option}</label>)}{checked && <small className={answers[index]===Number(question[4]) ? "correct" : "incorrect"}>{answers[index]===question[3] ? "Correct" : "Review this lesson and try again."}</small>}</div>)}<button className="solid-button" onClick={() => setChecked(true)} disabled={Object.keys(answers).length!==questions.length}>Check my answers</button>{checked && <div className="academy-score">You scored {score} out of {questions.length}.</div>}</article>}</div></div>;
 }
 
 function ShareWorkspace() {
