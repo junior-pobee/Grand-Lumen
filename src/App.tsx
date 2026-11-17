@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Activity, ArrowDownToLine, ArrowLeft, ArrowRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, Menu, Moon, Play, Plus, Search, Settings, ShieldCheck, Sparkles, Sun, Terminal, Video, Wallet, X, Zap } from "lucide-react";
+import { Activity, ArrowDownToLine, ArrowLeft, ArrowRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, LocateFixed, MapPin, Menu, Moon, Navigation, Play, Plus, Search, Settings, ShieldCheck, Sparkles, Sun, Terminal, Video, Wallet, X, Zap } from "lucide-react";
 import { getCurrency, getDictionary, getHoliday, getPokemon, getWeather, searchArchiveVideos, searchCommonsImages, searchHackerNews, searchWikipedia, type SearchItem } from "./api";
 
 function readWorkspaceData<T>(key: string, fallback: T): T {
@@ -11,13 +11,14 @@ function readWorkspaceData<T>(key: string, fallback: T): T {
   }
 }
 
-type Section = "Home" | "Search" | "Research" | "Images" | "Videos" | "Code Lab" | "Learn" | "API Library" | "Tools" | "Saved" | "Projects" | "Settings";
+type Section = "Home" | "Search" | "Research" | "Images" | "Videos" | "Maps" | "Code Lab" | "Learn" | "API Library" | "Tools" | "Saved" | "Projects" | "Settings";
 const sections: { name: Section; icon: any; group: string }[] = [
   { name: "Home", icon: Compass, group: "Workspace" },
   { name: "Search", icon: Search, group: "Workspace" },
   { name: "Research", icon: FlaskConical, group: "Workspace" },
   { name: "Images", icon: Image, group: "Explore" },
   { name: "Videos", icon: Video, group: "Explore" },
+  { name: "Maps", icon: MapPin, group: "Explore" },
   { name: "Code Lab", icon: Code2, group: "Create" },
   { name: "Learn", icon: GraduationCap, group: "Create" },
   { name: "API Library", icon: Database, group: "Discover" },
@@ -216,6 +217,7 @@ function App() {
     Research: "Think deeper.",
     Images: "A visual universe.",
     Videos: "Watch and discover.",
+    Maps: "Explore the world.",
     "Code Lab": "Build anything.",
     Learn: "Knowledge, expanded.",
     "API Library": "Connect the world.",
@@ -263,10 +265,11 @@ function App() {
             {section === "Research" && <section><PageTitle eyebrow="RESEARCH STUDIO" title={heading.Research} description="Create a research workspace, collect questions and develop structured notes." /><div className="research-grid"><div className="glass-card"><span className="eyebrow">START AN INQUIRY</span><h3>What are you investigating?</h3><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Enter a research topic..." /><button className="solid-button" onClick={() => { selectSection("Search"); runSearch("all"); }}>Find source material <ArrowRight size={15} /></button><div className="research-topics"><button onClick={() => setQuery("renewable energy")}>Renewable energy</button><button onClick={() => setQuery("neural networks")}>Neural networks</button><button onClick={() => setQuery("African history")}>African history</button></div></div><div className="glass-card"><span className="eyebrow">RESEARCH NOTEBOOK</span><h3>Working notes</h3><textarea value={researchNotes} onChange={e => setResearchNotes(e.target.value)} placeholder="Capture your questions, findings, hypotheses and references..." /><div className="note-footer"><span>Saved automatically in this session</span><button onClick={() => navigator.clipboard?.writeText(researchNotes)}><Copy size={14} /> Copy notes</button></div></div></div><div className="info-banner"><ShieldCheck size={18} /><span>Research results should be checked against original sources. Grand-Lumen keeps discovery and note-taking together; it does not replace source verification.</span></div></section>}
             {section === "Images" && <section><PageTitle eyebrow="VISUAL DISCOVERY" title={heading.Images} description="Search openly licensed image collections and view discoveries directly in Grand-Lumen." /><div className="search-panel"><Image size={18} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search images, places, science, design..." onKeyDown={e => e.key === "Enter" && runMediaSearch("images")} /><button onClick={() => runMediaSearch("images")} disabled={mediaBusy}>{mediaBusy ? "Searching..." : "Search images"}</button></div><div className="quick-tags">{["Nature","Architecture","Space","Technology","African art"].map(tag => <button key={tag} onClick={() => { setQuery(tag); runMediaSearch("images", tag); }}>{tag}</button>)}</div><MediaResults items={mediaResults} busy={mediaBusy} error={error} kind="images" onSave={toggleSave} /><div className="info-banner"><ShieldCheck size={18} /><span>Images are retrieved from Wikimedia Commons. Check each file page for its licence and attribution requirements before reuse.</span></div></section>}
             {section === "Videos" && <section><PageTitle eyebrow="VIDEO DISCOVERY" title={heading.Videos} description="Search public video collections and preview available items inside your workspace." /><div className="search-panel"><Video size={18} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search documentaries, tutorials, science..." onKeyDown={e => e.key === "Enter" && runMediaSearch("videos")} /><button onClick={() => runMediaSearch("videos")} disabled={mediaBusy}>{mediaBusy ? "Searching..." : "Search videos"}</button></div><div className="quick-tags">{["Science","Technology","History","Education"].map(tag => <button key={tag} onClick={() => { setQuery(tag); runMediaSearch("videos", tag); }}>{tag}</button>)}</div><MediaResults items={mediaResults} busy={mediaBusy} error={error} kind="videos" onSave={toggleSave} /></section>}
+            {section === "Maps" && <section><PageTitle eyebrow="LOCATION & NAVIGATION" title={heading.Maps} description="Explore places with Google Maps, search destinations and use your device location when you choose to share it." /><MapWorkspace /></section>}
             {section === "Code Lab" && <section className="code-section"><PageTitle eyebrow="MULTI-LANGUAGE DEVELOPMENT" title={heading["Code Lab"]} description="A growing coding space with language starters and a live browser preview for HTML." /><div className="code-toolbar"><div><Terminal size={16} /><select value={codeLanguage} onChange={e => changeLanguage(e.target.value)}>{languages.map(language => <option key={language}>{language}</option>)}</select></div><button className="solid-button" onClick={() => setPreview(!preview)}><Play size={14} /> {preview ? "Hide preview" : "Run preview"}</button><button className="quiet-button" onClick={() => navigator.clipboard?.writeText(code)}><Copy size={14} /> Copy</button></div><div className="editor-layout"><div className="editor-panel"><div className="editor-header"><span><span className="live-dot" /> {codeLanguage.toLowerCase()} / main</span><span>{code.split("\n").length} lines</span></div><textarea spellCheck={false} value={code} onChange={e => setCode(e.target.value)} aria-label={codeLanguage + " editor"} /></div>{preview && <div className="preview-panel"><div className="editor-header"><span>LIVE PREVIEW</span><button onClick={() => setPreview(false)}><X size={14} /></button></div>{codeLanguage === "HTML" || codeLanguage === "JavaScript" ? <iframe title="Code preview" sandbox="allow-scripts" srcDoc={codeLanguage === "HTML" ? code : "<script>" + code.replace(/<\/script/gi, "<\\/script") + "<\/script>"} /> : <div className="preview-placeholder"><Code2 size={25} /><b>{codeLanguage} workspace</b><p>Editing and language starter are available. Native execution for this language will be connected through a secure runtime service.</p></div>}</div>}</div><div className="language-rail">{languages.map(language => <button className={codeLanguage === language ? "selected" : ""} key={language} onClick={() => changeLanguage(language)}>{language}</button>)}</div></section>}
             {section === "Learn" && <section><PageTitle eyebrow="LEARNING HUB" title={heading.Learn} description="Explore guided learning paths across web development, programming and digital knowledge." /><div className="learning-grid">{[{name:"Web foundations",detail:"HTML, CSS, JavaScript and responsive interfaces",level:"BEGINNER",language:"HTML · CSS · JS"},{name:"Programming concepts",detail:"Variables, logic, functions and data structures",level:"FOUNDATION",language:"Python · C · Java"},{name:"Modern development",detail:"Types, components, APIs and application architecture",level:"INTERMEDIATE",language:"TypeScript · React · Node"},{name:"Data and databases",detail:"Queries, records, relationships and analysis",level:"PRACTICAL",language:"SQL · Python"}].map((item,index) => <div className="glass-card learning-card" key={item.name}><span className="learning-number">0{index+1}</span><span className="eyebrow">{item.level}</span><h3>{item.name}</h3><p>{item.detail}</p><span className="language-tags">{item.language}</span><button onClick={() => { setCodeLanguage(item.name === "Web foundations" ? "HTML" : item.name === "Data and databases" ? "SQL" : item.name === "Programming concepts" ? "Python" : "TypeScript"); setCode(starterCode[item.name === "Web foundations" ? "HTML" : item.name === "Data and databases" ? "SQL" : item.name === "Programming concepts" ? "Python" : "TypeScript"]); selectSection("Code Lab"); }}>Open learning workspace <ArrowRight size={14} /></button></div>)}</div></section>}
             {section === "API Library" && <section><PageTitle eyebrow="INTEGRATION DIRECTORY" title={heading["API Library"]} description="A curated catalogue of public APIs and developer services for in-app experiences." /><div className="api-search"><Search size={17} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Find an API or capability..." /></div><div className="api-categories">{["All","Knowledge","Technology","Environment","Finance","Development","Science","Images","Media","AI","Language","Geography","Food","Utilities","Entertainment","Research","News"].map(item => <button className={apiFilter === item ? "selected" : ""} key={item} onClick={() => setApiFilter(item)}>{item}</button>)}</div><div className="api-grid">{filteredApis.map(item => <div className="api-card" key={item[0]}><div className="api-card-top"><span className="api-symbol"><Database size={17} /></span><span className={item[3] === "No key" ? "keyless" : "key-needed"}>{item[3]}</span></div><h3>{item[0]}</h3><p>{item[1]}</p><div className="api-card-bottom"><span>{item[2]}</span><button onClick={() => { setQuery(item[0]); setToolInput(item[0]); selectSection("Tools"); }}>Explore <ArrowRight size={13} /></button></div></div>)}</div></section>}
-            {section === "Tools" && <section><PageTitle eyebrow="UTILITY DECK" title={heading.Tools} description="A set of connected utilities that return useful information inside Grand-Lumen." /><div className="tool-layout"><div className="tool-list">{toolCards.map(([name,detail,Icon]) => <button className={tool === name ? "tool-option active" : "tool-option"} key={name} onClick={() => { setTool(name); setToolOutput(null); setError(""); }}><Icon size={17} /><span><b>{name}</b><small>{detail}</small></span><ChevronDown size={14} /></button>)}</div><div className="glass-card tool-workspace"><span className="eyebrow">ACTIVE UTILITY</span><h3>{tool}</h3>{tool === "Currency" && <div className="currency-row"><select value={currencyBase} onChange={e => setCurrencyBase(e.target.value)}>{["USD","GHS","EUR","GBP","NGN","CAD","JPY","INR","ZAR"].map(x => <option key={x}>{x}</option>)}</select><ArrowRight size={16} /><select value={currencyTarget} onChange={e => setCurrencyTarget(e.target.value)}>{["GHS","USD","EUR","GBP","NGN","CAD","JPY","INR","ZAR"].map(x => <option key={x}>{x}</option>)}</select></div>}<div className="tool-input-row"><input value={toolInput} onChange={e => setToolInput(e.target.value)} onKeyDown={e => e.key === "Enter" && runTool()} placeholder={tool === "Calculator" ? "Example: (25 * 4) / 2" : tool === "Weather" ? "Enter a city, e.g. Accra" : tool === "Pokédex" ? "Enter a Pokémon name" : tool === "Public Holidays" ? "Country code, e.g. GH" : "Enter a word"} /><button className="solid-button" onClick={runTool} disabled={busy}>{busy ? "Working..." : "Run tool"}</button></div>{error && <p className="error-text">{error}</p>}<ToolOutput output={toolOutput} tool={tool} /></div></div></section>}
+            {section === "Tools" && <section><PageTitle eyebrow="UTILITY DECK" title={heading.Tools} description="A set of connected utilities that return useful information inside Grand-Lumen." /><div className="tool-layout"><div className="tool-list">{toolCards.map(([name,detail,Icon]) => <button className={tool === name ? "tool-option active" : "tool-option"} key={name} onClick={() => { setTool(name); setToolOutput(null); setError(""); }}><Icon size={17} /><span><b>{name}</b><small>{detail}</small></span><ChevronDown size={14} /></button>)}</div><div className="glass-card tool-workspace">{tool === "Calculator" ? <CalculatorWorkspace /> : <><span className="eyebrow">ACTIVE UTILITY</span><h3>{tool}</h3>{tool === "Currency" && <div className="currency-row"><select value={currencyBase} onChange={e => setCurrencyBase(e.target.value)}>{["USD","GHS","EUR","GBP","NGN","CAD","JPY","INR","ZAR"].map(x => <option key={x}>{x}</option>)}</select><ArrowRight size={16} /><select value={currencyTarget} onChange={e => setCurrencyTarget(e.target.value)}>{["GHS","USD","EUR","GBP","NGN","CAD","JPY","INR","ZAR"].map(x => <option key={x}>{x}</option>)}</select></div>}<div className="tool-input-row"><input value={toolInput} onChange={e => setToolInput(e.target.value)} onKeyDown={e => e.key === "Enter" && runTool()} placeholder={tool === "Calculator" ? "Example: (25 * 4) / 2" : tool === "Weather" ? "Enter a city, e.g. Accra" : tool === "Pokédex" ? "Enter a Pokémon name" : tool === "Public Holidays" ? "Country code, e.g. GH" : "Enter a word"} /><button className="solid-button" onClick={runTool} disabled={busy}>{busy ? "Working..." : "Run tool"}</button></div>{error && <p className="error-text">{error}</p>}<ToolOutput output={toolOutput} tool={tool} /></>}</div></div></section>}
             {section === "Saved" && <section><PageTitle eyebrow="PERSONAL KNOWLEDGE VAULT" title={heading.Saved} description="Keep useful discoveries close. Saved items remain in this browser." /><div className="saved-list"><Results items={saved} saved={saved} onSave={toggleSave} busy={false} error="" /></div>{!saved.length && <EmptyState title="Your vault is ready." detail="Save search results to build your personal knowledge collection." />}</section>}
             {section === "Projects" && <section><PageTitle eyebrow="PROJECT MANAGEMENT" title={heading.Projects} description="Keep track of ideas and projects you are developing." /><div className="project-create"><input value={projectName} onChange={e => setProjectName(e.target.value)} onKeyDown={e => e.key === "Enter" && projectName.trim() && (setProjects([projectName.trim(), ...projects]), setProjectName(""))} placeholder="Name a project or idea..." /><button className="solid-button" onClick={() => { if (projectName.trim()) { setProjects([projectName.trim(), ...projects]); setProjectName(""); } }}><Plus size={15} /> Add project</button></div><div className="project-grid">{projects.map((name,index) => <div className="glass-card project-card" key={name + index}><span className="feature-icon"><Layers3 size={19} /></span><h3>{name}</h3><span className="muted">PERSONAL PROJECT</span><button onClick={() => setProjects(projects.filter((_,i) => i !== index))}>Remove <X size={13} /></button></div>)}</div>{!projects.length && <EmptyState title="A space for your next big idea." detail="Create your first project to start organising your work." />}</section>}
             {section === "Settings" && <section><PageTitle eyebrow="PREFERENCES" title={heading.Settings} description="Configure the appearance and local workspace preferences." /><div className="settings-card"><div><b>Appearance</b><p>Choose the interface theme.</p></div><div className="theme-switch"><button className={theme === "dark" ? "selected" : ""} onClick={() => setTheme("dark")}><Moon size={15} /> Dark</button><button className={theme === "light" ? "selected" : ""} onClick={() => setTheme("light")}><Sun size={15} /> Light</button></div></div><div className="settings-card"><div><b>Local workspace data</b><p>Saved items and projects are stored in this browser.</p></div><button className="quiet-button" onClick={() => { if (confirm("Clear saved items and projects from this browser?")) { setSaved([]); setProjects([]); } }}>Clear local data</button></div><div className="settings-card"><div><b>About Grand-Lumen</b><p>Foundation build · Modular React and TypeScript architecture.</p></div><span className="version">v1.0.0</span></div></section>}
@@ -276,6 +279,200 @@ function App() {
       </div>
     </>
   );
+}
+
+
+function evaluateExpression(source: string): number {
+  const tokens = source.match(/(?:\d+(?:\.\d*)?|\.\d+)|(?:[a-zA-Z]+)|[()+\-*/%^!]/g) || [];
+  let position = 0;
+  const peek = () => tokens[position];
+  const take = () => tokens[position++];
+  const factorial = (value: number) => {
+    if (!Number.isInteger(value) || value < 0 || value > 170) throw new Error("Factorial requires a whole number from 0 to 170.");
+    let result = 1;
+    for (let index = 2; index <= value; index += 1) result *= index;
+    return result;
+  };
+  const primary = (): number => {
+    const token = take();
+    if (!token) throw new Error("Complete the expression.");
+    if (token === "+") return primary();
+    if (token === "-") return -primary();
+    if (token === "(") {
+      const value = addition();
+      if (take() !== ")") throw new Error("Missing closing bracket.");
+      return value;
+    }
+    if (/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(token)) return Number(token);
+    if (token === "pi") return Math.PI;
+    if (token === "e") return Math.E;
+    if (["sin","cos","tan","sqrt","ln","log","abs"].includes(token)) {
+      if (take() !== "(") throw new Error("Use brackets after " + token + ".");
+      const value = addition();
+      if (take() !== ")") throw new Error("Missing closing bracket.");
+      if (token === "sin") return Math.sin(value * Math.PI / 180);
+      if (token === "cos") return Math.cos(value * Math.PI / 180);
+      if (token === "tan") return Math.tan(value * Math.PI / 180);
+      if (token === "sqrt") return Math.sqrt(value);
+      if (token === "ln") return Math.log(value);
+      if (token === "log") return Math.log10(value);
+      return Math.abs(value);
+    }
+    throw new Error("Unrecognised value: " + token);
+  };
+  const power = (): number => {
+    let value = primary();
+    if (peek() === "!") {
+      take();
+      value = factorial(value);
+    }
+    if (peek() === "^") {
+      take();
+      value = Math.pow(value, power());
+    }
+    return value;
+  };
+  const multiplication = (): number => {
+    let value = power();
+    while (["*","/","%"].includes(peek() || "")) {
+      const operator = take();
+      const next = power();
+      if (operator === "*") value *= next;
+      if (operator === "/") value /= next;
+      if (operator === "%") value %= next;
+    }
+    return value;
+  };
+  const addition = (): number => {
+    let value = multiplication();
+    while (peek() === "+" || peek() === "-") {
+      const operator = take();
+      const next = multiplication();
+      value = operator === "+" ? value + next : value - next;
+    }
+    return value;
+  };
+  const result = addition();
+  if (position !== tokens.length) throw new Error("Check the expression near " + tokens[position] + ".");
+  if (!Number.isFinite(result)) throw new Error("This expression has no finite real result.");
+  return Number(result.toPrecision(12));
+}
+
+function CalculatorWorkspace() {
+  const [expression, setExpression] = useState("");
+  const [display, setDisplay] = useState("0");
+  const [history, setHistory] = useState<{ expression: string; result: string }[]>([]);
+  const [justSolved, setJustSolved] = useState(false);
+  const [error, setError] = useState("");
+  const keys = [
+    ["AC","clear"],["DEL","delete"],["(","function"],[")","function"],["÷","operator"],
+    ["sin","function"],["cos","function"],["tan","function"],["√","function"],["×","operator"],
+    ["7","number"],["8","number"],["9","number"],["%","operator"],["−","operator"],
+    ["4","number"],["5","number"],["6","number"],["x²","function"],["+","operator"],
+    ["1","number"],["2","number"],["3","number"],["π","constant"],["=","equals"],
+    ["0","number"],[".","number"],["±","function"],["log","function"],["ln","function"]
+  ];
+  const insert = (key: string) => {
+    setError("");
+    if (key === "AC") {
+      setExpression("");
+      setDisplay("0");
+      setJustSolved(false);
+      return;
+    }
+    if (key === "DEL") {
+      const next = expression.slice(0, -1);
+      setExpression(next);
+      setDisplay(next || "0");
+      setJustSolved(false);
+      return;
+    }
+    if (key === "=") {
+      if (!expression.trim()) return;
+      try {
+        const result = evaluateExpression(expression);
+        const formatted = String(result);
+        setDisplay(formatted);
+        setHistory(items => [{ expression, result: formatted }, ...items].slice(0, 5));
+        setExpression(formatted);
+        setJustSolved(true);
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "Unable to calculate this expression.");
+      }
+      return;
+    }
+    if (key === "±") {
+      const next = expression.startsWith("-") ? expression.slice(1) : "-" + expression;
+      setExpression(next);
+      setDisplay(next || "0");
+      setJustSolved(false);
+      return;
+    }
+    let value = key;
+    if (key === "÷") value = "/";
+    if (key === "×") value = "*";
+    if (key === "−") value = "-";
+    if (key === "π") value = "pi";
+    if (key === "√") value = "sqrt(";
+    if (key === "x²") value = "^2";
+    if (["sin","cos","tan","log","ln"].includes(key)) value = key + "(";
+    const next = justSolved && /^[0-9.]$/.test(key) ? key : expression + value;
+    setExpression(next);
+    setDisplay(next || "0");
+    setJustSolved(false);
+  };
+  return <div className="calculator-shell">
+    <div className="calculator-top"><div><span className="eyebrow">GRAND-LUMEN · PRECISION TOOLS</span><h3>Scientific calculator</h3></div><span className="calculator-live"><i /> READY</span></div>
+    <div className="calculator-display"><span> {expression || "READY"} </span><strong>{display}</strong>{error && <small>{error}</small>}</div>
+    <div className="calculator-keypad">{keys.map(([label,type],index) => <button key={label + index} className={"calc-key calc-" + type + (label === "=" ? " calc-equals" : "") + (label === "0" ? " calc-zero" : "")} onClick={() => insert(label)}>{label}</button>)}</div>
+    <div className="calculator-foot"><span>DEG · REAL-TIME EVALUATION</span><button onClick={() => { setExpression(""); setDisplay("0"); setHistory([]); setError(""); }}>Clear history</button></div>
+    {history.length > 0 && <div className="calculator-history"><span className="eyebrow">RECENT CALCULATIONS</span>{history.map((item,index) => <button key={item.expression + index} onClick={() => { setExpression(item.expression); setDisplay(item.result); setJustSolved(true); }}><span>{item.expression}</span><b>{item.result}</b></button>)}</div>}
+  </div>;
+}
+
+function MapWorkspace() {
+  const [place, setPlace] = useState("");
+  const [mapQuery, setMapQuery] = useState("Ghana");
+  const [coordinates, setCoordinates] = useState("");
+  const [locationStatus, setLocationStatus] = useState("Location access is off until you choose to use GPS.");
+  const [locating, setLocating] = useState(false);
+  const encoded = encodeURIComponent(mapQuery);
+  const mapUrl = "https://www.google.com/maps?q=" + encoded + "&output=embed";
+  const directionsUrl = "https://www.google.com/maps/dir/?api=1&destination=" + encodeURIComponent(mapQuery);
+  const searchPlace = () => {
+    if (!place.trim()) return;
+    setMapQuery(place.trim());
+    setCoordinates("");
+    setLocationStatus("Showing map results for " + place.trim() + ".");
+  };
+  const useGps = () => {
+    if (!navigator.geolocation) {
+      setLocationStatus("GPS location is not supported by this browser.");
+      return;
+    }
+    setLocating(true);
+    setLocationStatus("Requesting your location permission…");
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        const coords = position.coords.latitude.toFixed(6) + ", " + position.coords.longitude.toFixed(6);
+        setCoordinates(coords);
+        setMapQuery(coords);
+        setLocationStatus("Your device location is now displayed on the map.");
+        setLocating(false);
+      },
+      reason => {
+        setLocationStatus(reason.code === 1 ? "Location permission was denied. You can still search for places manually." : "Your location could not be detected. Try again or search for a place.");
+        setLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 30000 }
+    );
+  };
+  return <div className="map-workspace">
+    <div className="map-controls"><div className="map-search"><MapPin size={18} /><input value={place} onChange={event => setPlace(event.target.value)} onKeyDown={event => event.key === "Enter" && searchPlace()} placeholder="Search a city, landmark or address" /><button onClick={searchPlace}>Find place</button></div><button className="gps-button" onClick={useGps} disabled={locating}><LocateFixed size={16} />{locating ? "Locating…" : "Use my GPS"}</button></div>
+    <div className="map-status"><span><i /> {locationStatus}</span>{coordinates && <b>{coordinates}</b>}</div>
+    <div className="map-frame"><iframe title="Google Maps location explorer" src={mapUrl} loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen /></div>
+    <div className="map-bottom"><div><b>Google Maps</b><span>Search places, explore the map and plan directions.</span></div><a href={directionsUrl} target="_blank" rel="noreferrer"><Navigation size={15} /> Directions <ExternalLink size={13} /></a></div>
+  </div>;
 }
 
 function PageTitle({ eyebrow, title, description }: { eyebrow: string; title: string; description: string }) {
