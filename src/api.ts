@@ -92,3 +92,16 @@ export async function getHoliday(country: string, year: number) {
   if (!response.ok) throw new Error("Holiday data is unavailable for that country and year.");
   return response.json();
 }
+
+export async function researchTopic(query: string): Promise<{ title: string; extract: string; url: string }[]> {
+  const matches = await searchWikipedia(query);
+  const pages = await Promise.all(matches.slice(0, 6).map(async item => {
+    const title = item.title.replace(/ /g, "_");
+    const response = await fetch("https://en.wikipedia.org/w/api.php?action=query&prop=extracts&explaintext=1&exintro=1&exchars=2200&titles=" + encodeURIComponent(title) + "&format=json&origin=*");
+    if (!response.ok) throw new Error("Research content is temporarily unavailable.");
+    const data = await response.json();
+    const page = Object.values(data.query?.pages || {})[0] as { extract?: string };
+    return { title: item.title, extract: page?.extract || item.description, url: item.url };
+  }));
+  return pages.filter(page => page.extract.trim().length > 0);
+}
