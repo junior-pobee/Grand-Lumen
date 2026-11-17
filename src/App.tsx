@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import { Activity, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, CheckCircle2, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, Eye, EyeOff, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, LocateFixed, LockKeyhole, LogIn, LogOut, Mail, MapPin, Menu, Moon, MonitorSmartphone, Navigation, Play, Plus, Search, ShieldCheck, Sparkles, Sun, Terminal, UserRound, Video, Wallet, X, Zap } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase, supabaseConfigured } from "./auth";
@@ -134,7 +135,7 @@ function AuthPanel({ mode, onModeChange }: { mode: "signin" | "signup"; onModeCh
     setMessage(value);
     setMessageType(type);
   };
-  const submit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setMessage("");
     if (!supabase) {
