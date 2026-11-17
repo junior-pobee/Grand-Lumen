@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Activity, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, CheckCircle2, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, Eye, EyeOff, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, LocateFixed, LockKeyhole, LogIn, LogOut, Mail, MapPin, Menu, Moon, MonitorSmartphone, Navigation, Play, Plus, Search, Settings, ShieldCheck, Sparkles, Sun, Terminal, UserRound, Video, Wallet, X, Zap } from "lucide-react";
+import { Activity, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, CheckCircle2, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, Eye, EyeOff, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, LocateFixed, LockKeyhole, LogIn, LogOut, Mail, MapPin, Menu, Moon, MonitorSmartphone, Navigation, Play, Plus, Search, Settings, ShieldCheck, Sparkles, Sun, Terminal, UserRound, Video, Wallet, X, Zap, QrCode, ScanLine, Share2, Upload, Download, Smartphone } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
+import Peer from "peerjs";
 import { supabase, supabaseConfigured } from "./auth";
 import { getCurrency, getDictionary, getHoliday, getPokemon, getWeather, searchArchiveVideos, searchCommonsImages, searchHackerNews, searchWikipedia, type SearchItem } from "./api";
 
@@ -36,7 +37,7 @@ async function hashLocalPassword(password: string, salt: string): Promise<string
   return Array.from(new Uint8Array(bits)).map(value => value.toString(16).padStart(2, "0")).join("");
 }
 
-type Section = "Home" | "Search" | "Research" | "Images" | "Videos" | "Maps" | "Code Lab" | "Learn" | "API Library" | "Tools" | "Saved" | "Projects" | "Settings";
+type Section = "Home" | "Search" | "Research" | "Images" | "Videos" | "Maps" | "Code Lab" | "Learn" | "API Library" | "Tools" | "Scanner" | "Share" | "Saved" | "Projects" | "Settings";
 const sections: { name: Section; icon: any; group: string }[] = [
   { name: "Home", icon: Compass, group: "Workspace" },
   { name: "Search", icon: Search, group: "Workspace" },
@@ -48,6 +49,8 @@ const sections: { name: Section; icon: any; group: string }[] = [
   { name: "Learn", icon: GraduationCap, group: "Create" },
   { name: "API Library", icon: Database, group: "Discover" },
   { name: "Tools", icon: Calculator, group: "Discover" },
+  { name: "Scanner", icon: ScanLine, group: "Discover" },
+  { name: "Share", icon: Share2, group: "Discover" },
   { name: "Saved", icon: Bookmark, group: "Personal" },
   { name: "Projects", icon: Boxes, group: "Personal" },
   { name: "Settings", icon: Settings, group: "Personal" }
@@ -231,6 +234,174 @@ function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup";
   </main>;
 }
 
+function BarcodeScanner({ onDetected }: { onDetected?: (value: string) => void }) {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [scanning, setScanning] = useState(false);
+  const [value, setValue] = useState("");
+  const [error, setError] = useState("");
+  const [supported, setSupported] = useState(true);
+
+  useEffect(() => {
+    if (!scanning) return;
+    let stream: MediaStream | null = null;
+    let frame = 0;
+    let stopped = false;
+    const start = async () => {
+      try {
+        const Detector = (window as any).BarcodeDetector;
+        if (!Detector) {
+          setSupported(false);
+          setError("This browser does not support camera barcode detection. Try the latest Chrome browser.");
+          setScanning(false);
+          return;
+        }
+        const detector = new Detector({ formats: ["qr_code","ean_13","ean_8","upc_a","upc_e","code_128","code_39","itf","data_matrix","pdf417","aztec"] });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
+        if (!videoRef.current || stopped) return;
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+        const scan = async () => {
+          if (stopped || !videoRef.current) return;
+          try {
+            const codes = await detector.detect(videoRef.current);
+            if (codes.length && codes[0].rawValue) {
+              const result = codes[0].rawValue;
+              setValue(result);
+              onDetected?.(result);
+              setScanning(false);
+              return;
+            }
+          } catch {
+            setError("The camera could not read this code. Adjust the angle and lighting.");
+          }
+          frame = requestAnimationFrame(scan);
+        };
+        scan();
+      } catch (reason) {
+        setError(reason instanceof Error ? reason.message : "Camera access was unavailable. Allow camera permission and try again.");
+        setScanning(false);
+      }
+    };
+    start();
+    return () => {
+      stopped = true;
+      cancelAnimationFrame(frame);
+      stream?.getTracks().forEach(track => track.stop());
+      if (videoRef.current) videoRef.current.srcObject = null;
+    };
+  }, [scanning, onDetected]);
+
+  return <div className="scanner-workspace">
+    <div className="scanner-camera">
+      {scanning ? <video ref={videoRef} muted playsInline /> : <div className="scanner-placeholder"><ScanLine size={42}/><b>Camera scanner</b><span>Position a QR code or barcode inside the camera view.</span></div>}
+      {scanning && <div className="scanner-frame"><i/></div>}
+    </div>
+    <div className="scanner-controls"><button className="solid-button" onClick={() => { setError(""); setScanning(value => !value); }}>{scanning ? "Stop camera" : "Start camera scanner"}</button><button className="quiet-button" onClick={() => { setValue(""); setError(""); }}>Clear result</button></div>
+    {!supported && <p className="error-text">{error}</p>}
+    {error && supported && <p className="error-text">{error}</p>}
+    {value && <div className="scanner-result"><span className="eyebrow">SCANNED CONTENT</span><strong>{value}</strong><div><button className="quiet-button" onClick={() => navigator.clipboard?.writeText(value)}><Copy size={14}/> Copy result</button><button className="quiet-button" onClick={() => onDetected?.(value)}>Use result</button></div></div>}
+    <p className="scanner-note">Camera access requires HTTPS and your permission. Scanning happens in this browser; camera frames are not uploaded by Grand-Lumen.</p>
+  </div>;
+}
+
+function ShareWorkspace() {
+  const peerRef = useRef<Peer | null>(null);
+  const connectionRef = useRef<any>(null);
+  const chunksRef = useRef<ArrayBuffer[]>([]);
+  const incomingRef = useRef<{ name: string; type: string; size: number } | null>(null);
+  const [peerId, setPeerId] = useState("");
+  const [targetId, setTargetId] = useState("");
+  const [connected, setConnected] = useState(false);
+  const [status, setStatus] = useState("Starting secure connection service…");
+  const [received, setReceived] = useState<{ name: string; url: string; size: number }[]>([]);
+  const [sending, setSending] = useState(false);
+  const [scanOpen, setScanOpen] = useState(false);
+
+  useEffect(() => {
+    const peer = new Peer();
+    peerRef.current = peer;
+    peer.on("open", id => { setPeerId(id); setStatus("Ready to connect. Share your QR code with the other device."); });
+    peer.on("connection", connection => attachConnection(connection));
+    peer.on("error", error => setStatus("Connection service: " + error.message));
+    return () => { peer.destroy(); peerRef.current = null; };
+  }, []);
+
+  const attachConnection = (connection: any) => {
+    connectionRef.current = connection;
+    connection.on("open", () => { setConnected(true); setStatus("Devices connected. You can now exchange files."); });
+    connection.on("data", (data: any) => {
+      if (typeof data === "string") {
+        try {
+          const message = JSON.parse(data);
+          if (message.kind === "file-start") {
+            incomingRef.current = { name: message.name, type: message.type || "application/octet-stream", size: message.size };
+            chunksRef.current = [];
+            setStatus("Receiving " + message.name + "…");
+          }
+          if (message.kind === "file-end" && incomingRef.current) {
+            const info = incomingRef.current;
+            const blob = new Blob(chunksRef.current, { type: info.type });
+            const url = URL.createObjectURL(blob);
+            setReceived(items => [{ name: info.name, url, size: blob.size }, ...items]);
+            incomingRef.current = null;
+            chunksRef.current = [];
+            setStatus("File received: " + info.name);
+          }
+        } catch {
+          setStatus("Received a message from the connected device.");
+        }
+      } else if (data instanceof ArrayBuffer) {
+        chunksRef.current.push(data);
+      } else if (data instanceof Blob) {
+        data.arrayBuffer().then(buffer => chunksRef.current.push(buffer));
+      }
+    });
+    connection.on("close", () => { setConnected(false); setStatus("The other device disconnected."); });
+    connection.on("error", (error: Error) => setStatus(error.message));
+  };
+
+  const connectToDevice = () => {
+    const id = targetId.trim();
+    if (!id || !peerRef.current) return;
+    setStatus("Connecting to the other device…");
+    const connection = peerRef.current.connect(id, { reliable: true });
+    attachConnection(connection);
+  };
+
+  const sendFiles = async (files: FileList | null) => {
+    if (!files || !connectionRef.current || !connected) return;
+    setSending(true);
+    try {
+      for (const file of Array.from(files)) {
+        connectionRef.current.send(JSON.stringify({ kind: "file-start", name: file.name, type: file.type, size: file.size }));
+        const chunkSize = 16 * 1024;
+        for (let offset = 0; offset < file.size; offset += chunkSize) {
+          const buffer = await file.slice(offset, Math.min(offset + chunkSize, file.size)).arrayBuffer();
+          connectionRef.current.send(buffer);
+        }
+        connectionRef.current.send(JSON.stringify({ kind: "file-end" }));
+      }
+      setStatus("Files sent successfully.");
+    } catch (reason) {
+      setStatus(reason instanceof Error ? reason.message : "File transfer failed.");
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const qrUrl = peerId ? "https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=12&data=" + encodeURIComponent(peerId) : "";
+
+  return <div className="share-workspace">
+    <div className="share-intro"><span className="share-symbol"><Share2 size={23}/></span><div><span className="eyebrow">LUMEN SHARE</span><h2>Move files between your devices.</h2><p>Connect two devices with a QR scan, then send files directly through a peer-to-peer connection.</p></div></div>
+    <div className="share-grid">
+      <article className="glass-card share-card"><span className="eyebrow">RECEIVE FILES</span><h3>Your device QR code</h3><p>Open Lumen Share on the other device and scan this code, or enter the ID manually.</p>{qrUrl ? <img className="share-qr" src={qrUrl} alt="Your device connection QR code"/> : <div className="share-qr-loading">Preparing QR code…</div>}<code className="share-peer-id">{peerId || "Connecting…"}</code><button className="quiet-button" onClick={() => navigator.clipboard?.writeText(peerId)} disabled={!peerId}><Copy size={14}/> Copy device ID</button></article>
+      <article className="glass-card share-card"><span className="eyebrow">SEND FILES</span><h3>Connect to another device</h3><p>Scan the other device's QR code or enter its connection ID.</p><input value={targetId} onChange={event => setTargetId(event.target.value)} placeholder="Paste device ID here"/><div className="share-actions"><button className="solid-button" onClick={connectToDevice} disabled={!targetId.trim() || connected}>Connect</button><button className="quiet-button" onClick={() => setScanOpen(value => !value)}><ScanLine size={14}/> {scanOpen ? "Close scanner" : "Scan QR"}</button></div>{scanOpen && <BarcodeScanner onDetected={value => { setTargetId(value); setScanOpen(false); }}/>}<div className={connected ? "share-status connected" : "share-status"}><i/>{status}</div><label className="share-file-button"><Upload size={16}/> {sending ? "Sending files…" : "Choose files to send"}<input type="file" multiple disabled={!connected || sending} onChange={event => { void sendFiles(event.target.files); event.currentTarget.value = ""; }}/></label></article>
+    </div>
+    <div className="glass-card share-received"><span className="eyebrow">INCOMING FILES</span><h3>Received on this device</h3>{received.length ? received.map((file,index) => <div className="received-file" key={file.url}><div><b>{file.name}</b><small>{(file.size / 1024 / 1024).toFixed(2)} MB</small></div><a href={file.url} download={file.name}><Download size={15}/> Save file</a></div>) : <p>No files received in this session yet.</p>}</div>
+    <div className="share-disclaimer"><ShieldCheck size={16}/> Transfers are peer-to-peer after pairing. A public PeerJS signalling service helps devices find each other; both devices need an internet connection. Keep the connection ID private and only pair with people you trust.</div>
+  </div>;
+}
+
 function App() {
   const [section, setSection] = useState<Section>("Home");
   const [session, setSession] = useState<Session | null>(null);
@@ -405,6 +576,8 @@ function App() {
     Learn: "Knowledge, expanded.",
     "API Library": "Connect the world.",
     Tools: "Tools for curious minds.",
+    Scanner: "Scan the physical world.",
+    Share: "Send it across.",
     Saved: "Your knowledge vault.",
     Projects: "Your creation space.",
     Settings: "Shape your workspace."
@@ -448,6 +621,8 @@ function App() {
               <div className="stats-strip"><div><b>15</b><span>LANGUAGE TRACKS</span></div><div><b>20+</b><span>API CATALOGUE</span></div><div><b>06</b><span>LIVE DATA TOOLS</span></div><div><b>{saved.length.toString().padStart(2,"0")}</b><span>SAVED ITEMS</span></div></div>
             </section>}
             {section === "Search" && <section><PageTitle eyebrow="DISCOVERY ENGINE" title={heading.Search} description="Search across knowledge sources and developer communities without leaving your workspace." /><div className="search-panel"><Search size={18} /><input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && runSearch()} placeholder="What would you like to discover?" /><button onClick={() => runSearch()} disabled={busy}>Search</button></div><div className="filter-row"><button onClick={() => runSearch("all")}>All sources</button><button onClick={() => runSearch("wiki")}>Wikipedia</button><button onClick={() => runSearch("hn")}>Hacker News</button></div><Results items={results} saved={saved} onSave={toggleSave} busy={busy} error={error} /></section>}
+            {section === "Scanner" && <section><PageTitle eyebrow="CAMERA TOOLS" title={heading.Scanner} description="Scan QR codes and common product barcodes using your device camera."/><BarcodeScanner/></section>}
+            {section === "Share" && <section><PageTitle eyebrow="DEVICE-TO-DEVICE TRANSFER" title={heading.Share} description="Pair devices with a QR scan and exchange files without uploading them to Grand-Lumen storage."/><ShareWorkspace/></section>}
             {section === "Research" && <section><PageTitle eyebrow="RESEARCH STUDIO" title={heading.Research} description="Create a research workspace, collect questions and develop structured notes." /><div className="research-grid"><div className="glass-card"><span className="eyebrow">START AN INQUIRY</span><h3>What are you investigating?</h3><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Enter a research topic..." /><button className="solid-button" onClick={() => { selectSection("Search"); runSearch("all"); }}>Find source material <ArrowRight size={15} /></button><div className="research-topics"><button onClick={() => setQuery("renewable energy")}>Renewable energy</button><button onClick={() => setQuery("neural networks")}>Neural networks</button><button onClick={() => setQuery("African history")}>African history</button></div></div><div className="glass-card"><span className="eyebrow">RESEARCH NOTEBOOK</span><h3>Working notes</h3><textarea value={researchNotes} onChange={e => setResearchNotes(e.target.value)} placeholder="Capture your questions, findings, hypotheses and references..." /><div className="note-footer"><span>Saved automatically in this session</span><button onClick={() => navigator.clipboard?.writeText(researchNotes)}><Copy size={14} /> Copy notes</button></div></div></div><div className="info-banner"><ShieldCheck size={18} /><span>Research results should be checked against original sources. Grand-Lumen keeps discovery and note-taking together; it does not replace source verification.</span></div></section>}
             {section === "Images" && <section><PageTitle eyebrow="VISUAL DISCOVERY" title={heading.Images} description="Search openly licensed image collections and view discoveries directly in Grand-Lumen." /><div className="search-panel"><Image size={18} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search images, places, science, design..." onKeyDown={e => e.key === "Enter" && runMediaSearch("images")} /><button onClick={() => runMediaSearch("images")} disabled={mediaBusy}>{mediaBusy ? "Searching..." : "Search images"}</button></div><div className="quick-tags">{["Nature","Architecture","Space","Technology","African art"].map(tag => <button key={tag} onClick={() => { setQuery(tag); runMediaSearch("images", tag); }}>{tag}</button>)}</div><MediaResults items={mediaResults} busy={mediaBusy} error={error} kind="images" onSave={toggleSave} /><div className="info-banner"><ShieldCheck size={18} /><span>Images are retrieved from Wikimedia Commons. Check each file page for its licence and attribution requirements before reuse.</span></div></section>}
             {section === "Videos" && <section><PageTitle eyebrow="VIDEO DISCOVERY" title={heading.Videos} description="Search public video collections and preview available items inside your workspace." /><div className="search-panel"><Video size={18} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search documentaries, tutorials, science..." onKeyDown={e => e.key === "Enter" && runMediaSearch("videos")} /><button onClick={() => runMediaSearch("videos")} disabled={mediaBusy}>{mediaBusy ? "Searching..." : "Search videos"}</button></div><div className="quick-tags">{["Science","Technology","History","Education"].map(tag => <button key={tag} onClick={() => { setQuery(tag); runMediaSearch("videos", tag); }}>{tag}</button>)}</div><MediaResults items={mediaResults} busy={mediaBusy} error={error} kind="videos" onSave={toggleSave} /></section>}
