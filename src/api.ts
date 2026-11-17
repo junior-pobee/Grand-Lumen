@@ -120,7 +120,7 @@ async function readJsonResponse(response: Response, source: string): Promise<any
 
 async function searchLiveNews(query: string, country: string): Promise<NewsItem[]> {
   const searchTerm = query.trim() || "world";
-  const fullQuery = country === "all" ? searchTerm : searchTerm + " sourcecountry:" + country.toLowerCase();
+  const fullQuery = country === "all" ? searchTerm : searchTerm + " sourcecountry:" + country.toUpperCase();
   const params = new URLSearchParams({ query: fullQuery, mode: "ArtList", format: "json", maxrecords: "75", sort: "DateDesc" });
   const response = await fetch("https://api.gdeltproject.org/api/v2/doc/doc?" + params.toString(), { headers: { Accept: "application/json" } });
   const data = await readJsonResponse(response, "Global news service");
