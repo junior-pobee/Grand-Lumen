@@ -33,31 +33,5 @@
       "type": "image/svg+xml",
       "purpose": "maskable"
     }
-  ],
-  "shortcuts": [
-    {
-      "name": "Open Share",
-      "short_name": "Share",
-      "url": "./?section=Share",
-      "icons": [
-        {
-          "src": "./icons/grand-lumen-icon.svg",
-          "sizes": "192x192",
-          "type": "image/svg+xml"
-        }
-      ]
-    },
-    {
-      "name": "Open Search",
-      "short_name": "Search",
-      "url": "./?section=Search",
-      "icons": [
-        {
-          "src": "./icons/grand-lumen-icon.svg",
-          "sizes": "192x192",
-          "type": "image/svg+xml"
-        }
-      ]
-    }
   ]
 }
