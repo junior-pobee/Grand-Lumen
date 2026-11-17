@@ -1218,22 +1218,52 @@ function App() {
   const [installHelp, setInstallHelp] = useState("");
   const [isInstalled, setIsInstalled] = useState(() => window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as any).standalone));
   useEffect(() => {
-    const captureInstall = (event: Event) => { event.preventDefault(); setInstallPrompt(event); };
-    const installed = () => { setIsInstalled(true); setInstallPrompt(null); setInstallHelp("Grand-Lumen is installed on this device."); };
+    const captureInstall = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event);
+      setInstallHelp("Grand-Lumen is ready to install on this device.");
+    };
+    const installed = () => {
+      setIsInstalled(true);
+      setInstallPrompt(null);
+      setInstallHelp("Grand-Lumen is installed on this device.");
+    };
+    const displayMode = window.matchMedia("(display-mode: standalone)");
+    const syncInstalledState = () => setIsInstalled(displayMode.matches || Boolean((navigator as any).standalone));
     window.addEventListener("beforeinstallprompt", captureInstall);
     window.addEventListener("appinstalled", installed);
-    return () => { window.removeEventListener("beforeinstallprompt", captureInstall); window.removeEventListener("appinstalled", installed); };
+    displayMode.addEventListener?.("change", syncInstalledState);
+    syncInstalledState();
+    return () => {
+      window.removeEventListener("beforeinstallprompt", captureInstall);
+      window.removeEventListener("appinstalled", installed);
+      displayMode.removeEventListener?.("change", syncInstalledState);
+    };
   }, []);
   const installGrandLumen = async () => {
-    if (isInstalled) { setInstallHelp("Grand-Lumen is already installed on this device."); return; }
-    if (installPrompt) {
-      await installPrompt.prompt();
-      const choice = await installPrompt.userChoice;
-      setInstallHelp(choice?.outcome === "accepted" ? "Follow your device prompts to finish installing." : "Installation was cancelled. You can try again later.");
-      setInstallPrompt(null);
+    if (isInstalled) {
+      setInstallHelp("Grand-Lumen is already installed on this device.");
       return;
     }
-    setInstallHelp(/iphone|ipad|ipod/i.test(navigator.userAgent) ? "On iPhone or iPad: open the browser Share menu, choose Add to Home Screen, then tap Add." : "Open this app in Chrome or Edge, open the browser menu, then choose Install app or Add to Home screen.");
+    if (installPrompt) {
+      try {
+        await installPrompt.prompt();
+        const choice = await installPrompt.userChoice;
+        setInstallHelp(choice?.outcome === "accepted" ? "Follow your device prompts to finish installing Grand-Lumen." : "Installation was cancelled. You can try again later.");
+      } catch {
+        setInstallHelp("The browser could not open its install prompt. Open the browser menu and choose Install app or Add to Home screen.");
+      } finally {
+        setInstallPrompt(null);
+      }
+      return;
+    }
+    if (!window.isSecureContext) {
+      setInstallHelp("Installation requires the secure HTTPS Grand-Lumen website.");
+      return;
+    }
+    setInstallHelp(/iphone|ipad|ipod/i.test(navigator.userAgent)
+      ? "On iPhone or iPad, open the Share menu, choose Add to Home Screen, then tap Add."
+      : "Chrome has not offered its install prompt yet. Open the published HTTPS site in Chrome, refresh it, then use Chrome ⋮ → Install app or Add to Home screen. If that option is missing, Chrome is still rejecting an installation requirement.");
   };
 
   useEffect(() => {
