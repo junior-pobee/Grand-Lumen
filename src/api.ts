@@ -105,3 +105,22 @@ export async function researchTopic(query: string): Promise<{ title: string; ext
   }));
   return pages.filter(page => page.extract.trim().length > 0);
 }
+
+export type NewsItem = SearchItem & { publishedAt: string; country: string };
+
+export async function searchGlobalNews(query: string, country = "all", period = "7d"): Promise<NewsItem[]> {
+  const params = new URLSearchParams({ query: query.trim() || "world", mode: "ArtList", format: "json", maxrecords: "50", sort: "DateDesc", timespan: period });
+  if (country !== "all") params.set("sourceCountry", country);
+  const response = await fetch("https://api.gdeltproject.org/api/v2/doc/doc?" + params.toString());
+  if (!response.ok) throw new Error("Global news search is temporarily unavailable. Please try again.");
+  const data = await response.json();
+  return (data.articles || []).map((item: any) => ({
+    title: item.title || "Untitled report",
+    description: [item.domain, item.language, item.sourcecountry].filter(Boolean).join(" · ") || "International news report",
+    url: item.url,
+    image: item.socialimage || undefined,
+    source: item.domain || "News publisher",
+    publishedAt: item.seendate || "",
+    country: item.sourcecountry || "International"
+  })).filter((item: NewsItem) => Boolean(item.url));
+}
