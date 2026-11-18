@@ -792,3 +792,11 @@ body{top:0!important}
 
 .team-incoming-call,.team-call-panel{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px;border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line));border-radius:14px;background:color-mix(in srgb,var(--accent) 7%,var(--surface))}.team-incoming-call>div:first-child{display:grid;gap:5px}.team-incoming-call b{font-size:13px}.team-incoming-call small,.team-call-panel>small{color:var(--muted);font-size:10px}.team-call-panel{display:grid}.team-call-media{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.team-call-media video{width:100%;max-height:340px;aspect-ratio:16/9;object-fit:cover;border-radius:12px;background:#111}.team-call-media audio{width:100%}
 @media(max-width:600px){.team-incoming-call{align-items:flex-start;flex-direction:column}.team-call-media{grid-template-columns:1fr}}
+
+.email-verification-card{display:flex;align-items:center;justify-content:space-between;gap:18px}
+.email-verification-status{display:inline-flex;align-items:center;margin-top:8px;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:700}
+.email-verification-status.verified{background:rgba(22,163,74,.12);color:#15803d}
+.email-verification-status.pending{background:rgba(217,119,6,.12);color:#b45309}
+.email-verification-message{display:block;margin-top:9px;color:var(--muted);line-height:1.6}
+.email-verification-actions{display:flex;align-items:center;justify-content:flex-end;gap:9px;flex-wrap:wrap}
+@media(max-width:650px){.email-verification-card{align-items:stretch;flex-direction:column}.email-verification-actions{justify-content:flex-start}.email-verification-actions button{width:100%;justify-content:center}}
