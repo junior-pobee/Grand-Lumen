@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Activity, BookOpen, CalendarDays, CheckCircle2, Copy, Download, FileText, Globe2, Languages, Plus, Search, ShieldCheck, Trash2, Upload, Wifi, WifiOff } from "lucide-react";
 
