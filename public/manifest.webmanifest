@@ -1,10 +1,10 @@
 {
-  "id": "/Grand-Lumen/",
+  "id": "./",
   "name": "Grand-Lumen — Explore, Research, Learn & Build",
   "short_name": "Grand-Lumen",
   "description": "Grand-Lumen is a multi-purpose digital workspace for discovering information, researching topics, exploring worldwide news, images and videos, learning new skills, using maps and practical tools, and creating software in a multi-language Code Lab with a live HTML, CSS and JavaScript preview.",
-  "start_url": "/Grand-Lumen/",
-  "scope": "/Grand-Lumen/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
   "display_override": ["standalone", "minimal-ui"],
   "orientation": "any",
@@ -14,22 +14,16 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/Grand-Lumen/icons/grand-lumen-192.png",
+      "src": "icons/grand-lumen-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/Grand-Lumen/icons/grand-lumen-512.png",
+      "src": "icons/grand-lumen-512.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "/Grand-Lumen/icons/grand-lumen-maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ]
 }
