@@ -112,7 +112,7 @@ export default function ExpansionHub({ onOpenScanner, language = "en" }: { onOpe
   const [documentText, setDocumentText] = useState("");
   const [documentName, setDocumentName] = useState("");
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState("");
-  const [documentSummary, setDocumentSummary] = useState("");
+  const [documentSummary, setDocumentSummary] = useState("");\n  const [documentBusy, setDocumentBusy] = useState(false);\n  const [documentError, setDocumentError] = useState("");
   const [convertValue, setConvertValue] = useState("1");
   const [convertCategory, setConvertCategory] = useState("Length");
   const [convertFrom, setConvertFrom] = useState("m");
@@ -259,17 +259,41 @@ export default function ExpansionHub({ onOpenScanner, language = "en" }: { onOpe
 
   const readDocument = async (file: File) => {
     setDocumentName(file.name);
-    if (file.type === "text/plain" || file.type === "text/markdown" || /\.(txt|md|csv|json)$/i.test(file.name)) {
-      const value = await file.text();
-      setDocumentText(value);
-      setDocumentSummary("");
-    } else if (file.type === "application/pdf") {
-      if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
-      setPdfPreviewUrl(URL.createObjectURL(file));
-      setDocumentText("");
-      setDocumentSummary("");
-    } else {
-      setNotice("This reader currently extracts text and Markdown files. Other formats can be stored in Vault.");
+    setDocumentText("");
+    setDocumentSummary("");
+    setDocumentError("");
+    setDocumentBusy(true);
+    try {
+      if (file.type === "text/plain" || file.type === "text/markdown" || file.type === "text/csv" || /\.(txt|md|csv|json)$/i.test(file.name)) {
+        setDocumentText(await file.text());
+      } else if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+        const pdfjs = await loadExternalScript("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js", "pdfjsLib");
+        pdfjs.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
+        if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl);
+        setPdfPreviewUrl(URL.createObjectURL(file));
+        const pages: string[] = [];
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
+          const page = await pdf.getPage(pageNumber);
+          const content = await page.getTextContent();
+          const pageText = content.items.map((item: any) => "str" in item ? item.str : "").filter(Boolean).join(" ");
+          pages.push("PAGE " + pageNumber + "\n" + pageText);
+        }
+        const extracted = pages.join("\n\n");
+        if (!extracted.replace(/PAGE \d+/g, "").trim()) throw new Error("This PDF appears to contain scanned pages rather than selectable text. It needs OCR before its text can be extracted.");
+        setDocumentText(extracted);
+      } else if (file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || /\.docx$/i.test(file.name)) {
+        const mammoth = await loadExternalScript("https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.8.0/mammoth.browser.min.js", "mammoth");
+        const result = await mammoth.extractRawText({ arrayBuffer: await file.arrayBuffer() });
+        if (!result.value.trim()) throw new Error("No readable text was found in this Word document.");
+        setDocumentText(result.value);
+      } else {
+        throw new Error("This file format is not supported yet. Upload a searchable PDF, DOCX, TXT, Markdown, CSV or JSON file.");
+      }
+    } catch (error) {
+      setDocumentError(error instanceof Error ? error.message : "The document could not be read.");
+    } finally {
+      setDocumentBusy(false);
     }
   };
 
@@ -515,7 +539,7 @@ export default function ExpansionHub({ onOpenScanner, language = "en" }: { onOpe
 
     {active === "Verify" && <Panel title="Claim comparison" description="Search independent reference collections. This tool presents evidence to inspect; it does not issue an automatic true/false verdict."><textarea value={claim} onChange={e => setClaim(e.target.value)} placeholder="Enter a factual claim to investigate…"/><ActionButton onClick={() => void verifyClaim()} disabled={verifyBusy || !claim.trim()}>{verifyBusy ? "Comparing sources…" : "Compare sources"}</ActionButton>{verifyResults.length > 0 && <div className="lh-results">{verifyResults.map((item, index) => <article key={item.url + index}><span>{item.source}</span><a href={item.url} target="_blank" rel="noreferrer">{item.title}</a><p>{item.description}</p></article>)}</div>}</Panel>}
 
-    {active === "Document Intelligence" && <div className="lh-two-col"><Panel title="Document reader" description="Extract text from plain-text, Markdown, CSV and JSON files. PDF viewing is supported through your browser; paste selected passages for analysis."><label className="lh-upload"><Upload size={16}/> Choose a document<input type="file" accept=".txt,.md,.csv,.json,.pdf,text/plain,text/markdown,text/csv,application/pdf" onChange={e => { const file = e.target.files?.[0]; if (file) void readDocument(file); }}/></label>{documentName && <p className="lh-muted">Selected: {documentName}</p>}<textarea value={documentText} onChange={e => setDocumentText(e.target.value)} placeholder="Document text appears here, or paste a passage…"/><ActionButton onClick={makeSummary} disabled={!documentText.trim()}>Extract key sentences</ActionButton>{documentSummary && <div className="lh-output"><b>Extracted key sentences</b><p>{documentSummary}</p><ActionButton onClick={() => navigator.clipboard?.writeText(documentSummary)}><Copy size={14}/> Copy extraction</ActionButton></div>}</Panel><Panel title="Reading workspace" description="A place to collect passages, observations and document notes.">{pdfPreviewUrl && <iframe className="lh-pdf-preview" title="PDF document preview" src={pdfPreviewUrl}/>}<p className="lh-muted">Text extraction is rule-based, not AI summarization. PDF files can be viewed here, then selected passages can be pasted into the reader. Always check the original document before relying on an extracted passage.</p><button className="lh-secondary" onClick={() => { setDocumentText(""); setDocumentName(""); setDocumentSummary(""); if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl); setPdfPreviewUrl(""); }}>Clear reader</button></Panel></div>}
+    {active === "Document Intelligence" && <div className="lh-two-col"><Panel title="Document reader" description="Upload learner manuals, study guides and other documents. Grand Lumen extracts readable text from searchable PDFs and Word documents directly inside the app."><label className="lh-upload"><Upload size={16}/> {documentBusy ? "Reading document…" : "Upload a manual or document"}<input type="file" accept=".txt,.md,.csv,.json,.pdf,.docx,text/plain,text/markdown,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" disabled={documentBusy} onChange={e => { const file = e.target.files?.[0]; if (file) void readDocument(file); e.currentTarget.value = ""; }}/></label>{documentName && <p className="lh-muted">Selected: {documentName}</p>}{documentBusy && <p className="lh-muted">Extracting document text. Large manuals may take a little longer…</p>}{documentError && <div className="lh-notice" role="alert">{documentError}</div>}<textarea className="lh-document-text" value={documentText} onChange={e => { setDocumentText(e.target.value); setDocumentSummary(""); }} placeholder="The contents of your uploaded manual will appear here for reading and analysis…" />{documentText && <div className="lh-document-actions"><span className="lh-muted">{documentText.trim().split(/\s+/).filter(Boolean).length.toLocaleString()} words extracted</span><ActionButton onClick={makeSummary}>Extract key sentences</ActionButton><ActionButton onClick={() => navigator.clipboard?.writeText(documentText)}><Copy size={14}/> Copy text</ActionButton></div>}{documentSummary && <div className="lh-output"><b>Key sentences from your document</b><p>{documentSummary}</p><ActionButton onClick={() => navigator.clipboard?.writeText(documentSummary)}><Copy size={14}/> Copy extraction</ActionButton></div>}</Panel><Panel title="Manual reading view" description="Read the uploaded document and work with its extracted contents without leaving Grand Lumen.">{pdfPreviewUrl && <iframe className="lh-pdf-preview" title="Original PDF manual preview" src={pdfPreviewUrl}/>}<p className="lh-muted">PDF and DOCX text is extracted into the reader on the left. You can read, edit the extracted text, copy passages and extract key sentences. Scanned image-only PDFs require OCR and may not contain extractable text.</p><button className="lh-secondary" onClick={() => { setDocumentText(""); setDocumentName(""); setDocumentSummary(""); setDocumentError(""); if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl); setPdfPreviewUrl(""); }}>Clear reader</button></Panel></div>}
 
     {active === "Convert" && <Panel title="Universal unit converter" description="Convert length, mass, volume, speed, area, time, data size and temperature. Currency reference conversion is available in World."><div className="lh-input-row"><label className="lh-field">Category<select value={convertCategory} onChange={e => { const category = e.target.value; setConvertCategory(category); const first = category === "Temperature" ? "°C" : category === "Length" ? "m" : category === "Mass" ? "kg" : category === "Volume" ? "L" : category === "Speed" ? "m/s" : category === "Area" ? "m²" : category === "Time" ? "second" : "B"; const second = category === "Temperature" ? "°F" : category === "Length" ? "km" : category === "Mass" ? "g" : category === "Volume" ? "mL" : category === "Speed" ? "km/h" : category === "Area" ? "km²" : category === "Time" ? "minute" : "KB"; setConvertFrom(first); setConvertTo(second); setConvertResult(""); }}><option>Length</option><option>Mass</option><option>Volume</option><option>Speed</option><option>Area</option><option>Time</option><option>Data</option><option>Temperature</option></select></label><label className="lh-field">Value<input type="number" value={convertValue} onChange={e => setConvertValue(e.target.value)}/></label></div><div className="lh-input-row"><label className="lh-field">From<select value={convertFrom} onChange={e => setConvertFrom(e.target.value)}>{(convertCategory === "Temperature" ? ["°C","°F","K"] : Object.keys(({Length:{m:1,km:1,cm:1,mm:1,mi:1,ft:1,in:1,yd:1},Mass:{kg:1,g:1,mg:1,tonne:1,lb:1,oz:1},Volume:{L:1,mL:1,m3:1,"US gal":1,"UK gal":1},Speed:{"m/s":1,"km/h":1,mph:1,knot:1},Area:{"m²":1,"km²":1,"cm²":1,hectare:1,acre:1},Time:{second:1,minute:1,hour:1,day:1},Data:{B:1,KB:1,MB:1,GB:1,TB:1}} as Record<string,Record<string,number>>)[convertCategory] || {})).map(unit => <option key={unit}>{unit}</option>)}</select></label><label className="lh-field">To<select value={convertTo} onChange={e => setConvertTo(e.target.value)}>{(convertCategory === "Temperature" ? ["°C","°F","K"] : Object.keys(({Length:{m:1,km:1,cm:1,mm:1,mi:1,ft:1,in:1,yd:1},Mass:{kg:1,g:1,mg:1,tonne:1,lb:1,oz:1},Volume:{L:1,mL:1,m3:1,"US gal":1,"UK gal":1},Speed:{"m/s":1,"km/h":1,mph:1,knot:1},Area:{"m²":1,"km²":1,"cm²":1,hectare:1,acre:1},Time:{second:1,minute:1,hour:1,day:1},Data:{B:1,KB:1,MB:1,GB:1,TB:1}} as Record<string,Record<string,number>>)[convertCategory] || {})).map(unit => <option key={unit}>{unit}</option>)}</select></label><ActionButton onClick={doUniversalConversion}>Convert</ActionButton></div>{convertResult && <div className="lh-output"><strong>{convertResult}</strong></div>}</Panel>}
 
