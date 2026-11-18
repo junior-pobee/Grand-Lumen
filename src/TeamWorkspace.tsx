@@ -58,15 +58,16 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       setMessages([]);
       return;
     }
+    const client = supabase;
     let alive = true;
     const loadMessages = async () => {
-      const conversation = await supabase.from("grand_lumen_team_conversations").select("id").eq("connection_id", selected.id).single();
+      const conversation = await client.from("grand_lumen_team_conversations").select("id").eq("connection_id", selected.id).single();
       if (conversation.error) { setNotice(conversation.error.message); return; }
-      const result = await supabase.from("grand_lumen_team_messages").select("*").eq("conversation_id", conversation.data.id).order("created_at", { ascending: true }).limit(150);
+      const result = await client.from("grand_lumen_team_messages").select("*").eq("conversation_id", conversation.data.id).order("created_at", { ascending: true }).limit(150);
       if (alive && !result.error) setMessages((result.data || []) as Message[]);
     };
     void loadMessages();
-    const channel = supabase.channel("grand-lumen-chat-" + selected.id)
+    const channel = client.channel("grand-lumen-chat-" + selected.id)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_team_messages" }, payload => {
         const message = payload.new as Message;
         if (alive) setMessages(current => current.some(item => item.id === message.id) ? current : [...current, message]);
