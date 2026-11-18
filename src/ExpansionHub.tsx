@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Activity, BookOpen, CalendarDays, CheckCircle2, Copy, Download, FileText, Globe2, Languages, Plus, Search, ShieldCheck, Trash2, Upload, Wifi, WifiOff } from "lucide-react";
 
-type ModuleName = "Knowledge Graph" | "Verify" | "Document Intelligence" | "World" | "Pulse" | "Scan" | "Workspace" | "Finance" | "Vault" | "Academy" | "Code" | "Lab" | "Create" | "Translate" | "Accessibility" | "Offline" | "Connect" | "Alerts";
+type ModuleName = "Knowledge Graph" | "Verify" | "Document Intelligence" | "Convert" | "World" | "Pulse" | "Scan" | "Workspace" | "Finance" | "Vault" | "Academy" | "Code" | "Lab" | "Create" | "Translate" | "Accessibility" | "Offline" | "Connect" | "Alerts";
 type Task = { id: string; title: string; due: string; done: boolean };
 type Entry = { id: string; name: string; amount: number; kind: "Income" | "Expense"; date: string };
 type SavedFile = { id: string; name: string; type: string; size: number; data: string; savedAt: string };
@@ -13,6 +13,7 @@ const modules: { name: ModuleName; group: string; description: string }[] = [
   { name: "Knowledge Graph", group: "Knowledge", description: "Explore connected concepts and source-backed topic relationships." },
   { name: "Verify", group: "Knowledge", description: "Compare claims with independent sources before drawing conclusions." },
   { name: "Document Intelligence", group: "Knowledge", description: "Read, extract and organize text from your documents." },
+  { name: "Convert", group: "Utilities", description: "Convert everyday units, measurements, data sizes and temperatures." },
   { name: "World", group: "Utilities", description: "Weather, currencies, time zones and country information." },
   { name: "Pulse", group: "Utilities", description: "Search global news and follow current developments." },
   { name: "Scan", group: "Utilities", description: "Create QR codes and open the existing camera scanner." },
@@ -109,6 +110,11 @@ export default function ExpansionHub({ onOpenScanner }: { onOpenScanner?: () => 
   const [documentName, setDocumentName] = useState("");
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState("");
   const [documentSummary, setDocumentSummary] = useState("");
+  const [convertValue, setConvertValue] = useState("1");
+  const [convertCategory, setConvertCategory] = useState("Length");
+  const [convertFrom, setConvertFrom] = useState("m");
+  const [convertTo, setConvertTo] = useState("km");
+  const [convertResult, setConvertResult] = useState("");
   const [weatherPlace, setWeatherPlace] = useState("");
   const [weatherData, setWeatherData] = useState<any>(null);
   const [currencyAmount, setCurrencyAmount] = useState("1");
@@ -417,6 +423,30 @@ export default function ExpansionHub({ onOpenScanner }: { onOpenScanner?: () => 
     setNotice("Project plan saved on this device.");
   };
 
+  const doUniversalConversion = () => {
+    const value = Number(convertValue);
+    if (!Number.isFinite(value)) { setConvertResult("Enter a valid number."); return; }
+    const groups: Record<string, Record<string, number>> = {
+      Length: { m: 1, km: 1000, cm: 0.01, mm: 0.001, mi: 1609.344, ft: 0.3048, in: 0.0254, yd: 0.9144 },
+      Mass: { kg: 1, g: 0.001, mg: 0.000001, tonne: 1000, lb: 0.45359237, oz: 0.028349523125 },
+      Volume: { L: 1, mL: 0.001, m3: 1000, "US gal": 3.785411784, "UK gal": 4.54609 },
+      Speed: { "m/s": 1, "km/h": 1 / 3.6, mph: 0.44704, knot: 0.514444 },
+      Area: { "m²": 1, "km²": 1000000, "cm²": 0.0001, hectare: 10000, acre: 4046.8564224 },
+      Time: { second: 1, minute: 60, hour: 3600, day: 86400 },
+      Data: { B: 1, KB: 1000, MB: 1000000, GB: 1000000000, TB: 1000000000000 }
+    };
+    if (convertCategory === "Temperature") {
+      const celsius = convertFrom === "°C" ? value : convertFrom === "°F" ? (value - 32) * 5 / 9 : value - 273.15;
+      const result = convertTo === "°C" ? celsius : convertTo === "°F" ? celsius * 9 / 5 + 32 : celsius + 273.15;
+      setConvertResult(value + " " + convertFrom + " = " + Number(result.toPrecision(10)) + " " + convertTo);
+      return;
+    }
+    const units = groups[convertCategory];
+    if (!units || units[convertFrom] === undefined || units[convertTo] === undefined) return;
+    const result = value * units[convertFrom] / units[convertTo];
+    setConvertResult(value + " " + convertFrom + " = " + Number(result.toPrecision(10)) + " " + convertTo);
+  };
+
   const doLabConversion = () => {
     const value = Number(labValue);
     if (!Number.isFinite(value)) { setLabResult("Enter a valid number."); return; }
@@ -473,6 +503,8 @@ export default function ExpansionHub({ onOpenScanner }: { onOpenScanner?: () => 
     {active === "Verify" && <Panel title="Claim comparison" description="Search independent reference collections. This tool presents evidence to inspect; it does not issue an automatic true/false verdict."><textarea value={claim} onChange={e => setClaim(e.target.value)} placeholder="Enter a factual claim to investigate…"/><ActionButton onClick={() => void verifyClaim()} disabled={verifyBusy || !claim.trim()}>{verifyBusy ? "Comparing sources…" : "Compare sources"}</ActionButton>{verifyResults.length > 0 && <div className="lh-results">{verifyResults.map((item, index) => <article key={item.url + index}><span>{item.source}</span><a href={item.url} target="_blank" rel="noreferrer">{item.title}</a><p>{item.description}</p></article>)}</div>}</Panel>}
 
     {active === "Document Intelligence" && <div className="lh-two-col"><Panel title="Document reader" description="Extract text from plain-text, Markdown, CSV and JSON files. PDF viewing is supported through your browser; paste selected passages for analysis."><label className="lh-upload"><Upload size={16}/> Choose a document<input type="file" accept=".txt,.md,.csv,.json,.pdf,text/plain,text/markdown,text/csv,application/pdf" onChange={e => { const file = e.target.files?.[0]; if (file) void readDocument(file); }}/></label>{documentName && <p className="lh-muted">Selected: {documentName}</p>}<textarea value={documentText} onChange={e => setDocumentText(e.target.value)} placeholder="Document text appears here, or paste a passage…"/><ActionButton onClick={makeSummary} disabled={!documentText.trim()}>Extract key sentences</ActionButton>{documentSummary && <div className="lh-output"><b>Extracted key sentences</b><p>{documentSummary}</p><ActionButton onClick={() => navigator.clipboard?.writeText(documentSummary)}><Copy size={14}/> Copy extraction</ActionButton></div>}</Panel><Panel title="Reading workspace" description="A place to collect passages, observations and document notes.">{pdfPreviewUrl && <iframe className="lh-pdf-preview" title="PDF document preview" src={pdfPreviewUrl}/>}<p className="lh-muted">Text extraction is rule-based, not AI summarization. PDF files can be viewed here, then selected passages can be pasted into the reader. Always check the original document before relying on an extracted passage.</p><button className="lh-secondary" onClick={() => { setDocumentText(""); setDocumentName(""); setDocumentSummary(""); if (pdfPreviewUrl) URL.revokeObjectURL(pdfPreviewUrl); setPdfPreviewUrl(""); }}>Clear reader</button></Panel></div>}
+
+    {active === "Convert" && <Panel title="Universal unit converter" description="Convert length, mass, volume, speed, area, time, data size and temperature. Currency reference conversion is available in World."><div className="lh-input-row"><label className="lh-field">Category<select value={convertCategory} onChange={e => { const category = e.target.value; setConvertCategory(category); const first = category === "Temperature" ? "°C" : category === "Length" ? "m" : category === "Mass" ? "kg" : category === "Volume" ? "L" : category === "Speed" ? "m/s" : category === "Area" ? "m²" : category === "Time" ? "second" : "B"; const second = category === "Temperature" ? "°F" : category === "Length" ? "km" : category === "Mass" ? "g" : category === "Volume" ? "mL" : category === "Speed" ? "km/h" : category === "Area" ? "km²" : category === "Time" ? "minute" : "KB"; setConvertFrom(first); setConvertTo(second); setConvertResult(""); }}><option>Length</option><option>Mass</option><option>Volume</option><option>Speed</option><option>Area</option><option>Time</option><option>Data</option><option>Temperature</option></select></label><label className="lh-field">Value<input type="number" value={convertValue} onChange={e => setConvertValue(e.target.value)}/></label></div><div className="lh-input-row"><label className="lh-field">From<select value={convertFrom} onChange={e => setConvertFrom(e.target.value)}>{(convertCategory === "Temperature" ? ["°C","°F","K"] : Object.keys(({Length:{m:1,km:1,cm:1,mm:1,mi:1,ft:1,in:1,yd:1},Mass:{kg:1,g:1,mg:1,tonne:1,lb:1,oz:1},Volume:{L:1,mL:1,m3:1,"US gal":1,"UK gal":1},Speed:{"m/s":1,"km/h":1,mph:1,knot:1},Area:{"m²":1,"km²":1,"cm²":1,hectare:1,acre:1},Time:{second:1,minute:1,hour:1,day:1},Data:{B:1,KB:1,MB:1,GB:1,TB:1}} as Record<string,Record<string,number>>)[convertCategory] || {})).map(unit => <option key={unit}>{unit}</option>)}</select></label><label className="lh-field">To<select value={convertTo} onChange={e => setConvertTo(e.target.value)}>{(convertCategory === "Temperature" ? ["°C","°F","K"] : Object.keys(({Length:{m:1,km:1,cm:1,mm:1,mi:1,ft:1,in:1,yd:1},Mass:{kg:1,g:1,mg:1,tonne:1,lb:1,oz:1},Volume:{L:1,mL:1,m3:1,"US gal":1,"UK gal":1},Speed:{"m/s":1,"km/h":1,mph:1,knot:1},Area:{"m²":1,"km²":1,"cm²":1,hectare:1,acre:1},Time:{second:1,minute:1,hour:1,day:1},Data:{B:1,KB:1,MB:1,GB:1,TB:1}} as Record<string,Record<string,number>>)[convertCategory] || {})).map(unit => <option key={unit}>{unit}</option>)}</select></label><ActionButton onClick={doUniversalConversion}>Convert</ActionButton></div>{convertResult && <div className="lh-output"><strong>{convertResult}</strong></div>}</Panel>}
 
     {active === "World" && <div className="lh-two-col"><Panel title="Weather around the world" description="Current conditions and a short forecast from Open-Meteo."><div className="lh-input-row"><input value={weatherPlace} onChange={e => setWeatherPlace(e.target.value)} onKeyDown={e => e.key === "Enter" && void loadWorldWeather()} placeholder="City or town"/><ActionButton onClick={() => void loadWorldWeather()}>Get weather</ActionButton></div>{weatherData && <div className="lh-output"><h4>{weatherData.place.name}, {weatherData.place.country}</h4><strong>{weatherData.forecast.current.temperature_2m}°C</strong><p>Feels like {weatherData.forecast.current.apparent_temperature}°C · Humidity {weatherData.forecast.current.relative_humidity_2m}% · Wind {weatherData.forecast.current.wind_speed_10m} km/h</p><div className="lh-weather-days">{weatherData.forecast.daily.time.slice(0, 5).map((day: string, index: number) => <span key={day}>{day}<b>{weatherData.forecast.daily.temperature_2m_max[index]}° / {weatherData.forecast.daily.temperature_2m_min[index]}°</b></span>)}</div></div>}</Panel><Panel title="Currency converter" description="Reference exchange rates from Frankfurter. Rates are not a guaranteed transaction quote."><div className="lh-input-row"><input type="number" min="0" value={currencyAmount} onChange={e => setCurrencyAmount(e.target.value)}/><select value={currencyFrom} onChange={e => setCurrencyFrom(e.target.value)}>{["USD","GHS","EUR","GBP","NGN","ZAR","CAD","JPY","INR","KES"].map(x => <option key={x}>{x}</option>)}</select><span>to</span><select value={currencyTo} onChange={e => setCurrencyTo(e.target.value)}>{["GHS","USD","EUR","GBP","NGN","ZAR","CAD","JPY","INR","KES"].map(x => <option key={x}>{x}</option>)}</select><ActionButton onClick={() => void convertCurrency()}>Convert</ActionButton></div>{currencyData && <div className="lh-output"><strong>{currencyAmount} {currencyFrom} = {Number(currencyData.converted).toFixed(2)} {currencyTo}</strong><small>Rate date: {currencyData.date}</small></div>}<label className="lh-field">World clock<select value={worldTime} onChange={e => setWorldTime(e.target.value)}>{["Africa/Accra","Europe/London","Europe/Paris","America/New_York","America/Los_Angeles","Asia/Tokyo","Asia/Dubai","Asia/Kolkata","Australia/Sydney","Pacific/Auckland"].map(x => <option key={x}>{x}</option>)}</select></label><div className="lh-output"><b>{new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "medium", timeZone: worldTime }).format(new Date())}</b><small>{worldTime}</small></div><h4>Country information</h4><div className="lh-input-row"><input value={countryQuery} onChange={e => setCountryQuery(e.target.value)} placeholder="Country name"/><ActionButton onClick={() => void lookupCountry()}>Find country</ActionButton></div>{countryData && <div className="lh-output"><b>{countryData.name.common}</b><p>Capital: {(countryData.capital || []).join(", ") || "Not listed"} · Region: {countryData.region} · Population: {Number(countryData.population).toLocaleString()}</p><p>Languages: {Object.values(countryData.languages || {}).join(", ")}</p><a href={countryData.maps?.googleMaps} target="_blank" rel="noreferrer">Open country map ↗</a></div>}<h4>Public holidays</h4><div className="lh-input-row"><input value={holidayCountry} onChange={e => setHolidayCountry(e.target.value)} placeholder="ISO country code"/><input type="number" value={holidayYear} onChange={e => setHolidayYear(e.target.value)}/><ActionButton onClick={() => void lookupHolidays()}>Find holidays</ActionButton></div>{holidayData.length > 0 && <div className="lh-task-list">{holidayData.slice(0, 12).map((item: any) => <article key={item.date + item.name}><span>{item.date} · {item.localName}</span><small>{item.name}</small></article>)}</div>}</Panel></div>}
 
