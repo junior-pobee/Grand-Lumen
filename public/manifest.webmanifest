@@ -21,12 +21,6 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/Grand-Lumen/icons/grand-lumen-icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
       "src": "/Grand-Lumen/icons/grand-lumen-192.png",
       "sizes": "192x192",
       "type": "image/png",
