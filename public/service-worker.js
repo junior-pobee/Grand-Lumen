@@ -1,67 +1,58 @@
-const CACHE_PREFIX = "grand-lumen-pwa-";
-const CACHE_NAME = CACHE_PREFIX + "v8";
-const SCOPE_URL = new URL(self.registration.scope);
-const BASE_PATH = SCOPE_URL.pathname.endsWith("/") ? SCOPE_URL.pathname : SCOPE_URL.pathname + "/";
+const CACHE_NAME = "grand-lumen-shell-v3";
 const APP_SHELL = [
-  new URL("./", SCOPE_URL).href,
-  new URL("manifest.webmanifest", SCOPE_URL).href,
-  new URL("icons/grand-lumen-192.png", SCOPE_URL).href,
-  new URL("icons/grand-lumen-512.png", SCOPE_URL).href,
-  new URL("icons/grand-lumen-maskable-512.png", SCOPE_URL).href
+  "./",
+  "./index.html",
+  "./manifest.webmanifest",
+  "./icons/grand-lumen-192.png",
+  "./icons/grand-lumen-512.png",
+  "./icons/grand-lumen-maskable-512.png"
 ];
 
 self.addEventListener("install", event => {
-  event.waitUntil((async () => {
-    const cache = await caches.open(CACHE_NAME);
-    await Promise.allSettled(APP_SHELL.map(async url => {
-      const response = await fetch(url, { cache: "reload" });
-      if (response.ok) await cache.put(url, response);
-    }));
-    await self.skipWaiting();
-  })());
+  event.waitUntil(
+    caches.open(CACHE_NAME).then(async cache => {
+      await Promise.allSettled(APP_SHELL.map(async path => {
+        const response = await fetch(path, { cache: "reload" });
+        if (response.ok) await cache.put(path, response);
+      }));
+      await self.skipWaiting();
+    })
+  );
 });
 
 self.addEventListener("activate", event => {
-  event.waitUntil((async () => {
-    const keys = await caches.keys();
-    await Promise.all(keys.filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME).map(key => caches.delete(key)));
-    await self.clients.claim();
-  })());
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(keys.filter(key => key.startsWith("grand-lumen-shell-") && key !== CACHE_NAME).map(key => caches.delete(key))))
+      .then(() => self.clients.claim())
+  );
 });
 
 self.addEventListener("fetch", event => {
   const request = event.request;
   const url = new URL(request.url);
-  if (request.method !== "GET" || url.origin !== self.location.origin || !url.pathname.startsWith(BASE_PATH)) return;
-
+  if (request.method !== "GET" || url.origin !== self.location.origin) return;
   if (request.mode === "navigate") {
-    event.respondWith((async () => {
-      try {
-        const response = await fetch(request);
+    event.respondWith(
+      fetch(request).then(response => {
         if (response.ok) {
-          const cache = await caches.open(CACHE_NAME);
-          await cache.put(request, response.clone());
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then(cache => cache.put("./index.html", copy));
         }
         return response;
-      } catch {
-        return await caches.match(request) || await caches.match(new URL("./", SCOPE_URL).href) || new Response("Grand-Lumen is unavailable offline.", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } });
-      }
-    })());
+      }).catch(() => caches.match("./index.html").then(response => response || caches.match("./")))
+    );
     return;
   }
-
-  if (request.destination === "script" || request.destination === "style" || request.destination === "image" || request.destination === "font" || url.pathname.endsWith(".webmanifest")) {
-    event.respondWith((async () => {
-      try {
-        const response = await fetch(request);
-        if (response.ok) {
-          const cache = await caches.open(CACHE_NAME);
-          await cache.put(request, response.clone());
-        }
-        return response;
-      } catch {
-        return await caches.match(request) || Response.error();
-      }
-    })());
+  if (url.pathname.includes("/assets/") || url.pathname.endsWith(".png") || url.pathname.endsWith(".svg") || url.pathname.endsWith(".webmanifest")) {
+    event.respondWith(
+      caches.match(request).then(cached => {
+        const update = fetch(request).then(response => {
+          if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()));
+          return response;
+        });
+        return cached || update;
+      })
+    );
   }
 });
