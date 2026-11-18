@@ -179,7 +179,7 @@ html[data-theme=light] .signed-in-email{color:#596b83}
 .orbit-two{width:370px;height:370px;transform:translate(-50%,-50%) rotate(-28deg) scaleY(.66)}
 .orbit-three{width:470px;height:470px;transform:translate(-50%,-50%) rotate(34deg) scaleY(.62)}
 .portal-core{position:relative;width:150px;height:150px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;border:1px solid rgba(179,214,255,.4);border-radius:42px;background:linear-gradient(145deg,rgba(34,66,111,.9),rgba(20,29,62,.94));box-shadow:0 30px 90px rgba(0,0,0,.36),inset 0 1px rgba(255,255,255,.17),0 0 70px rgba(92,151,255,.2);transform:rotate(-8deg)}
-.portal-core>span{font-size:56px;font-weight:900;line-height:.9;color:#b5d9ff;text-shadow:0 0 25px rgba(139,192,255,.5)}
+.portal-core>img{width:112px;height:112px;object-fit:contain;filter:drop-shadow(0 0 22px rgba(76,190,255,.35))}
 .portal-core small{font:8px "DM Mono",monospace;letter-spacing:.2em;text-align:center;color:#b3c9e8}
 .portal-float{position:absolute;z-index:2;display:flex;align-items:center;gap:9px;padding:12px 15px;border:1px solid rgba(169,204,249,.2);border-radius:12px;background:rgba(13,27,48,.8);box-shadow:0 15px 45px rgba(0,0,0,.22);backdrop-filter:blur(16px);color:#d7e7fc;font-size:10px;font-weight:700}
 .portal-float svg{color:#9acbff}
