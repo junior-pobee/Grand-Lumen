@@ -181,7 +181,8 @@ export default function ExpansionHub({ onOpenScanner }: { onOpenScanner?: () => 
   const course = courses[courseIndex];
   const previewDocument = useMemo(() => {
     const html = codeTab === "HTML" ? codeText : codeText;
-    return html.replace("</body>", "<style>" + codeCss + "</style><script>" + codeJs.replace(/<\\/script/gi, "<\\\\/script") + "</script></body>");
+    const script = "<script>" + codeJs + "</" + "script>";
+    return html.replace("</body>", "<style>" + codeCss + "</style>" + script + "</body>");
   }, [codeCss, codeJs, codeText, codeTab]);
 
   const searchKnowledge = async (value = graphTopic) => {
@@ -226,7 +227,7 @@ export default function ExpansionHub({ onOpenScanner }: { onOpenScanner?: () => 
 
   const readDocument = async (file: File) => {
     setDocumentName(file.name);
-    if (file.type === "text/plain" || file.type === "text/markdown" || /\\.(txt|md|csv|json)$/i.test(file.name)) {
+    if (file.type === "text/plain" || file.type === "text/markdown" || /\.(txt|md|csv|json)$/i.test(file.name)) {
       const value = await file.text();
       setDocumentText(value);
       setDocumentSummary("");
@@ -239,10 +240,10 @@ export default function ExpansionHub({ onOpenScanner }: { onOpenScanner?: () => 
   };
 
   const makeSummary = () => {
-    const words = documentText.trim().split(/\\s+/).filter(Boolean);
+    const words = documentText.trim().split(/\s+/).filter(Boolean);
     if (!words.length) return;
     const sentences = documentText.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [documentText];
-    const scored = sentences.map(sentence => ({ sentence: sentence.trim(), score: sentence.trim().split(/\\s+/).length }));
+    const scored = sentences.map(sentence => ({ sentence: sentence.trim(), score: sentence.trim().split(/\s+/).length }));
     setDocumentSummary(scored.sort((a, b) => b.score - a.score).slice(0, 5).map(item => item.sentence).join(" "));
   };
 
