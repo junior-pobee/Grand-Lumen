@@ -4,6 +4,7 @@ import { Activity, Newspaper, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRig
 import type { Session } from "@supabase/supabase-js";
 import Peer from "peerjs";
 import GraphWorkspace from "./GraphWorkspace";
+import ExpansionHub from "./ExpansionHub";
 import { supabase, supabaseConfigured } from "./auth";
 import { getCurrency, getDictionary, getHoliday, getPokemon, getWeather, researchTopic, searchArchiveVideos, searchCommonsImages, searchHackerNews, searchWikipedia, searchGlobalNews, type SearchItem, type NewsItem } from "./api";
 
@@ -38,8 +39,9 @@ async function hashLocalPassword(password: string, salt: string): Promise<string
   return Array.from(new Uint8Array(bits)).map(value => value.toString(16).padStart(2, "0")).join("");
 }
 
-type Section = "Home" | "Search" | "Research" | "News" | "Images" | "Videos" | "Maps" | "Code Lab" | "Learn" | "API Library" | "Tools" | "Scanner" | "Share" | "Saved" | "Projects" | "Creative Studio" | "Messages" | "Settings";
+type Section = "Lumen Hub" | "Home" | "Search" | "Research" | "News" | "Images" | "Videos" | "Maps" | "Code Lab" | "Learn" | "API Library" | "Tools" | "Scanner" | "Share" | "Saved" | "Projects" | "Creative Studio" | "Messages" | "Settings";
 const sections: { name: Section; icon: any; group: string }[] = [
+  { name: "Lumen Hub", icon: Boxes, group: "Workspace" },
   { name: "Home", icon: Compass, group: "Workspace" },
   { name: "Search", icon: Search, group: "Workspace" },
   { name: "Research", icon: FlaskConical, group: "Workspace" },
@@ -2143,6 +2145,7 @@ function App() {
   }
 
   const heading: Record<Section, string> = {
+    "Lumen Hub": "One workspace. More possibilities.",
     Home: "Explore beyond.",
     Search: "Find what matters.",
     Research: "Think deeper.",
@@ -2195,6 +2198,7 @@ function App() {
             <div className="top-actions"><span className="system-status"><i /> SYSTEM READY</span><span className="signed-in-email">{session?.user.email || localProfile?.email || "LOCAL WORKSPACE"}</span><button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => void handleLogout()} aria-label="Sign out"><LogOut size={16} /></button></div>
           </header>
           <div className="content-wrap">
+            {section === "Lumen Hub" && <section><PageTitle eyebrow="GLOBAL DIGITAL UTILITY PLATFORM" title={heading["Lumen Hub"]} description="Connected knowledge, everyday utilities, productivity, learning and accessibility tools. AI is intentionally excluded from this release."/><ExpansionHub onOpenScanner={() => selectSection("Scanner")}/></section>}
             {section === "Home" && <section>
               <div className="hero-block"><div className="eyebrow"><Sparkles size={13} /> YOUR EXPANDED DIGITAL UNIVERSE</div><h1>Explore beyond<br /><span>what you know.</span></h1><p>One workspace for discovery, research, learning, development and creation. Your next idea starts here.</p><div className="hero-search"><Search size={19} /><input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && runSearch()} placeholder="Search knowledge, ideas, technology..." /><button onClick={() => { selectSection("Search"); runSearch(); }}>Explore <ArrowRight size={15} /></button></div><div className="quick-tags"><button onClick={() => { setQuery("artificial intelligence"); selectSection("Search"); }}>Artificial intelligence</button><button onClick={() => { setQuery("space exploration"); selectSection("Search"); }}>Space exploration</button><button onClick={() => { setQuery("web development"); selectSection("Search"); }}>Web development</button></div></div>
               <div className="section-heading"><div><span className="eyebrow">THE WORKSPACE</span><h2>Everything in one orbit.</h2></div><span className="muted">12 connected spaces</span></div>
