@@ -434,3 +434,16 @@ body:has(.studio-shell.studio-preview-expanded){overflow:hidden}
   .studio-has-preview .studio-preview-controls button:first-child{display:none}
   .studio-has-preview .studio-preview-controls button:last-child{display:flex;min-width:40px;min-height:36px}
 }
+
+
+.language-settings-card{align-items:center;gap:22px}
+.language-setting-control{display:grid;grid-template-columns:minmax(180px,1fr) auto;gap:9px;align-items:center;min-width:min(100%,340px)}
+.language-setting-control input{width:100%;min-height:43px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text);padding:0 12px;font:inherit}
+.language-setting-control span{grid-column:1/-1;color:var(--muted);font-size:11px}
+.language-setting-control .quiet-button{white-space:nowrap}
+.grand-lumen-translate-host{position:fixed;left:-10000px;top:-10000px;width:1px;height:1px;overflow:hidden;visibility:hidden;pointer-events:none}
+.goog-te-banner-frame,.skiptranslate iframe,.goog-te-gadget-icon{display:none!important}
+body{top:0!important}
+.goog-te-gadget{font-size:0!important}
+.goog-tooltip,.goog-tooltip:hover{display:none!important}
+@media(max-width:650px){.language-settings-card{align-items:stretch;flex-direction:column}.language-setting-control{min-width:0;width:100%;grid-template-columns:minmax(0,1fr) auto}}
