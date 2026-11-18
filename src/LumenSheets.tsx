@@ -246,6 +246,25 @@ export default function LumenSheets({ userId }: { userId: string }) {
     return values;
   }, [cells]);
 
+  useEffect(() => {
+    if (!supabase || !sheet) return;
+    const channel = supabase.channel("lumen-sheet-live-" + sheet.id)
+      .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_sheet_cells", filter: "sheet_id=eq." + sheet.id }, payload => {
+        if (payload.eventType === "DELETE") {
+          const removed = payload.old as Cell;
+          setCells(current => {
+            const next = { ...current };
+            delete next[removed.cell_ref];
+            return next;
+          });
+        } else {
+          const updated = payload.new as Cell;
+          setCells(current => ({ ...current, [updated.cell_ref]: updated }));
+        }
+      }).subscribe();
+    return () => { void supabase?.removeChannel(channel); };
+  }, [sheet?.id]);
+
   useEffect(() => { setInput(cells[selected]?.formula || cells[selected]?.value || ""); }, [selected, cells]);
 
   if (!supabase) return <div className="sheets-workspace"><div className="team-empty"><h3>Cloud account required</h3><p>Sign in with your Grand Lumen cloud account to save business records and access them on other devices.</p></div></div>;
