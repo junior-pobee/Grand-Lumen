@@ -168,7 +168,7 @@ function PublicPortal({ onGuest }: { onGuest: (profile?: { fullName: string; ema
     <div className="portal-ambient portal-ambient-one" />
     <div className="portal-ambient portal-ambient-two" />
     <header className="portal-nav">
-      <button className="portal-brand" onClick={() => setMode("about")}><span className="portal-brand-mark">L</span><span><b>GRAND-LUMEN</b><small>EXPLORE BEYOND</small></span></button>
+      <button className="portal-brand" onClick={() => setMode("about")}><span className="portal-brand-mark"><img src={`${import.meta.env.BASE_URL}icons/grand-lumen-icon.svg`} alt="Grand-Lumen" /></span><span><b>GRAND-LUMEN</b><small>EXPLORE BEYOND</small></span></button>
       <nav><button className={mode === "about" ? "portal-nav-active" : ""} onClick={() => setMode("about")}>Overview</button><button onClick={() => setMode("signin")}>Sign in</button><button className="portal-nav-cta" onClick={() => setMode("signup")}>Create account <ArrowUpRight size={15} /></button></nav>
     </header>
     {mode === "about" ? <main className="portal-about">
@@ -272,7 +272,7 @@ function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup";
     }
   };
   return <main className="portal-auth-layout">
-    <section className="portal-auth-story"><button className="portal-brand" onClick={() => onModeChange("about")}><span className="portal-brand-mark">L</span><span><b>GRAND-LUMEN</b><small>EXPLORE BEYOND</small></span></button><div className="portal-story-copy"><span className="portal-kicker">YOUR NEXT CHAPTER STARTS HERE</span><h1>{isSignup ? "Create space for your next idea." : "Your world of discovery awaits."}</h1><p>Research, learn, explore and build from one connected digital workspace.</p><div className="portal-story-points"><span><CheckCircle2 size={17}/> One account across your devices</span><span><CheckCircle2 size={17}/> A workspace built for curiosity</span><span><CheckCircle2 size={17}/> Secure email and password access</span></div></div><div className="portal-story-footer">GRAND-LUMEN · EXPLORE BEYOND</div></section>
+    <section className="portal-auth-story"><button className="portal-brand" onClick={() => onModeChange("about")}><span className="portal-brand-mark"><img src={`${import.meta.env.BASE_URL}icons/grand-lumen-icon.svg`} alt="Grand-Lumen" /></span><span><b>GRAND-LUMEN</b><small>EXPLORE BEYOND</small></span></button><div className="portal-story-copy"><span className="portal-kicker">YOUR NEXT CHAPTER STARTS HERE</span><h1>{isSignup ? "Create space for your next idea." : "Your world of discovery awaits."}</h1><p>Research, learn, explore and build from one connected digital workspace.</p><div className="portal-story-points"><span><CheckCircle2 size={17}/> One account across your devices</span><span><CheckCircle2 size={17}/> A workspace built for curiosity</span><span><CheckCircle2 size={17}/> Secure email and password access</span></div></div><div className="portal-story-footer">GRAND-LUMEN · EXPLORE BEYOND</div></section>
     <section className="portal-auth-side"><div className="portal-auth-card"><button className="portal-back-link" onClick={() => onModeChange("about")}><ArrowLeft size={15}/> Back to overview</button><div className="portal-auth-tabs"><button className={!isSignup ? "active" : ""} onClick={() => { onModeChange("signin"); setNotice(""); }}>Sign in</button><button className={isSignup ? "active" : ""} onClick={() => { onModeChange("signup"); setNotice(""); }}>Create account</button></div><span className="portal-kicker">{isSignup ? "JOIN GRAND-LUMEN" : "WELCOME BACK"}</span><h2>{isSignup ? "Start exploring." : "Good to see you."}</h2><p className="portal-auth-intro">{isSignup ? "Create your account to enter your personal workspace." : "Sign in to continue to your Grand-Lumen workspace."}</p>
       {!supabaseConfigured && <div className="portal-config-notice"><LockKeyhole size={17}/><span>Temporary local accounts are active. Your account works in this browser only; cross-device sync will be enabled when cloud authentication is added.</span></div>}
       <form onSubmit={submit}>
@@ -1614,7 +1614,7 @@ function App() {
     Settings: "Shape your workspace."
   };
 
-  if (!authReady) return <div className="auth-boot"><div className="portal-brand-mark">L</div><span>SECURING YOUR WORKSPACE</span></div>;
+  if (!authReady) return <div className="auth-boot"><div className="portal-brand-mark"><img src={`${import.meta.env.BASE_URL}icons/grand-lumen-icon.svg`} alt="Grand-Lumen" /></div><span>SECURING YOUR WORKSPACE</span></div>;
   if (!session && !guestMode) return <PublicPortal onGuest={(profile) => { if (profile) setLocalProfile(profile); setGuestMode(true); }} />;
 
   return (
@@ -1628,7 +1628,7 @@ function App() {
       </div>}
       <div className={theme === "light" ? "app-shell theme-light" : "app-shell theme-dark"} style={{ "--gl-font-scale": fontScale, "--gl-interface-scale": interfaceScale, "--gl-font-family": fontFamily, "--gl-font-weight": fontWeight } as React.CSSProperties}>
         <aside className={mobileMenu ? "sidebar open" : "sidebar"}>
-          <div className="brand"><span className="brand-mark">L</span><div><strong>GRAND-LUMEN</strong><small>EXPLORE BEYOND</small></div></div>
+          <div className="brand"><span className="brand-mark"><img src={`${import.meta.env.BASE_URL}icons/grand-lumen-icon.svg`} alt="Grand-Lumen" /></span><div><strong>GRAND-LUMEN</strong><small>EXPLORE BEYOND</small></div></div>
           <div className="workspace-label">WORKSPACE</div>
           <nav className="side-nav">
             {sections.map(item => {
