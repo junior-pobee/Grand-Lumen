@@ -6,15 +6,43 @@
   "start_url": "/Grand-Lumen/",
   "scope": "/Grand-Lumen/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui"],
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
   "orientation": "any",
   "background_color": "#06070d",
   "theme_color": "#06070d",
-  "categories": ["education", "productivity", "utilities"],
+  "categories": [
+    "education",
+    "productivity",
+    "utilities"
+  ],
   "prefer_related_applications": false,
   "icons": [
-    {"src": "/Grand-Lumen/icons/grand-lumen-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
-    {"src": "/Grand-Lumen/icons/grand-lumen-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-    {"src": "/Grand-Lumen/icons/grand-lumen-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+    {
+      "src": "/Grand-Lumen/icons/grand-lumen-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/Grand-Lumen/icons/grand-lumen-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/Grand-Lumen/icons/grand-lumen-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/Grand-Lumen/icons/grand-lumen-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
