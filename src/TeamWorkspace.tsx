@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
+import Peer from "peerjs";
 import { supabase } from "./auth";
 
 type Profile = { id: string; display_name: string | null; email: string | null; avatar_url: string | null };
@@ -7,6 +8,7 @@ type Connection = { id: string; user_low: string; user_high: string };
 type RequestRow = { id: string; requester_id: string; recipient_id: string; status: string; created_at: string };
 type Message = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string };
 type Project = { id: string; user_id: string; name: string; description: string; status: string };
+type CallInvite = { id: string; connection_id: string; caller_id: string; recipient_id: string; peer_id: string; media_type: "audio" | "video"; status: string; expires_at: string };
 
 export default function TeamWorkspace({ userId, email }: { userId: string; email: string }) {
   const [invite, setInvite] = useState("");
@@ -22,6 +24,17 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   const [projectDescription, setProjectDescription] = useState("");
   const [projectMember, setProjectMember] = useState("");
   const [projectRole, setProjectRole] = useState<"viewer" | "editor" | "manager">("editor");
+  const [incomingCall, setIncomingCall] = useState<CallInvite | null>(null);
+  const [activeCallId, setActiveCallId] = useState("");
+  const [callStatus, setCallStatus] = useState("");
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const peerRef = useRef<Peer | null>(null);
+  const callRef = useRef<any>(null);
+  const localStreamRef = useRef<MediaStream | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -60,6 +73,104 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       .subscribe();
     return () => { void supabase?.removeChannel(channel); };
   }, [loadTeam, userId]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    const channel = supabase.channel("grand-lumen-call-invites-" + userId)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_team_call_invites", filter: "recipient_id=eq." + userId }, payload => {
+        const invitation = payload.new as CallInvite;
+        if (invitation.status === "pending" && new Date(invitation.expires_at).getTime() > Date.now()) setIncomingCall(invitation);
+      }).subscribe();
+    return () => { void supabase?.removeChannel(channel); };
+  }, [userId]);
+
+  useEffect(() => {
+    if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream;
+    if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream;
+    if (remoteAudioRef.current && remoteStream) remoteAudioRef.current.srcObject = remoteStream;
+  }, [localStream, remoteStream]);
+
+  const finishCall = async (updateServer = true) => {
+    if (updateServer && supabase && activeCallId) await supabase.from("grand_lumen_team_call_invites").update({ status: "ended" }).eq("id", activeCallId);
+    callRef.current?.close();
+    peerRef.current?.destroy();
+    peerRef.current = null;
+    localStreamRef.current?.getTracks().forEach(track => track.stop());
+    localStreamRef.current = null;
+    setLocalStream(null);
+    setRemoteStream(null);
+    setActiveCallId("");
+    setIncomingCall(null);
+    setCallStatus("");
+  };
+
+  const startCall = async (mediaType: "audio" | "video") => {
+    if (!supabase || !selected) return;
+    if (!navigator.mediaDevices?.getUserMedia) { setNotice("Calls require a secure HTTPS connection and browser media support."); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: mediaType === "video" });
+      localStreamRef.current = stream;
+      setLocalStream(stream);
+      const peer = new Peer();
+      peerRef.current = peer;
+      peer.on("error", reason => setNotice("Call connection error: " + reason.message));
+      peer.on("call", incoming => {
+        const local = localStreamRef.current;
+        if (!local) { incoming.close(); return; }
+        callRef.current = incoming;
+        incoming.answer(local);
+        incoming.on("stream", streamValue => { setRemoteStream(streamValue); setCallStatus("Connected"); });
+        incoming.on("close", () => void finishCall(false));
+      });
+      peer.on("open", async peerId => {
+        const memberId = selected.user_low === userId ? selected.user_high : selected.user_low;
+        const result = await supabase.from("grand_lumen_team_call_invites").insert({
+          connection_id: selected.id,
+          caller_id: userId,
+          recipient_id: memberId,
+          peer_id: peerId,
+          media_type: mediaType
+        }).select("id").single();
+        if (result.error) { setNotice(result.error.message); await finishCall(false); return; }
+        setActiveCallId(result.data.id);
+        setCallStatus(mediaType === "video" ? "Starting video call…" : "Starting voice call…");
+      });
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : "Camera or microphone permission was not granted.");
+      await finishCall(false);
+    }
+  };
+
+  const acceptCall = async () => {
+    if (!supabase || !incomingCall) return;
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: incomingCall.media_type === "video" });
+      localStreamRef.current = stream;
+      setLocalStream(stream);
+      const peer = new Peer();
+      peerRef.current = peer;
+      peer.on("error", reason => setNotice("Call connection error: " + reason.message));
+      peer.on("open", () => {
+        const call = peer.call(incomingCall.peer_id, stream);
+        callRef.current = call;
+        call.on("stream", streamValue => { setRemoteStream(streamValue); setCallStatus("Connected"); });
+        call.on("close", () => void finishCall(false));
+      });
+      const result = await supabase.from("grand_lumen_team_call_invites").update({ status: "accepted" }).eq("id", incomingCall.id);
+      if (result.error) throw result.error;
+      setActiveCallId(incomingCall.id);
+      setCallStatus(incomingCall.media_type === "video" ? "Connecting video…" : "Connecting voice…");
+      setIncomingCall(null);
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : "Could not accept the call.");
+      await finishCall(false);
+    }
+  };
+
+  const declineCall = async () => {
+    if (supabase && incomingCall) await supabase.from("grand_lumen_team_call_invites").update({ status: "declined" }).eq("id", incomingCall.id);
+    setIncomingCall(null);
+  };
 
   useEffect(() => {
     if (!supabase || !selected) {
@@ -215,6 +326,8 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   return <div className="team-workspace">
     <div className="team-intro"><div><span className="eyebrow">COLLABORATION NETWORK</span><h2>Build together.</h2><p>Connect by invitation, approve every request and collaborate in private conversations.</p></div><span className="team-account"><b>{email}</b><small>ACTIVE CLOUD ACCOUNT</small></span></div>
     {notice && <div className="team-notice" role="status">{notice}</div>}
+    {incomingCall && <section className="team-incoming-call"><div><b>Incoming {incomingCall.media_type === "video" ? "video" : "voice"} call</b><small>Another connected Team member is calling you.</small></div><div className="team-actions"><button className="team-secondary" onClick={() => void declineCall()}>Decline</button><button className="team-primary" onClick={() => void acceptCall()}>Accept</button></div></section>}
+    {callStatus && <section className="team-call-panel"><div className="team-card-heading"><div><span className="eyebrow">LIVE CALL</span><h3>{callStatus}</h3></div><button className="team-secondary" onClick={() => void finishCall()}>End call</button></div><div className="team-call-media">{remoteStream && <video ref={remoteVideoRef} autoPlay playsInline/>}{localStream && <video ref={localVideoRef} autoPlay playsInline muted/>}<audio ref={remoteAudioRef} autoPlay/></div><small>Calls connect directly between devices. Browser camera and microphone permissions are required.</small></section>}
     <div className="team-grid">
       <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR IDENTITY</span><h3>Personal QR invitation</h3></div><span className="team-icon">QR</span></div><p>Create a temporary QR code. It contains a one-time invitation token, not your email address.</p><button className="team-primary" onClick={() => void createInvite()} disabled={busy}>Create my QR code</button>
         {invite && <div className="team-qr"><QRCodeSVG value={JSON.stringify({ type: "grand-lumen-team-invite", token: invite })} size={190} level="M"/><b>Expires at {inviteExpiry}</b><button onClick={() => { void navigator.clipboard?.writeText(invite); setNotice("Invitation code copied."); }}>Copy invitation code</button></div>}
@@ -224,6 +337,6 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">CONNECTION REQUESTS</span><h3>Requests awaiting your approval</h3></div><span className="team-count">{requests.length}</span></div>{requests.length ? requests.map(request => <div className="team-request" key={request.id}><div><b>Grand Lumen member</b><small>Account ID · {request.requester_id.slice(0, 8)}</small></div><div className="team-actions"><button className="team-secondary" disabled={busy} onClick={() => void respond(request.id, false)}>Decline</button><button className="team-primary" disabled={busy} onClick={() => void respond(request.id, true)}>Accept</button></div></div>) : <p className="team-muted">No pending requests.</p>}</section>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR NETWORK</span><h3>Connected members</h3></div><span className="team-count">{connections.length}</span></div>{connections.length ? <div className="team-contacts">{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; const profile = profiles[memberId]; return <button className={selected?.id === connection.id ? "team-contact active" : "team-contact"} key={connection.id} onClick={() => setSelected(connection)}><span className="team-avatar">{(profile?.display_name || profile?.email || "GL").slice(0, 1).toUpperCase()}</span><span><b>{profile?.display_name || "Grand Lumen member"}</b><small>{profile?.email || "Connected account"}</small></span></button>; })}</div> : <p className="team-muted">Your connections will appear here after they approve your requests.</p>}</section>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">SHARED WORK</span><h3>Team projects</h3></div><span className="team-count">{projects.length}</span></div><div className="team-project-create"><input value={projectName} onChange={event => setProjectName(event.target.value)} placeholder="Project name"/><input value={projectDescription} onChange={event => setProjectDescription(event.target.value)} placeholder="Short project description"/><button className="team-primary" onClick={() => void createProject()} disabled={!projectName.trim()}>Create project</button></div>{projects.map(project => <article className="team-project-row" key={project.id}><div><b>{project.name}</b><small>{project.description || "No description"} · {project.user_id === userId ? "Owner" : "Shared with you"}</small></div>{project.user_id === userId && connections.length > 0 && <div className="team-project-share"><select value={projectMember} onChange={event => setProjectMember(event.target.value)}><option value="">Choose member</option>{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; return <option key={memberId} value={memberId}>{profiles[memberId]?.display_name || profiles[memberId]?.email || memberId.slice(0, 8)}</option>; })}</select><select value={projectRole} onChange={event => setProjectRole(event.target.value as "viewer" | "editor" | "manager")}><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="manager">Manager</option></select><button className="team-secondary" onClick={() => void shareProject(project.id)} disabled={!projectMember}>Share</button></div>}</article>)}{!projects.length && <p className="team-muted">Create a cloud project, then share it with connected members.</p>}</section>
-    {selected && <section className="team-card team-chat"><div className="team-card-heading"><div><span className="eyebrow">PRIVATE CONVERSATION</span><h3>{(() => { const memberId = selected.user_low === userId ? selected.user_high : selected.user_low; return profiles[memberId]?.display_name || "Team member"; })()}</h3></div><div className="team-actions"><button className="team-secondary" onClick={openWhatsApp}>WhatsApp</button><button className="team-secondary" onClick={() => setSelected(null)}>Close chat</button></div></div><div className="team-message-list">{messages.map(message => <article className={message.sender_id === userId ? "team-message own" : "team-message"} key={message.id}><p>{message.body}</p><small>{new Date(message.created_at).toLocaleString()}</small></article>)}{!messages.length && <p className="team-muted">Start the conversation.</p>}</div><form className="team-compose" onSubmit={event => { event.preventDefault(); void sendMessage(); }}><input value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write a message…" maxLength={12000}/><button className="team-primary" disabled={!draft.trim()}>Send</button></form><div className="team-call-note">Voice and video calling require a configured call-signalling service. Chat and connection features are available here.</div></section>}
+    {selected && <section className="team-card team-chat"><div className="team-card-heading"><div><span className="eyebrow">PRIVATE CONVERSATION</span><h3>{(() => { const memberId = selected.user_low === userId ? selected.user_high : selected.user_low; return profiles[memberId]?.display_name || "Team member"; })()}</h3></div><div className="team-actions"><button className="team-secondary" onClick={() => void startCall("audio")}>Voice call</button><button className="team-secondary" onClick={() => void startCall("video")}>Video call</button><button className="team-secondary" onClick={openWhatsApp}>WhatsApp</button><button className="team-secondary" onClick={() => setSelected(null)}>Close chat</button></div></div><div className="team-message-list">{messages.map(message => <article className={message.sender_id === userId ? "team-message own" : "team-message"} key={message.id}><p>{message.body}</p><small>{new Date(message.created_at).toLocaleString()}</small></article>)}{!messages.length && <p className="team-muted">Start the conversation.</p>}</div><form className="team-compose" onSubmit={event => { event.preventDefault(); void sendMessage(); }}><input value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write a message…" maxLength={12000}/><button className="team-primary" disabled={!draft.trim()}>Send</button></form><div className="team-call-note">Voice and video calling require a configured call-signalling service. Chat and connection features are available here.</div></section>}
   </div>;
 }
