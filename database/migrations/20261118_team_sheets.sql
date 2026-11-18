@@ -419,6 +419,19 @@ for select to authenticated using (
   id = auth.uid() or public.grand_lumen_are_connected(auth.uid(), id)
 );
 
+
+grant select on public.grand_lumen_team_invites to authenticated;
+grant select on public.grand_lumen_connection_requests to authenticated;
+grant select on public.grand_lumen_team_connections to authenticated;
+grant select on public.grand_lumen_team_conversations to authenticated;
+grant select, insert on public.grand_lumen_team_messages to authenticated;
+grant select, insert, update, delete on public.grand_lumen_project_members to authenticated;
+grant select, insert, update, delete on public.grand_lumen_workbooks to authenticated;
+grant select, insert, update, delete on public.grand_lumen_workbook_members to authenticated;
+grant select, insert, update, delete on public.grand_lumen_sheets to authenticated;
+grant select, insert, update, delete on public.grand_lumen_sheet_cells to authenticated;
+grant select on public.grand_lumen_profiles to authenticated;
+
 grant execute on function public.grand_lumen_create_team_invite(text, integer) to authenticated;
 grant execute on function public.grand_lumen_redeem_team_invite(text) to authenticated;
 grant execute on function public.grand_lumen_respond_connection_request(uuid, boolean) to authenticated;
