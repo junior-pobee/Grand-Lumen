@@ -333,6 +333,15 @@ for insert to authenticated with check (
   )
 );
 
+drop policy if exists "Project members view shared projects" on public.grand_lumen_projects;
+create policy "Project members view shared projects" on public.grand_lumen_projects
+for select to authenticated using (
+  exists (
+    select 1 from public.grand_lumen_project_members m
+    where m.project_id = id and m.member_id = auth.uid()
+  )
+);
+
 drop policy if exists "Project owners manage project members" on public.grand_lumen_project_members;
 create policy "Project owners manage project members" on public.grand_lumen_project_members
 for all to authenticated using (owner_id = auth.uid()) with check (
