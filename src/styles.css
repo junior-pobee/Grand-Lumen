@@ -701,3 +701,21 @@ body{top:0!important}
 .lh-vault-preview>header>div{display:grid;gap:4px;min-width:0}.lh-vault-preview>header b{overflow-wrap:anywhere}.lh-vault-preview>header small{color:var(--muted,#718096);font-size:12px}.lh-vault-preview>header>button{width:34px;height:34px;flex:0 0 34px;border:0;border-radius:10px;background:var(--surface,#f1f5f9);font-size:24px;cursor:pointer}
 .lh-vault-preview-body{min-height:180px;max-height:calc(88vh - 145px);overflow:auto;display:grid;place-items:center;padding:16px}.lh-vault-preview-body img,.lh-vault-preview-body video{display:block;max-width:100%;max-height:65vh;object-fit:contain;border-radius:10px}.lh-vault-preview-body audio{width:min(560px,100%)}.lh-vault-preview-body iframe{width:100%;height:65vh;border:0;border-radius:10px;background:#fff}.lh-vault-preview-body pre{width:100%;max-height:65vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;padding:16px;border-radius:12px;background:var(--surface,#f1f5f9);font:13px/1.6 ui-monospace,monospace}.lh-vault-preview>footer{justify-content:flex-end;border-top:1px solid var(--border,rgba(100,116,139,.18));border-bottom:0}
 @media(max-width:600px){.lh-vault-preview-backdrop{padding:8px}.lh-vault-preview{max-height:94vh;border-radius:15px}.lh-vault-preview-body{max-height:calc(94vh - 145px);padding:10px}.lh-vault-preview-body iframe{height:62vh}}
+
+
+.lh-document-open-actions{display:flex;gap:9px;flex-wrap:wrap}
+.lh-document-workspace{position:fixed;inset:0;z-index:20000;display:flex;flex-direction:column;width:100%;height:100dvh;min-height:100vh;overflow:hidden;background:var(--bg,#f7f9fc);color:var(--text,#172033);animation:lh-view-in .22s ease both}
+.lh-document-workspace-header{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:16px;padding:14px clamp(12px,3vw,28px);border-bottom:1px solid var(--line);background:var(--surface);box-shadow:0 4px 18px rgba(20,35,60,.06)}
+.lh-document-workspace-header>div{display:grid;gap:4px;min-width:0}
+.lh-document-workspace-header>div strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
+.lh-document-workspace-header>div span{color:var(--muted);font-size:10px}
+.lh-document-workspace-header nav{display:flex;gap:7px}
+.lh-document-workspace-header nav button{display:inline-flex;align-items:center;gap:6px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--glass);color:var(--text);font:inherit;font-size:11px;cursor:pointer}
+.lh-document-workspace-header nav button.active{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,var(--surface))}
+.lh-document-workspace-content{display:flex;flex:1;flex-direction:column;gap:14px;min-height:0;overflow:auto;padding:clamp(14px,3vw,32px)}
+.lh-document-reading-paper{width:min(920px,100%);min-height:100%;margin:0 auto;padding:clamp(20px,4vw,48px);border:1px solid var(--line);border-radius:14px;background:var(--surface);box-shadow:0 8px 30px rgba(20,35,60,.05);font-size:clamp(13px,1.4vw,16px);line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere}
+.lh-document-workspace-pdf{width:min(1100px,100%);height:75vh;flex:0 0 auto;margin:0 auto;border:1px solid var(--line);border-radius:12px;background:#fff}
+.lh-document-workspace-editor{width:min(1100px,100%);min-height:60vh;flex:1;margin:0 auto;padding:clamp(16px,3vw,28px);resize:none;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--text);font:14px/1.85 ui-monospace,monospace}
+.lh-document-workspace-footer{display:flex;justify-content:space-between;align-items:center;gap:12px;width:min(1100px,100%);margin:0 auto;color:var(--muted);font-size:11px}
+@media(max-width:760px){.lh-document-workspace-header{grid-template-columns:1fr auto;gap:10px}.lh-document-workspace-header>div{grid-column:1/-1;grid-row:1}.lh-document-workspace-header>button{grid-column:1;grid-row:2;justify-self:start}.lh-document-workspace-header nav{grid-column:2;grid-row:2}.lh-document-workspace-header nav button{padding:8px;font-size:10px}.lh-document-workspace-content{padding:10px}.lh-document-reading-paper{border-radius:10px}}
+@media(max-width:390px){.lh-document-workspace-header nav button{gap:4px;padding:7px;font-size:9px}.lh-document-workspace-header>button{font-size:10px}}
