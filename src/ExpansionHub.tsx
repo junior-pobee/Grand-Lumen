@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import { Activity, BookOpen, CalendarDays, CheckCircle2, Copy, Download, FileText, Globe2, Languages, Plus, Search, ShieldCheck, Trash2, Upload, Wifi, WifiOff } from "lucide-react";
 
 type ModuleName = "Knowledge Graph" | "Verify" | "Document Intelligence" | "World" | "Pulse" | "Scan" | "Workspace" | "Finance" | "Vault" | "Academy" | "Code" | "Lab" | "Create" | "Translate" | "Accessibility" | "Offline" | "Connect" | "Alerts";
@@ -73,7 +74,7 @@ function makeId() {
   return crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2);
 }
 
-function Panel({ title, description, children }: { title: string; description: string; children: React.ReactNode }) {
+function Panel({ title, description, children }: { title: string; description: string; children: ReactNode }) {
   return <section className="lh-panel"><div className="lh-panel-heading"><div><h3>{title}</h3><p>{description}</p></div></div>{children}</section>;
 }
 
