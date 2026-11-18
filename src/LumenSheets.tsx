@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "./auth";
-import * as XLSX from "xlsx";
+import ExcelJS from "exceljs";
 
 type Workbook = { id: string; owner_id: string; name: string; description: string; updated_at: string };
 type Sheet = { id: string; workbook_id: string; name: string; position: number };
@@ -159,39 +159,44 @@ export default function LumenSheets({ userId }: { userId: string }) {
     else { setMemberEmail(""); setNotice("Workbook shared with " + (profile.data.display_name || profile.data.email) + "."); await loadWorkbook(workbook); }
   };
 
-  const exportXlsx = () => {
-    const workbookFile = XLSX.utils.book_new();
-    const worksheet = XLSX.utils.aoa_to_sheet([]);
+  const exportXlsx = async () => {
+    const workbookFile = new ExcelJS.Workbook();
+    const worksheet = workbookFile.addWorksheet(sheet?.name || "Sheet1");
     rows.forEach(row => columns.forEach(column => {
       const ref = column + row;
       const cell = cells[ref];
       if (!cell || (!cell.value && !cell.formula)) return;
-      const address = XLSX.utils.encode_cell({ r: row - 1, c: columnIndex(ref) });
-      if (cell.formula) worksheet[address] = { t: "n", f: cell.formula.replace(/^=/, ""), v: Number(calculated[ref]) || 0 };
-      else worksheet[address] = { t: "s", v: cell.value };
+      const target = worksheet.getCell(ref);
+      if (cell.formula) target.value = { formula: cell.formula.replace(/^=/, ""), result: Number(calculated[ref]) || 0 };
+      else target.value = cell.value;
     }));
-    worksheet["!ref"] = "A1:L30";
-    XLSX.utils.book_append_sheet(workbookFile, worksheet, sheet?.name || "Sheet1");
-    XLSX.writeFile(workbookFile, (workbook?.name || "lumen-workbook") + ".xlsx");
+    const buffer = await workbookFile.xlsx.writeBuffer();
+    const url = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = (workbook?.name || "lumen-workbook") + ".xlsx";
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   const importXlsx = async (file: File) => {
     if (!sheet || !supabase) return;
-    const workbookFile = XLSX.read(await file.arrayBuffer(), { type: "array", cellFormula: true });
-    const firstName = workbookFile.SheetNames[0];
-    if (!firstName) return;
-    const worksheet = workbookFile.Sheets[firstName];
-    const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
+    const workbookFile = new ExcelJS.Workbook();
+    await workbookFile.xlsx.load(await file.arrayBuffer());
+    const worksheet = workbookFile.worksheets[0];
+    if (!worksheet) return;
     const inserts: Cell[] = [];
-    for (let row = range.s.r; row <= Math.min(range.e.r, 29); row += 1) {
-      for (let col = range.s.c; col <= Math.min(range.e.c, 11); col += 1) {
-        const address = XLSX.utils.encode_cell({ r: row, c: col });
-        const source = worksheet[address];
-        if (!source) continue;
-        const cellRef = columns[col] + (row + 1);
-        inserts.push({ sheet_id: sheet.id, cell_ref: cellRef, value: source.f ? "" : String(source.v ?? ""), formula: source.f ? "=" + source.f : null, format: {}, updated_by: userId });
-      }
-    }
+    worksheet.eachRow((row, rowNumber) => {
+      if (rowNumber > 30) return;
+      row.eachCell((source, columnNumber) => {
+        if (columnNumber > 12) return;
+        const cellRef = columns[columnNumber - 1] + rowNumber;
+        const sourceValue = source.value;
+        const formula = sourceValue && typeof sourceValue === "object" && "formula" in sourceValue ? "=" + String(sourceValue.formula) : null;
+        const value = formula ? "" : source.text || String(sourceValue ?? "");
+        inserts.push({ sheet_id: sheet.id, cell_ref: cellRef, value, formula, format: {}, updated_by: userId });
+      });
+    });
     if (!inserts.length) return;
     const result = await supabase.from("grand_lumen_sheet_cells").upsert(inserts, { onConflict: "sheet_id,cell_ref" });
     if (result.error) setNotice(result.error.message);
