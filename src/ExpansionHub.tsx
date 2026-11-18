@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import LumenSheets from "./LumenSheets";
 import { Activity, ArrowLeft, BookOpen, CalendarDays, CheckCircle2, Copy, Download, FileText, Globe2, Languages, Plus, Search, ShieldCheck, Trash2, Upload, Wifi, WifiOff } from "lucide-react";
 
-type ModuleName = "Knowledge Graph" | "Verify" | "Document Intelligence" | "Convert" | "World" | "Pulse" | "Scan" | "Workspace" | "Finance" | "Vault" | "Academy" | "Code" | "Lab" | "Create" | "Translate" | "Accessibility" | "Offline" | "Connect" | "Alerts";
+type ModuleName = "Knowledge Graph" | "Verify" | "Document Intelligence" | "Convert" | "World" | "Pulse" | "Scan" | "Workspace" | "Finance" | "Vault" | "Academy" | "Code" | "Lab" | "Create" | "Translate" | "Accessibility" | "Offline" | "Connect" | "Alerts" | "Sheets";
 type Task = { id: string; title: string; due: string; done: boolean };
 type Entry = { id: string; name: string; amount: number; kind: "Income" | "Expense"; date: string };
 type SavedFile = { id: string; name: string; type: string; size: number; data: string; savedAt: string };
@@ -41,6 +42,7 @@ const modules: { name: ModuleName; group: string; description: string }[] = [
   { name: "Scan", group: "Utilities", description: "Create QR codes and open the existing camera scanner." },
   { name: "Workspace", group: "Productivity", description: "Tasks, notes and a personal schedule." },
   { name: "Finance", group: "Productivity", description: "Track income, expenses, budgets and balances locally." },
+  { name: "Sheets", group: "Productivity", description: "Create cloud spreadsheets for business records, budgets and accounts." },
   { name: "Vault", group: "Productivity", description: "Keep personal files in this browser's local storage." },
   { name: "Academy", group: "Learning", description: "Study structured topics and test your understanding." },
   { name: "Code", group: "Learning", description: "Experiment with HTML, CSS and JavaScript in a live preview." },
@@ -105,7 +107,7 @@ function ActionButton({ children, onClick, disabled = false }: { children: React
   return <button className="lh-action" onClick={onClick} disabled={disabled}>{children}</button>;
 }
 
-export default function ExpansionHub({ onOpenScanner, language = "en" }: { onOpenScanner?: () => void; language?: string }) {
+export default function ExpansionHub({ onOpenScanner, language = "en", userId = "" }: { onOpenScanner?: () => void; language?: string; userId?: string }) {
   const [active, setActive] = useState<ModuleName>("Knowledge Graph");
   const [moduleOpened, setModuleOpened] = useState(false);
   const [tasks, setTasks] = useState<Task[]>(() => readLocal("lumenTasks", initialTasks));
@@ -596,6 +598,8 @@ export default function ExpansionHub({ onOpenScanner, language = "en" }: { onOpe
     {active === "Offline" && <div className="lh-two-col"><Panel title="Offline readiness" description="Your local notes, tasks and stored files remain in this browser. Network-only services need a connection."><div className="lh-network"><span className={networkOnline ? "lh-online" : "lh-offline"}/>{networkOnline ? "Connection available" : "Offline mode"}</div><p>Offline reading list: {readLocal<Resource[]>("lumenOfflineResources", []).length} saved links.</p><ActionButton onClick={exportOfflineNotes}><Download size={14}/> Export offline pack</ActionButton></Panel><Panel title="Save resources for later" description="Keep useful source links in your local reading list."><div className="lh-results">{resources.slice(0, 5).map(resource => <article key={resource.url}><a href={resource.url} target="_blank" rel="noreferrer">{resource.title}</a><p>{resource.description}</p><button onClick={() => saveOfflineResource(resource)}>Save for offline list</button></article>)}</div></Panel></div>}
 
     {active === "Connect" && <Panel title="Global digital directory" description="A curated starting point for public knowledge, science, development and learning services."><div className="lh-connect-grid">{resources.map(resource => <article key={resource.url}><span>{resource.source}</span><h4>{resource.title}</h4><p>{resource.description}</p><a href={resource.url} target="_blank" rel="noreferrer">Visit resource ↗</a><button onClick={() => saveOfflineResource(resource)}>Save resource</button></article>)}</div></Panel>}
+
+    {active === "Sheets" && <LumenSheets userId={userId}/>}
 
     {active === "Alerts" && <Panel title="Personal reminders" description="Create reminders. Browser notifications are optional and require your permission."><div className="lh-input-row"><input value={reminderTitle} onChange={e => setReminderTitle(e.target.value)} placeholder="Reminder title"/><input type="datetime-local" value={reminderWhen} onChange={e => setReminderWhen(e.target.value)}/><ActionButton onClick={() => void addReminder()}><Plus size={14}/> Add reminder</ActionButton></div><div className="lh-task-list">{reminders.map(item => <article key={item.id}><CalendarDays size={14}/><span>{item.title}<small>{new Date(item.when).toLocaleString()}</small></span><small>{item.notified ? "Notified" : "Scheduled"}</small><button onClick={() => setReminders(current => current.filter(reminder => reminder.id !== item.id))}><Trash2 size={14}/></button></article>)}</div></Panel>}
 
