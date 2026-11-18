@@ -85,6 +85,7 @@ function ActionButton({ children, onClick, disabled = false }: { children: React
 
 export default function ExpansionHub({ onOpenScanner }: { onOpenScanner?: () => void }) {
   const [active, setActive] = useState<ModuleName>("Knowledge Graph");
+  const [moduleOpened, setModuleOpened] = useState(false);
   const [tasks, setTasks] = useState<Task[]>(() => readLocal("lumenTasks", initialTasks));
   const [entries, setEntries] = useState<Entry[]>(() => readLocal("lumenFinanceEntries", initialEntries));
   const [files, setFiles] = useState<SavedFile[]>(() => readLocal("lumenVaultFiles", initialFiles));
@@ -193,7 +194,7 @@ export default function ExpansionHub({ onOpenScanner }: { onOpenScanner?: () => 
       const now = Date.now();
       setReminders(current => current.map(item => {
         if (!item.notified && new Date(item.when).getTime() <= now) {
-          if ("Notification" in window && Notification.permission === "granted") new Notification("Grand Lumen reminder", { body: item.title });
+          if ("Notification" in window && Notification.permission === "granted" && "serviceWorker" in navigator) { void navigator.serviceWorker.ready.then(registration => registration.showNotification("Grand Lumen reminder", { body: item.title })).catch(() => setNotice("The reminder is due, but this browser could not display its notification.")); }
           return { ...item, notified: true };
         }
         return item;
@@ -380,7 +381,7 @@ export default function ExpansionHub({ onOpenScanner }: { onOpenScanner?: () => 
 
   const addReminder = async () => {
     if (!reminderTitle.trim() || !reminderWhen || new Date(reminderWhen).getTime() <= Date.now()) return;
-    if ("Notification" in window && Notification.permission === "default") await Notification.requestPermission();
+    if ("Notification" in window && "serviceWorker" in navigator && Notification.permission === "default") await Notification.requestPermission();
     setReminders(current => [{ id: makeId(), title: reminderTitle.trim(), when: reminderWhen, notified: false }, ...current]);
     setReminderTitle("");
     setReminderWhen("");
@@ -493,9 +494,8 @@ export default function ExpansionHub({ onOpenScanner }: { onOpenScanner?: () => 
   const qrUrl = qrText.trim() ? "https://quickchart.io/qr?size=240&text=" + encodeURIComponent(qrText) : "";
 
   return <div className={highContrast ? "lumen-hub lh-contrast" : "lumen-hub"}>
-    <div className="lh-intro"><div><span className="eyebrow">GRAND LUMEN · CONNECTED UTILITIES</span><h2>One workspace. More possibilities.</h2><p>Explore practical tools for knowledge, daily life, productivity and learning. AI features are not included in this release.</p></div><div className="lh-network"><span className={networkOnline ? "lh-online" : "lh-offline"} />{networkOnline ? <><Wifi size={15}/> Online</> : <><WifiOff size={15}/> Offline</>}</div></div>
-    <div className="lh-module-nav">{["Knowledge","Utilities","Productivity","Learning","Access"].map(group => <div className="lh-module-group" key={group}><span>{group}</span><div>{modules.filter(item => item.group === group).map(item => <button key={item.name} className={active === item.name ? "active" : ""} onClick={() => { setActive(item.name); setNotice(""); }} title={item.description}>{item.name}</button>)}</div></div>)}</div>
-    <div className="lh-active-heading"><div><span className="eyebrow">{currentModule.group.toUpperCase()} MODULE</span><h2>{active}</h2><p>{currentModule.description}</p></div></div>
+    {!moduleOpened && <div className="lh-hub-selection"><div className="lh-intro"><div><span className="eyebrow">GRAND LUMEN · CONNECTED UTILITIES</span><h2>One workspace. More possibilities.</h2><p>Explore practical tools for knowledge, daily life, productivity and learning. AI features are not included in this release.</p></div><div className="lh-network"><span className={networkOnline ? "lh-online" : "lh-offline"} />{networkOnline ? <><Wifi size={15}/> Online</> : <><WifiOff size={15}/> Offline</>}</div></div><div className="lh-module-nav">{["Knowledge","Utilities","Productivity","Learning","Access"].map(group => <div className="lh-module-group" key={group}><span>{group}</span><div>{modules.filter(item => item.group === group).map(item => <button key={item.name} className={active === item.name ? "active" : ""} onClick={() => { setActive(item.name); setNotice(""); setModuleOpened(true); }} title={item.description}>{item.name}</button>)}</div></div>)}</div></div>}
+    {moduleOpened && <div className="lh-module-view"><button className="lh-back-modules" onClick={() => { setModuleOpened(false); setNotice(""); }}><ArrowLeft size={15}/> All Lumen Hub tools</button><div className="lh-active-heading"><div><span className="eyebrow">{currentModule.group.toUpperCase()} MODULE</span><h2>{active}</h2><p>{currentModule.description}</p></div></div></div>}
     {notice && <div className="lh-notice" role="status">{notice}</div>}
 
     {active === "Knowledge Graph" && <div className="lh-two-col"><Panel title="Explore a concept" description="Search the public encyclopedia and see related topics as connected knowledge nodes."><div className="lh-input-row"><input value={graphTopic} onChange={e => setGraphTopic(e.target.value)} onKeyDown={e => e.key === "Enter" && void searchKnowledge()} placeholder="Search a concept, discovery or subject"/><ActionButton onClick={() => void searchKnowledge()} disabled={graphBusy}>{graphBusy ? "Searching…" : "Explore"}</ActionButton></div>{graphResults.length > 0 && <div className="lh-knowledge-map"><div className="lh-knowledge-root">{graphTopic}</div><div className="lh-knowledge-edges">{graphResults.map(item => <a key={item.url} href={item.url} target="_blank" rel="noreferrer"><b>{item.title}</b><span>{item.description}</span></a>)}</div></div>}</Panel><Panel title="Your knowledge links" description="Keep a small local list of concepts to investigate next."><textarea id="lh-knowledge-notes" defaultValue={localStorage.getItem("lumenKnowledgeNotes") || ""} onChange={e => localStorage.setItem("lumenKnowledgeNotes", e.target.value)} placeholder="Write concepts and how they connect…"/><small className="lh-muted">Saved locally in this browser.</small></Panel></div>}
@@ -536,6 +536,7 @@ export default function ExpansionHub({ onOpenScanner }: { onOpenScanner?: () => 
 
     {active === "Alerts" && <Panel title="Personal reminders" description="Create reminders. Browser notifications are optional and require your permission."><div className="lh-input-row"><input value={reminderTitle} onChange={e => setReminderTitle(e.target.value)} placeholder="Reminder title"/><input type="datetime-local" value={reminderWhen} onChange={e => setReminderWhen(e.target.value)}/><ActionButton onClick={() => void addReminder()}><Plus size={14}/> Add reminder</ActionButton></div><div className="lh-task-list">{reminders.map(item => <article key={item.id}><CalendarDays size={14}/><span>{item.title}<small>{new Date(item.when).toLocaleString()}</small></span><small>{item.notified ? "Notified" : "Scheduled"}</small><button onClick={() => setReminders(current => current.filter(reminder => reminder.id !== item.id))}><Trash2 size={14}/></button></article>)}</div></Panel>}
 
-    <div className="lh-footer"><span><ShieldCheck size={14}/> Your personal data is stored locally in this browser unless a feature explicitly uses an external public service.</span><span><Activity size={14}/> Lumen Core · {coreActivity}</span></div>
+    {moduleOpened && <div className="lh-footer"><span><ShieldCheck size={14}/> Your personal data is stored locally in this browser unless a feature explicitly uses an external public service.</span><span><Activity size={14}/> Lumen Core · {coreActivity}</span></div>}
+    {!moduleOpened && <div className="lh-footer"><span><ShieldCheck size={14}/> Your personal data is stored locally in this browser unless a feature explicitly uses an external public service.</span><span><Activity size={14}/> Lumen Core · {coreActivity}</span></div>}
   </div>;
 }
