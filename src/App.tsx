@@ -1103,224 +1103,86 @@ const expandedAcademyCourses = academyCourses.map(course => ({
 
 
 function MessagesWorkspace({ session }: { session: Session | null }) {
-  const email = session?.user.email || "";
-  const identities = session?.user.identities || [];
-  const linkedIdentity = identities.find(identity => identity.provider === "google" || identity.provider === "azure");
-  const provider = linkedIdentity?.provider as "google" | "azure" | undefined;
-  const connectedEmail = String(linkedIdentity?.identity_data?.email || linkedIdentity?.identity_data?.preferred_username || email);
-  const [recipient, setRecipient] = useState("");
-  const [cc, setCc] = useState("");
-  const [bcc, setBcc] = useState("");
-  const [subject, setSubject] = useState("");
-  const [draft, setDraft] = useState("");
-  const [showCopies, setShowCopies] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
-  const [noticeType, setNoticeType] = useState<"success" | "error" | "info">("info");
-  const [announcements, setAnnouncements] = useState<any[]>([]);
-  const isOwner = email.toLowerCase() === "emmanuelpobee112@gmail.com";
-  const providerName = provider === "google" ? "Gmail" : provider === "azure" ? "Outlook" : "";
-
-  const setFeedback = (message: string, type: "success" | "error" | "info" = "info") => {
-    setNotice(message);
-    setNoticeType(type);
-  };
-
-  const connectProvider = async (target: "google" | "azure") => {
-    if (!supabase || !session) {
-      setFeedback("Sign in to your Grand-Lumen account before connecting an email account.", "info");
-      return;
-    }
-    setBusy(true);
-    setFeedback("");
-    try {
-      const scopes = target === "google"
-        ? "https://www.googleapis.com/auth/gmail.send"
-        : "email profile openid offline_access https://graph.microsoft.com/Mail.Send";
-      const options: any = { scopes, redirectTo: window.location.origin + window.location.pathname };
-      if (target === "google") options.queryParams = { access_type: "offline", prompt: "consent" };
-      else options.queryParams = { prompt: "consent" };
-      const { error } = await supabase.auth.linkIdentity({ provider: target, options } as any);
-      if (error) throw error;
-    } catch (reason) {
-      setFeedback(reason instanceof Error ? reason.message : "The email account could not be connected.", "error");
-      setBusy(false);
-    }
-  };
-
-  const parseAddresses = (value: string) => value.split(/[;,]/).map(item => item.trim()).filter(Boolean);
-
-  const encodeMail = (value: string) => {
-    const bytes = new TextEncoder().encode(value);
-    let binary = "";
-    bytes.forEach(byte => { binary += String.fromCharCode(byte); });
-    return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
-  };
-
-  const reconnectProvider = async () => {
-    if (!supabase || !linkedIdentity || !provider) return;
-    setBusy(true);
-    try {
-      const { error: unlinkError } = await supabase.auth.unlinkIdentity(linkedIdentity);
-      if (unlinkError) throw unlinkError;
-      sessionStorage.removeItem("grandLumenMailProviderToken");
-      const scopes = provider === "google"
-        ? "https://www.googleapis.com/auth/gmail.send"
-        : "email profile openid offline_access https://graph.microsoft.com/Mail.Send";
-      const options: any = { scopes, redirectTo: window.location.origin + window.location.pathname };
-      options.queryParams = provider === "google" ? { access_type: "offline", prompt: "consent" } : { prompt: "consent" };
-      const { error } = await supabase.auth.linkIdentity({ provider, options } as any);
-      if (error) throw error;
-    } catch (reason) {
-      setFeedback(reason instanceof Error ? reason.message : "The email permission could not be refreshed.", "error");
-      setBusy(false);
-    }
-  };
-
-  const disconnectProvider = async () => {
-    if (!supabase || !linkedIdentity) return;
-    setBusy(true);
-    try {
-      const { error } = await supabase.auth.unlinkIdentity(linkedIdentity);
-      if (error) throw error;
-      sessionStorage.removeItem("grandLumenMailProviderToken");
-      setFeedback("Email account disconnected from Grand-Lumen.", "success");
-    } catch (reason) {
-      setFeedback(reason instanceof Error ? reason.message : "The email account could not be disconnected.", "error");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const sendEmail = async () => {
-    if (!session || !supabase || !provider) {
-      setFeedback("Connect Gmail or Outlook before sending an email.", "info");
-      return;
-    }
-    const toList = parseAddresses(recipient);
-    const ccList = parseAddresses(cc);
-    const bccList = parseAddresses(bcc);
-    const allAddresses = [...toList, ...ccList, ...bccList];
-    const validAddress = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
-    if (!toList.length || allAddresses.some(address => !validAddress.test(address))) {
-      setFeedback("Enter at least one valid recipient email address. Separate multiple addresses with commas.", "error");
-      return;
-    }
-    if (!subject.trim() || !draft.trim()) {
-      setFeedback("Add a subject and write your email before sending.", "error");
-      return;
-    }
-    let savedToken: any = null;
-    try { savedToken = JSON.parse(sessionStorage.getItem("grandLumenMailProviderToken") || "null"); } catch { savedToken = null; }
-    const accessToken = savedToken
-      ? (savedToken.provider === provider && savedToken.expiresAt > Date.now() ? savedToken.token : null)
-      : session.provider_token;
-    if (!accessToken) {
-      setFeedback("Your email permission has expired. Disconnect and reconnect the account to authorize a fresh sending session.", "error");
-      return;
-    }
-    setBusy(true);
-    setFeedback("Sending your email…");
-    try {
-      let response: Response;
-      if (provider === "google") {
-        const headers = ["To: " + toList.join(", ")];
-        if (ccList.length) headers.push("Cc: " + ccList.join(", "));
-        if (bccList.length) headers.push("Bcc: " + bccList.join(", "));
-        headers.push("Subject: " + subject.trim(), "MIME-Version: 1.0", "Content-Type: text/plain; charset=UTF-8", "Content-Transfer-Encoding: 8bit");
-        const raw = headers.join("\\r\\n") + "\\r\\n\\r\\n" + draft.trim();
-        response = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
-          method: "POST",
-          headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" },
-          body: JSON.stringify({ raw: encodeMail(raw) })
-        });
-      } else {
-        const message: any = {
-          subject: subject.trim(),
-          body: { contentType: "Text", content: draft.trim() },
-          toRecipients: toList.map(address => ({ emailAddress: { address } }))
-        };
-        if (ccList.length) message.ccRecipients = ccList.map(address => ({ emailAddress: { address } }));
-        if (bccList.length) message.bccRecipients = bccList.map(address => ({ emailAddress: { address } }));
-        response = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
-          method: "POST",
-          headers: { Authorization: "Bearer " + accessToken, "Content-Type": "application/json" },
-          body: JSON.stringify({ message, saveToSentItems: true })
-        });
-      }
-      if (!response.ok) {
-        const detail = await response.json().catch(() => ({}));
-        const providerMessage = detail?.error?.message || detail?.error_description || "The email provider rejected the request.";
-        throw new Error(providerMessage + " Reconnect your account if its permission has expired.");
-      }
-      setRecipient("");
-      setCc("");
-      setBcc("");
-      setSubject("");
-      setDraft("");
-      setShowCopies(false);
-      setFeedback("Email accepted by " + providerName + " for delivery.", "success");
-    } catch (reason) {
-      setFeedback(reason instanceof Error ? reason.message : "The email could not be sent. Please try again.", "error");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const loadAnnouncements = async () => {
-    if (!supabase || !email) return;
-    const { data, error } = await supabase.from("grand_lumen_announcements").select("*").order("created_at", { ascending: false }).limit(30);
-    if (!error) setAnnouncements(data || []);
-  };
-
-  useEffect(() => {
-    void loadAnnouncements();
-    if (!supabase || !email) return;
-    const channel = supabase.channel("grand-lumen-mail-updates-" + session?.user.id).on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_announcements" }, () => void loadAnnouncements()).subscribe();
-    return () => { void supabase?.removeChannel(channel); };
-  }, [email]);
-
-  const publishAnnouncement = async () => {
-    if (!supabase || !isOwner || !announcementTitle.trim() || !announcementBody.trim()) return;
-    setBusy(true);
-    const { error } = await supabase.from("grand_lumen_announcements").insert({ title: announcementTitle.trim(), body: announcementBody.trim(), author_email: email });
-    setFeedback(error ? error.message : "Your update has been published to Grand-Lumen.", error ? "error" : "success");
-    if (!error) {
-      setAnnouncementTitle("");
-      setAnnouncementBody("");
-      await loadAnnouncements();
-    }
-    setBusy(false);
-  };
-
-  const [announcementTitle, setAnnouncementTitle] = useState("");
-  const [announcementBody, setAnnouncementBody] = useState("");
-
-  if (!supabaseConfigured || !supabase || !email) return <div className="glass-card messaging-setup"><Mail size={24}/><h3>Sign in to use Grand-Lumen Mails</h3><p>Email connections are attached to a secure Grand-Lumen cloud account. Sign in first, then connect Gmail or Outlook.</p></div>;
-
-  return <div className="mail-workspace">
-    <section className="glass-card mail-compose-panel">
-      <div className="mail-heading"><div><span className="eyebrow">GRAND-LUMEN MAILS</span><h3>Compose email</h3><p>Send directly through your own email account.</p></div><Mail size={24}/></div>
-      <div className="mail-account-row">
-        <div className="mail-account-mark">{provider === "google" ? "G" : provider === "azure" ? "O" : <Mail size={19}/>}</div>
-        <div className="mail-account-info"><strong>{providerName || "No email account connected"}</strong><span>{provider ? connectedEmail : "Connect an account to start sending"}</span></div>
-        {provider && <><span className="mail-connected-status"><CheckCircle2 size={14}/> Connected</span><button className="mail-disconnect-button" onClick={() => void reconnectProvider()} disabled={busy}>Refresh access</button><button className="mail-disconnect-button" onClick={() => void disconnectProvider()} disabled={busy}>Disconnect</button></>}
-      </div>
-      {!provider && <div className="mail-connect-options"><button className="mail-provider-button" onClick={() => void connectProvider("google")} disabled={busy}><span className="mail-google-mark">G</span><span><strong>Connect Gmail</strong><small>Authorize Grand-Lumen to send using Gmail</small></span><ArrowUpRight size={16}/></button><button className="mail-provider-button" onClick={() => void connectProvider("azure")} disabled={busy}><span className="mail-outlook-mark"><Mail size={18}/></span><span><strong>Connect Outlook</strong><small>Authorize Grand-Lumen to send using Outlook</small></span><ArrowUpRight size={16}/></button></div>}
-      {provider && <div className="mail-connected-note"><ShieldCheck size={15}/> Your email password is never requested by Grand-Lumen. Sending uses the permission granted by {providerName}.</div>}
-      <div className="mail-fields">
-        <label>To<input type="text" value={recipient} onChange={event => setRecipient(event.target.value)} placeholder="recipient@example.com, another@example.com" disabled={!provider}/></label>
-        <div className="mail-copy-toggle"><button type="button" onClick={() => setShowCopies(value => !value)} disabled={!provider}>{showCopies ? "Hide Cc and Bcc" : "Add Cc / Bcc"}</button></div>
-        {showCopies && <><label>Cc<input type="text" value={cc} onChange={event => setCc(event.target.value)} placeholder="Copy recipients" disabled={!provider}/></label><label>Bcc<input type="text" value={bcc} onChange={event => setBcc(event.target.value)} placeholder="Blind copy recipients" disabled={!provider}/></label></>}
-        <label>Subject<input type="text" value={subject} onChange={event => setSubject(event.target.value)} placeholder="Email subject" disabled={!provider}/></label>
-        <label>Message<textarea value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write your email here…" disabled={!provider}/></label>
-        <div className="mail-compose-footer"><span>Sending from {provider ? connectedEmail : "no connected account"}</span><button className="solid-button" onClick={() => void sendEmail()} disabled={busy || !provider || !recipient.trim() || !subject.trim() || !draft.trim()}><Send size={15}/> {busy ? "Please wait…" : "Send email"}</button></div>
-      </div>
-      {notice && <div className={"mail-feedback " + noticeType}>{notice}</div>}
+  const [openQuestion, setOpenQuestion] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
+  const questions = [
+    { category: "About Grand Lumen", question: "What is Grand Lumen?", answer: "Grand Lumen is a connected digital workspace designed to bring discovery, research, learning, creativity and practical tools together in one place. Its guiding idea is to help people explore beyond the ordinary." },
+    { category: "About Grand Lumen", question: "Who founded Grand Lumen?", answer: "Grand Lumen was founded and developed by Emmanuel Pobee Okpoti, a student developer and technology enthusiast who is interested in building useful digital experiences." },
+    { category: "About Grand Lumen", question: "Who is Emmanuel Pobee Okpoti?", answer: "Emmanuel Pobee Okpoti is the founder and developer of Grand Lumen. He is a student developer with interests in front-end development, technology, learning, invention and building practical tools that help people explore ideas." },
+    { category: "About Grand Lumen", question: "Why was Grand Lumen created?", answer: "Grand Lumen was created to bring useful digital experiences into one connected workspace, reducing the need to jump between separate tools for research, learning, exploration and creation." },
+    { category: "About Grand Lumen", question: "What does “Explore Beyond” mean?", answer: "“Explore Beyond” is Grand Lumen's guiding phrase. It encourages curiosity, independent learning and looking beyond the first answer or familiar way of doing things." },
+    { category: "About Grand Lumen", question: "Who is Grand Lumen designed for?", answer: "Grand Lumen is designed for curious people, students, researchers, creators and anyone who wants a convenient place to explore information and use practical digital tools." },
+    { category: "Features", question: "What can I do with Grand Lumen?", answer: "Depending on the feature and its connected services, you can search and research topics, explore news and media, use maps and utilities, practise learning, write and preview code, scan QR codes, save items and organize projects." },
+    { category: "Features", question: "What is the Lumen Hub?", answer: "The Lumen Hub is a collection of focused utilities for knowledge, productivity, learning and everyday tasks. Open a tool from the Hub to work in its dedicated view, then use its back control to return to the Hub." },
+    { category: "Features", question: "How does Search work?", answer: "Use Search to enter a topic or phrase and review the results returned by the connected search services. Open a result to continue with its source when you need more detail." },
+    { category: "Features", question: "What is the Research workspace for?", answer: "Research helps you investigate a topic, discover relevant material and compare information. Check the original sources before relying on important claims." },
+    { category: "Features", question: "Where does the News section get its stories?", answer: "The News section retrieves current stories through connected news search services and links to the publishers. Availability and coverage depend on those external services." },
+    { category: "Features", question: "Can I explore images and videos?", answer: "Yes. The Images and Videos sections help you discover media through connected public search services. The original media or publisher may have its own usage and copyright conditions." },
+    { category: "Features", question: "What is Code Lab?", answer: "Code Lab is a workspace for writing code and testing supported projects with an in-app preview. Available languages and execution features depend on the tools provided in the Code Lab." },
+    { category: "Features", question: "What can I do in Learn?", answer: "Learn provides structured learning material and practice activities. Use it to review a topic, work through lessons and check your understanding." },
+    { category: "Features", question: "What is the API Library?", answer: "The API Library introduces public APIs and services that developers can use in their own projects. Check each provider's documentation for its current limits, terms and attribution requirements." },
+    { category: "Features", question: "What is the Tools section?", answer: "Tools brings together practical utilities such as calculators, graphing and selected information lookups. The available tools are shown inside the section." },
+    { category: "Features", question: "Can Grand Lumen scan QR codes?", answer: "Yes. Open Scanner and choose the camera scanner. Your browser will ask for camera permission when the scanner needs it. You can also use the QR creation option where available." },
+    { category: "Features", question: "What does the Share section do?", answer: "Share provides ways to share supported Grand Lumen content or create shareable items. Review the details shown before sharing anything personal." },
+    { category: "Features", question: "What are Saved and Projects used for?", answer: "Saved helps you keep supported items for later, while Projects gives you a place to organize project-related work. What is retained can depend on the feature and your browser or account state." },
+    { category: "Features", question: "What is Creative Studio?", answer: "Creative Studio is a space for supported creative tasks and visual exploration. Available creation options may change as the app develops." },
+    { category: "Features", question: "What is the Messages section now?", answer: "Messages is the Grand Lumen Help Desk. It contains questions and answers about the app, its founder, features, usage and privacy. Open a question to reveal its answer." },
+    { category: "Documents", question: "Can Grand Lumen read uploaded manuals?", answer: "Document Intelligence in the Lumen Hub can extract readable text from supported documents so you can read, edit and work with the contents inside the app." },
+    { category: "Documents", question: "Which document formats are supported?", answer: "The current reader supports searchable PDF files, DOCX Word documents, TXT, Markdown, CSV and JSON files. Older DOC files are not currently listed as supported." },
+    { category: "Documents", question: "Can I read and edit a manual in full screen?", answer: "Yes. After text has been extracted, choose Read full screen or Edit full screen. Use the Back to Document Intelligence control to return to the document workspace." },
+    { category: "Documents", question: "Can scanned PDFs be converted into editable text?", answer: "Scanned image-only PDFs need optical character recognition (OCR). The current reader extracts selectable text from searchable PDFs; it does not currently provide OCR for image-only pages." },
+    { category: "Documents", question: "Will editing extracted text change my original file?", answer: "Editing the extracted text changes the working text inside Grand Lumen. It does not rewrite the original uploaded PDF or DOCX file." },
+    { category: "Language & Access", question: "Can I change Grand Lumen's language?", answer: "Use the language setting in the app to select a supported language. Some external content or services may remain in their original language if a translation is not available." },
+    { category: "Language & Access", question: "Does Grand Lumen work offline?", answer: "Some previously loaded or saved app content may remain available, but search, news, maps, translation and other connected services generally need an internet connection. Offline availability varies by feature." },
+    { category: "Language & Access", question: "Can I use Grand Lumen on a phone or computer?", answer: "Grand Lumen is designed to adapt to different screen sizes, including phones, tablets and desktop browsers. The exact experience can vary with the browser and device." },
+    { category: "Language & Access", question: "Can I install Grand Lumen like an app?", answer: "Where your browser supports installation, use its Install option. On some mobile browsers, the available option may be Add to Home Screen. Installation availability depends on the browser and device." },
+    { category: "Privacy & Accounts", question: "Do I need an account to use Grand Lumen?", answer: "Some parts of Grand Lumen may be available without signing in, while account-linked features require you to sign in. Follow the sign-in prompt shown by the feature you want to use." },
+    { category: "Privacy & Accounts", question: "Where is my information stored?", answer: "Storage depends on the feature. Some working data is kept in your browser, while account-linked features may use the connected Grand Lumen cloud services. The app indicates when a feature relies on an external service." },
+    { category: "Privacy & Accounts", question: "Does Grand Lumen send my files to other people?", answer: "Grand Lumen does not automatically send a document to another person just because you open it in the reader. Be mindful when you choose a sharing action or use an external service, and review what that service receives." },
+    { category: "Privacy & Accounts", question: "Are search and news results guaranteed to be correct?", answer: "No. Search and news results are supplied by external sources and can be incomplete, outdated or mistaken. Check the original source and compare reliable references for important decisions." },
+    { category: "Support", question: "How can I report a problem or suggest a feature?", answer: "You can report an issue or suggest an improvement through the Grand Lumen GitHub repository: https://github.com/junior-pobee/Grand-Lumen/issues. Include the section involved and a clear description of what happened. Do not include passwords or private account details." },
+    { category: "Support", question: "Where can I find the official Grand Lumen app?", answer: "The current public GitHub Pages version is available at https://junior-pobee.github.io/Grand-Lumen/. Use that address to open the app." },
+    { category: "Support", question: "Is Grand Lumen still being developed?", answer: "Grand Lumen is an evolving project. Features and supported services may be improved over time, so check the app and its official repository for updates." }
+  ];
+  const filteredQuestions = questions.filter(item => (item.question + " " + item.answer + " " + item.category).toLowerCase().includes(search.trim().toLowerCase()));
+  const categories = Array.from(new Set(questions.map(item => item.category)));
+  return <div className="lumen-faq">
+    <section className="lumen-faq-hero">
+      <div className="lumen-faq-mark"><CircleHelp size={26}/></div>
+      <span className="eyebrow">GRAND LUMEN · HELP DESK</span>
+      <h2>Questions about Grand Lumen?</h2>
+      <p>Explore answers about the platform, its tools, and the person behind it.</p>
+      <label className="lumen-faq-search"><Search size={17}/><input value={search} onChange={event => { setSearch(event.target.value); setOpenQuestion(null); }} placeholder="Search questions or topics…"/></label>
+      <div className="lumen-faq-count"><span>{questions.length} answers available</span><span>{session ? "Signed in" : "Guest access"}</span></div>
     </section>
-    <aside className="glass-card mail-side-panel"><span className="eyebrow">EMAIL CONNECTIONS</span><h3>Your accounts</h3><p className="mail-side-copy">Connect one provider at a time. You can switch providers by disconnecting the current identity in your Grand-Lumen account settings.</p><div className="mail-provider-summary"><span className="mail-google-mark">G</span><div><strong>Google Gmail</strong><small>Gmail send permission</small></div><span>{provider === "google" ? "Active" : "Available"}</span></div><div className="mail-provider-summary"><span className="mail-outlook-mark"><Mail size={17}/></span><div><strong>Microsoft Outlook</strong><small>Microsoft Graph Mail.Send</small></div><span>{provider === "azure" ? "Active" : "Available"}</span></div><div className="mail-privacy-card"><LockKeyhole size={17}/><div><strong>Private by design</strong><p>Grand-Lumen requests sending permission only. It does not ask for your email password or read your inbox.</p></div></div><div className="mail-delivery-note">A successful response means Gmail or Outlook accepted the message for delivery. Final delivery depends on the recipient's mail service.</div>
-      <div className="mail-updates"><span className="eyebrow">GRAND-LUMEN UPDATES</span><h3>What's new</h3>{announcements.length ? announcements.map(item => <article className="announcement-card" key={item.id}><small>{new Date(item.created_at).toLocaleString()} · {item.author_email}</small><h4>{item.title}</h4><p>{item.body}</p></article>) : <p>No updates have been published yet.</p>}{isOwner && <div className="announcement-composer"><span className="eyebrow">OWNER BROADCAST</span><h4>Publish an app update</h4><input value={announcementTitle} onChange={event => setAnnouncementTitle(event.target.value)} placeholder="Update title"/><textarea value={announcementBody} onChange={event => setAnnouncementBody(event.target.value)} placeholder="Write an announcement for Grand-Lumen users…"/><button className="solid-button" onClick={() => void publishAnnouncement()} disabled={busy || !announcementTitle.trim() || !announcementBody.trim()}>Publish update to all users</button></div>}</div>
-    </aside>
+    <section className="lumen-faq-list">
+      {categories.map(category => {
+        const items = filteredQuestions.filter(item => item.category === category);
+        if (!items.length) return null;
+        return <div className="lumen-faq-category" key={category}>
+          <div className="lumen-faq-category-title">{category}</div>
+          {items.map(item => {
+            const index = questions.indexOf(item);
+            const isOpen = openQuestion === index;
+            return <article className={"lumen-faq-item" + (isOpen ? " open" : "")} key={item.question}>
+              <button className="lumen-faq-question" aria-expanded={isOpen} onClick={() => setOpenQuestion(current => current === index ? null : index)}>
+                <span className="lumen-faq-number">{String(index + 1).padStart(2, "0")}</span>
+                <span>{item.question}</span>
+                <ChevronDown size={18}/>
+              </button>
+              <div className="lumen-faq-answer-wrap" aria-hidden={!isOpen}>
+                <div className="lumen-faq-answer"><p>{item.answer}</p></div>
+              </div>
+            </article>;
+          })}
+        </div>;
+      })}
+      {!filteredQuestions.length && <div className="lumen-faq-empty"><Search size={22}/><strong>No matching questions</strong><span>Try another word or clear your search.</span><button onClick={() => setSearch("")}>Show all questions</button></div>}
+    </section>
+    <footer className="lumen-faq-founder">
+      <div><span className="eyebrow">BUILT WITH CURIOSITY</span><h3>Meet the founder</h3><strong>Emmanuel Pobee Okpoti</strong><p>Founder & Developer · Student Developer · Technology Enthusiast</p><p>Building Grand Lumen around discovery, learning, research and practical digital experiences.</p><div className="lumen-faq-links"><a href="https://github.com/junior-pobee" target="_blank" rel="noreferrer">GitHub profile <ArrowUpRight size={13}/></a><a href="https://junior-pobee.github.io/my-profile" target="_blank" rel="noreferrer">Personal portfolio <ArrowUpRight size={13}/></a><a href="https://github.com/junior-pobee/Grand-Lumen" target="_blank" rel="noreferrer">Grand Lumen repository <ArrowUpRight size={13}/></a></div></div>
+      <div className="lumen-faq-founder-badge"><Sparkles size={22}/><span>GRAND LUMEN</span><small>EXPLORE BEYOND</small></div>
+    </footer>
   </div>;
 }
 
