@@ -1775,7 +1775,15 @@ function App() {
   const [interfaceScale, setInterfaceScale] = useState(() => Number(localStorage.getItem("grandLumenInterfaceScale") || "1"));
   const [fontFamily, setFontFamily] = useState(() => localStorage.getItem("grandLumenFontFamily") || "Manrope, sans-serif");
   const [fontWeight, setFontWeight] = useState(() => localStorage.getItem("grandLumenFontWeight") || "normal");
-  const [appLanguage, setAppLanguage] = useState(() => localStorage.getItem("grandLumenLanguage") || "en");
+  const [appLanguage, setAppLanguage] = useState(() => {
+    const initialized = localStorage.getItem("grandLumenLanguageDefaultEnglishV1") === "true";
+    if (!initialized) {
+      localStorage.setItem("grandLumenLanguage", "en");
+      localStorage.setItem("grandLumenLanguageDefaultEnglishV1", "true");
+      return "en";
+    }
+    return localStorage.getItem("grandLumenLanguage") || "en";
+  });
   const [languageSearch, setLanguageSearch] = useState(() => appLanguages.find(language => language.code === (localStorage.getItem("grandLumenLanguage") || "en"))?.name || "English");
 
   useEffect(() => {
@@ -1791,6 +1799,10 @@ function App() {
 
   useEffect(() => {
     localStorage.setItem("grandLumenLanguage", appLanguage);
+    document.documentElement.lang = appLanguage;
+    if (appLanguage === "en") {
+      document.cookie = "googtrans=/en/en;path=/;max-age=31536000;SameSite=Lax";
+    }
     let attempts = 0;
     const applyLanguage = () => {
       const selector = document.querySelector<HTMLSelectElement>(".goog-te-combo");
@@ -1833,6 +1845,9 @@ function App() {
         const selector = document.querySelector<HTMLSelectElement>(".goog-te-combo");
         if (selector) {
           const preferred = localStorage.getItem("grandLumenLanguage") || "en";
+          if (preferred === "en") {
+            document.cookie = "googtrans=/en/en;path=/;max-age=31536000;SameSite=Lax";
+          }
           selector.value = preferred === "en" ? "" : preferred;
           selector.dispatchEvent(new Event("change"));
           window.clearInterval(languageTimer);
