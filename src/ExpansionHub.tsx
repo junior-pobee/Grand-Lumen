@@ -349,7 +349,7 @@ export default function ExpansionHub({ onOpenScanner, language = "en" }: { onOpe
     }
   };
 
-  const translate = async () => {
+  useEffect(() => {\n    if (active === "Pulse" && pulseResults.length > 0) void loadPulse();\n  }, [language]);\n\n  const translate = async () => {
     if (!translateText.trim()) return;
     setTranslateBusy(true);
     setTranslated("");
