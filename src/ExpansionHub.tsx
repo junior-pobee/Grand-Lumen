@@ -134,7 +134,9 @@ export default function ExpansionHub({ onOpenScanner, language = "en" }: { onOpe
   const [documentText, setDocumentText] = useState("");
   const [documentName, setDocumentName] = useState("");
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState("");
-  const [documentSummary, setDocumentSummary] = useState("");\n  const [documentBusy, setDocumentBusy] = useState(false);\n  const [documentError, setDocumentError] = useState("");
+  const [documentSummary, setDocumentSummary] = useState("");
+  const [documentBusy, setDocumentBusy] = useState(false);
+  const [documentError, setDocumentError] = useState("");
   const [convertValue, setConvertValue] = useState("1");
   const [convertCategory, setConvertCategory] = useState("Length");
   const [convertFrom, setConvertFrom] = useState("m");
