@@ -1799,15 +1799,22 @@ function App() {
   useEffect(() => {
     localStorage.setItem("grandLumenLanguage", appLanguage);
     document.documentElement.lang = appLanguage;
-    if (appLanguage === "en") {
-      document.cookie = "googtrans=/en/en;path=/;max-age=31536000;SameSite=Lax";
-    }
     let attempts = 0;
     const applyLanguage = () => {
       const selector = document.querySelector<HTMLSelectElement>(".goog-te-combo");
+      if (appLanguage === "en") {
+        document.cookie = "googtrans=/en/en;path=/;max-age=31536000;SameSite=Lax";
+        document.cookie = "googtrans=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT;SameSite=Lax";
+        document.cookie = "googtrans=;path=/;domain=" + window.location.hostname + ";expires=Thu, 01 Jan 1970 00:00:00 GMT;SameSite=Lax";
+        if (selector) {
+          selector.value = "";
+          selector.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        return Boolean(selector);
+      }
       if (!selector) return false;
-      selector.value = appLanguage === "en" ? "" : appLanguage;
-      selector.dispatchEvent(new Event("change"));
+      selector.value = appLanguage;
+      selector.dispatchEvent(new Event("change", { bubbles: true }));
       return true;
     };
     const timer = window.setInterval(() => {
