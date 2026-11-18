@@ -134,6 +134,13 @@ with check (
   )
 );
 
+grant usage on schema public to authenticated;
+grant select on public.grand_lumen_profiles to authenticated;
+grant select on public.grand_lumen_connection_requests to authenticated;
+grant select on public.grand_lumen_team_connections to authenticated;
+grant select on public.grand_lumen_team_conversations to authenticated;
+grant select, insert on public.grand_lumen_team_messages to authenticated;
+
 create or replace function public.grand_lumen_sync_profile()
 returns trigger
 language plpgsql
