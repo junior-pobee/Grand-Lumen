@@ -27,6 +27,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   const [incomingCall, setIncomingCall] = useState<CallInvite | null>(null);
   const [activeCallId, setActiveCallId] = useState("");
   const [callStatus, setCallStatus] = useState("");
+  const [activeMediaType, setActiveMediaType] = useState<"audio" | "video">("audio");
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const peerRef = useRef<Peer | null>(null);
@@ -85,6 +86,12 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     return () => { void supabase?.removeChannel(channel); };
   }, [userId]);
 
+  useEffect(() => () => {
+    streamRef.current?.getTracks().forEach(track => track.stop());
+    localStreamRef.current?.getTracks().forEach(track => track.stop());
+    peerRef.current?.destroy();
+  }, []);
+
   useEffect(() => {
     if (localVideoRef.current && localStream) localVideoRef.current.srcObject = localStream;
     if (remoteVideoRef.current && remoteStream) remoteVideoRef.current.srcObject = remoteStream;
@@ -103,6 +110,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     setActiveCallId("");
     setIncomingCall(null);
     setCallStatus("");
+    setActiveMediaType("audio");
   };
 
   const startCall = async (mediaType: "audio" | "video") => {
@@ -114,6 +122,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: mediaType === "video" });
       localStreamRef.current = stream;
       setLocalStream(stream);
+      setActiveMediaType(mediaType);
       const peer = new Peer();
       peerRef.current = peer;
       peer.on("error", reason => setNotice("Call connection error: " + reason.message));
@@ -152,6 +161,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: invitation.media_type === "video" });
       localStreamRef.current = stream;
       setLocalStream(stream);
+      setActiveMediaType(invitation.media_type);
       const peer = new Peer();
       peerRef.current = peer;
       peer.on("error", reason => setNotice("Call connection error: " + reason.message));
@@ -332,7 +342,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     <div className="team-intro"><div><span className="eyebrow">COLLABORATION NETWORK</span><h2>Build together.</h2><p>Connect by invitation, approve every request and collaborate in private conversations.</p></div><span className="team-account"><b>{email}</b><small>ACTIVE CLOUD ACCOUNT</small></span></div>
     {notice && <div className="team-notice" role="status">{notice}</div>}
     {incomingCall && <section className="team-incoming-call"><div><b>Incoming {incomingCall.media_type === "video" ? "video" : "voice"} call</b><small>Another connected Team member is calling you.</small></div><div className="team-actions"><button className="team-secondary" onClick={() => void declineCall()}>Decline</button><button className="team-primary" onClick={() => void acceptCall()}>Accept</button></div></section>}
-    {callStatus && <section className="team-call-panel"><div className="team-card-heading"><div><span className="eyebrow">LIVE CALL</span><h3>{callStatus}</h3></div><button className="team-secondary" onClick={() => void finishCall()}>End call</button></div><div className="team-call-media">{remoteStream && <video ref={remoteVideoRef} autoPlay playsInline/>}{localStream && <video ref={localVideoRef} autoPlay playsInline muted/>}<audio ref={remoteAudioRef} autoPlay/></div><small>Calls connect directly between devices. Browser camera and microphone permissions are required.</small></section>}
+    {callStatus && <section className="team-call-panel"><div className="team-card-heading"><div><span className="eyebrow">LIVE CALL</span><h3>{callStatus}</h3></div><button className="team-secondary" onClick={() => void finishCall()}>End call</button></div><div className="team-call-media">{remoteStream && <video ref={remoteVideoRef} autoPlay playsInline/>}{localStream && <video ref={localVideoRef} autoPlay playsInline muted/>}{activeMediaType === "audio" && <audio ref={remoteAudioRef} autoPlay/>}</div><small>Calls connect directly between devices. Browser camera and microphone permissions are required.</small></section>}
     <div className="team-grid">
       <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR IDENTITY</span><h3>Personal QR invitation</h3></div><span className="team-icon">QR</span></div><p>Create a temporary QR code. It contains a one-time invitation token, not your email address.</p><button className="team-primary" onClick={() => void createInvite()} disabled={busy}>Create my QR code</button>
         {invite && <div className="team-qr"><QRCodeSVG value={JSON.stringify({ type: "grand-lumen-team-invite", token: invite })} size={190} level="M"/><b>Expires at {inviteExpiry}</b><button onClick={() => { void navigator.clipboard?.writeText(invite); setNotice("Invitation code copied."); }}>Copy invitation code</button></div>}
