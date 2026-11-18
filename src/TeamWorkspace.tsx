@@ -107,6 +107,8 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
 
   const startCall = async (mediaType: "audio" | "video") => {
     if (!supabase || !selected) return;
+    const client = supabase;
+    const connection = selected;
     if (!navigator.mediaDevices?.getUserMedia) { setNotice("Calls require a secure HTTPS connection and browser media support."); return; }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: mediaType === "video" });
@@ -124,9 +126,9 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
         incoming.on("close", () => void finishCall(false));
       });
       peer.on("open", async peerId => {
-        const memberId = selected.user_low === userId ? selected.user_high : selected.user_low;
-        const result = await supabase.from("grand_lumen_team_call_invites").insert({
-          connection_id: selected.id,
+        const memberId = connection.user_low === userId ? connection.user_high : connection.user_low;
+        const result = await client.from("grand_lumen_team_call_invites").insert({
+          connection_id: connection.id,
           caller_id: userId,
           recipient_id: memberId,
           peer_id: peerId,
@@ -144,23 +146,25 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
 
   const acceptCall = async () => {
     if (!supabase || !incomingCall) return;
+    const client = supabase;
+    const invitation = incomingCall;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: incomingCall.media_type === "video" });
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: invitation.media_type === "video" });
       localStreamRef.current = stream;
       setLocalStream(stream);
       const peer = new Peer();
       peerRef.current = peer;
       peer.on("error", reason => setNotice("Call connection error: " + reason.message));
       peer.on("open", () => {
-        const call = peer.call(incomingCall.peer_id, stream);
+        const call = peer.call(invitation.peer_id, stream);
         callRef.current = call;
         call.on("stream", streamValue => { setRemoteStream(streamValue); setCallStatus("Connected"); });
         call.on("close", () => void finishCall(false));
       });
-      const result = await supabase.from("grand_lumen_team_call_invites").update({ status: "accepted" }).eq("id", incomingCall.id);
+      const result = await client.from("grand_lumen_team_call_invites").update({ status: "accepted" }).eq("id", invitation.id);
       if (result.error) throw result.error;
-      setActiveCallId(incomingCall.id);
-      setCallStatus(incomingCall.media_type === "video" ? "Connecting video…" : "Connecting voice…");
+      setActiveCallId(invitation.id);
+      setCallStatus(invitation.media_type === "video" ? "Connecting video…" : "Connecting voice…");
       setIncomingCall(null);
     } catch (reason) {
       setNotice(reason instanceof Error ? reason.message : "Could not accept the call.");
