@@ -1,39 +1,46 @@
-const CACHE_PREFIX = "grand-lumen-pwa-";
-const CACHE_NAME = CACHE_PREFIX + "v6";
-const SCOPE_URL = new URL(self.registration.scope);
-const BASE_PATH = SCOPE_URL.pathname.endsWith("/") ? SCOPE_URL.pathname : SCOPE_URL.pathname + "/";
+const CACHE_PREFIX = "grand-lumen-";
+const CACHE_NAME = CACHE_PREFIX + "pwa-v7";
+const APP_SCOPE = new URL(self.registration.scope);
+const APP_PATH = APP_SCOPE.pathname.endsWith("/") ? APP_SCOPE.pathname : APP_SCOPE.pathname + "/";
 const APP_SHELL = [
-  SCOPE_URL.href,
-  new URL("manifest.webmanifest", SCOPE_URL).href,
-  new URL("icons/grand-lumen-icon.svg", SCOPE_URL).href,
-  new URL("icons/grand-lumen-192.png", SCOPE_URL).href,
-  new URL("icons/grand-lumen-512.png", SCOPE_URL).href
+  APP_SCOPE.href,
+  new URL("manifest.json", APP_SCOPE).href,
+  new URL("icons/grand-lumen-icon.svg", APP_SCOPE).href,
+  new URL("icons/grand-lumen-192.png", APP_SCOPE).href,
+  new URL("icons/grand-lumen-512.png", APP_SCOPE).href
 ];
 
 self.addEventListener("install", event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    await Promise.all(APP_SHELL.map(async url => {
-      const response = await fetch(url, { cache: "reload" });
-      if (!response.ok) throw new Error("Grand-Lumen app shell request failed: " + url + " (" + response.status + ")");
-      await cache.put(url, response);
-    }));
+    for (const asset of APP_SHELL) {
+      const response = await fetch(new Request(asset, { cache: "reload" }));
+      if (!response.ok) {
+        throw new Error("Unable to precache " + asset + ": HTTP " + response.status);
+      }
+      await cache.put(asset, response);
+    }
     await self.skipWaiting();
   })());
 });
 
 self.addEventListener("activate", event => {
   event.waitUntil((async () => {
-    const keys = await caches.keys();
-    await Promise.all(keys.filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME).map(key => caches.delete(key)));
+    const cacheNames = await caches.keys();
+    await Promise.all(cacheNames
+      .filter(name => name.startsWith(CACHE_PREFIX) && name !== CACHE_NAME)
+      .map(name => caches.delete(name)));
     await self.clients.claim();
   })());
 });
 
 self.addEventListener("fetch", event => {
   const request = event.request;
-  const url = new URL(request.url);
-  if (request.method !== "GET" || url.origin !== self.location.origin || !url.pathname.startsWith(BASE_PATH)) return;
+  if (request.method !== "GET") return;
+
+  const requestUrl = new URL(request.url);
+  if (requestUrl.origin !== self.location.origin) return;
+  if (!requestUrl.pathname.startsWith(APP_PATH)) return;
 
   if (request.mode === "navigate") {
     event.respondWith((async () => {
@@ -45,24 +52,39 @@ self.addEventListener("fetch", event => {
         }
         return response;
       } catch {
-        return await caches.match(request) || await caches.match(SCOPE_URL.href) || new Response("Grand-Lumen is unavailable offline.", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+        return await caches.match(request) ||
+          await caches.match(APP_SCOPE.href) ||
+          new Response("Grand-Lumen is unavailable offline.", {
+            status: 503,
+            headers: { "Content-Type": "text/plain; charset=utf-8" }
+          });
       }
     })());
     return;
   }
 
-  if (request.destination === "script" || request.destination === "style" || request.destination === "image" || request.destination === "font" || url.pathname.endsWith(".webmanifest")) {
-    event.respondWith((async () => {
-      try {
-        const response = await fetch(request);
-        if (response.ok) {
-          const cache = await caches.open(CACHE_NAME);
-          await cache.put(request, response.clone());
-        }
-        return response;
-      } catch {
-        return await caches.match(request) || Response.error();
+  const isAppAsset = ["script", "style", "image", "font"].includes(request.destination) ||
+    requestUrl.pathname.endsWith("/manifest.json");
+
+  if (!isAppAsset) return;
+
+  event.respondWith((async () => {
+    const cached = await caches.match(request);
+    const network = fetch(request).then(async response => {
+      if (response.ok) {
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(request, response.clone());
       }
-    })());
-  }
+      return response;
+    });
+    if (cached) {
+      event.waitUntil(network.catch(() => undefined));
+      return cached;
+    }
+    try {
+      return await network;
+    } catch {
+      return Response.error();
+    }
+  })());
 });
