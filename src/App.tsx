@@ -289,12 +289,140 @@ function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup";
   </main>;
 }
 
+function parseScannedPayload(value: string) {
+  const raw = value.trim();
+  const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  const entries: { label: string; value: string }[] = [];
+  let type = "Plain text";
+  let summary = "This code contains text data.";
+  let link = "";
+
+  const add = (label: string, content: unknown) => {
+    if (content === undefined || content === null || content === "") return;
+    const display = typeof content === "string" ? content : typeof content === "object" ? JSON.stringify(content, null, 2) : String(content);
+    entries.push({ label, value: display });
+  };
+
+  if (/^https?:\/\//i.test(raw)) {
+    type = "Website link";
+    summary = "This QR code stores a web address.";
+    link = raw;
+    try {
+      const url = new URL(raw);
+      add("Website", url.hostname);
+      add("Full address", url.href);
+      if (url.pathname !== "/") add("Page path", url.pathname);
+      url.searchParams.forEach((value, key) => add("Parameter: " + key, value));
+      if (url.hash) add("Page section", url.hash.slice(1));
+    } catch {
+      add("Address", raw);
+    }
+  } else if (/^WIFI:/i.test(raw)) {
+    type = "Wi-Fi connection";
+    summary = "This code contains wireless network connection details.";
+    const body = raw.slice(raw.indexOf(":") + 1).replace(/;;$/, "");
+    const fields = body.match(/(?:^|;)(S|T|P|H|E|A|I|PH):((?:\\.|[^;])*)/g) || [];
+    const values: Record<string, string> = {};
+    fields.forEach(field => {
+      const match = field.replace(/^;/, "").match(/^([A-Z]+):([\s\S]*)$/);
+      if (match) values[match[1]] = match[2].replace(/\\([\\;,:"])/g, "$1");
+    });
+    add("Network name (SSID)", values.S);
+    add("Security", values.T || "Not specified");
+    add("Password", values.P);
+    add("Hidden network", values.H === "true" ? "Yes" : values.H === "false" ? "No" : undefined);
+    add("EAP method", values.E);
+    add("Anonymous identity", values.A);
+    add("Identity", values.I);
+    add("Phase 2 method", values.PH);
+  } else if (/^(BEGIN:VCARD|MECARD:)/i.test(raw)) {
+    type = "Contact card";
+    summary = "This code contains contact information.";
+    if (/^MECARD:/i.test(raw)) {
+      const body = raw.replace(/^MECARD:/i, "").replace(/;;$/, "");
+      const fields = body.match(/(?:^|;)(N|SOUND|TEL|EMAIL|NOTE|ADR|BDAY|URL|ORG|TITLE|NICKNAME):((?:\\.|[^;])*)/g) || [];
+      fields.forEach(field => {
+        const match = field.replace(/^;/, "").match(/^([^:]+):([\s\S]*)$/);
+        if (match) add(({N:"Name",SOUND:"Pronunciation",TEL:"Phone",EMAIL:"Email",NOTE:"Note",ADR:"Address",BDAY:"Birthday",URL:"Website",ORG:"Organisation",TITLE:"Job title",NICKNAME:"Nickname"} as Record<string,string>)[match[1]] || match[1], match[2].replace(/\\([\\;,:"])/g, "$1"));
+      });
+    } else {
+      lines.filter(line => !/^BEGIN:VCARD|^END:VCARD|^VERSION:/i.test(line)).forEach(line => {
+        const match = line.match(/^([^:;]+)(?:;[^:]*)?:(.*)$/);
+        if (!match) return;
+        const key = match[1].toUpperCase();
+        const labels: Record<string,string> = {FN:"Full name",N:"Name",ORG:"Organisation",TITLE:"Job title",TEL:"Phone",EMAIL:"Email",ADR:"Address",URL:"Website",NOTE:"Note",BDAY:"Birthday"};
+        add(labels[key] || key, match[2].replace(/\\n/g, "\n").replace(/\\,/g, ",").replace(/\\;/g, ";"));
+      });
+    }
+  } else if (/^geo:/i.test(raw)) {
+    type = "Map location";
+    summary = "This code contains geographic coordinates.";
+    const match = raw.match(/^geo:([^,;]+),([^;]+)(?:;(.+))?/i);
+    if (match) {
+      add("Latitude", match[1]);
+      add("Longitude", match[2]);
+      add("Additional location data", match[3]);
+      link = "https://www.google.com/maps?q=" + encodeURIComponent(match[1] + "," + match[2]);
+    } else add("Location data", raw);
+  } else if (/^mailto:/i.test(raw)) {
+    type = "Email";
+    summary = "This code contains an email recipient and possibly a message.";
+    try {
+      const url = new URL(raw);
+      add("Recipient", decodeURIComponent(url.pathname));
+      add("Subject", url.searchParams.get("subject"));
+      add("Message", url.searchParams.get("body"));
+    } catch { add("Email data", raw); }
+  } else if (/^(tel:|sms:|smsto:)/i.test(raw)) {
+    type = /^tel:/i.test(raw) ? "Phone number" : "Text message";
+    summary = /^tel:/i.test(raw) ? "This code contains a telephone number." : "This code contains a message recipient and possibly message text.";
+    try {
+      const url = new URL(raw.replace(/^smsto:/i, "sms:"));
+      add("Number", url.pathname);
+      add("Message", url.searchParams.get("body"));
+    } catch { add("Data", raw); }
+  } else {
+    try {
+      const parsed = JSON.parse(raw);
+      type = "Structured JSON data";
+      summary = "This code contains structured data. Its fields are displayed below.";
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        Object.entries(parsed).forEach(([key, content]) => add(key, content));
+      } else add("Value", parsed);
+    } catch {
+      if (/^[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}$/.test(raw)) {
+        type = "Email address";
+        summary = "This code contains an email address.";
+        add("Email", raw);
+      } else if (/^\+?[\d\s().-]{7,}$/.test(raw)) {
+        type = "Number or identifier";
+        summary = "This code contains a numeric value. A QR code only stores the data encoded by its creator; it does not automatically contain a person's or product's full details.";
+        add("Encoded number", raw);
+      } else if (lines.some(line => /^[\w -]{2,30}\s*[:=]\s*.+/.test(line))) {
+        type = "Labelled information";
+        summary = "This code contains labelled text fields.";
+        lines.forEach(line => {
+          const match = line.match(/^([\w -]{2,30})\s*[:=]\s*(.+)$/);
+          if (match) add(match[1], match[2]);
+          else add("Additional text", line);
+        });
+      } else {
+        add("Content", raw);
+      }
+    }
+  }
+
+  return { type, summary, entries, raw, link };
+}
+
 function BarcodeScanner({ onDetected }: { onDetected?: (value: string) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [scanning, setScanning] = useState(false);
   const [value, setValue] = useState("");
+  const [format, setFormat] = useState("");
   const [error, setError] = useState("");
   const [supported, setSupported] = useState(true);
+  const details = value ? parseScannedPayload(value) : null;
 
   useEffect(() => {
     if (!scanning) return;
@@ -311,7 +439,7 @@ function BarcodeScanner({ onDetected }: { onDetected?: (value: string) => void }
           return;
         }
         const detector = new Detector({ formats: ["qr_code","ean_13","ean_8","upc_a","upc_e","code_128","code_39","itf","data_matrix","pdf417","aztec"] });
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: true });
+        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false });
         if (!videoRef.current || stopped) return;
         videoRef.current.srcObject = stream;
         await videoRef.current.play();
@@ -322,6 +450,7 @@ function BarcodeScanner({ onDetected }: { onDetected?: (value: string) => void }
             if (codes.length && codes[0].rawValue) {
               const result = codes[0].rawValue;
               setValue(result);
+              setFormat(codes[0].format || "Detected code");
               onDetected?.(result);
               setScanning(false);
               return;
@@ -351,14 +480,24 @@ function BarcodeScanner({ onDetected }: { onDetected?: (value: string) => void }
       {scanning ? <video ref={videoRef} muted playsInline /> : <div className="scanner-placeholder"><ScanLine size={42}/><b>Camera scanner</b><span>Position a QR code or barcode inside the camera view.</span></div>}
       {scanning && <div className="scanner-frame"><i/></div>}
     </div>
-    <div className="scanner-controls"><button className="solid-button" onClick={() => { setError(""); setScanning(value => !value); }}>{scanning ? "Stop camera" : "Start camera scanner"}</button><button className="quiet-button" onClick={() => { setValue(""); setError(""); }}>Clear result</button></div>
+    <div className="scanner-controls"><button className="solid-button" onClick={() => { setError(""); setScanning(value => !value); }}>{scanning ? "Stop camera" : "Start camera scanner"}</button><button className="quiet-button" onClick={() => { setValue(""); setFormat(""); setError(""); }}>Clear result</button></div>
     {!supported && <p className="error-text">{error}</p>}
     {error && supported && <p className="error-text">{error}</p>}
-    {value && <div className="scanner-result">{/^https?:\/\//i.test(value) ? <><span className="eyebrow">LINK QR CODE DETECTED</span><strong>This code contains a web link, not the picture files themselves.</strong><p>To receive pictures, connect both devices through Lumen Share and send the image files from the other device.</p><div><button className="quiet-button" onClick={() => navigator.clipboard?.writeText(value)}><Copy size={14}/> Copy link</button><button className="quiet-button" onClick={() => window.open(value, "_blank", "noopener,noreferrer")}>Open link</button></div></> : <><span className="eyebrow">SCANNED DEVICE CODE</span><strong>{value}</strong><div><button className="quiet-button" onClick={() => navigator.clipboard?.writeText(value)}><Copy size={14}/> Copy result</button><button className="quiet-button" onClick={() => onDetected?.(value)}>Use result</button></div></>}</div>}
-    <p className="scanner-note">Camera access requires HTTPS and your permission. Scanning happens in this browser; camera frames are not uploaded by Grand-Lumen.</p>
+    {details && <div className="scanner-result">
+      <span className="eyebrow">SCAN COMPLETE · {format.toUpperCase()}</span>
+      <h3>{details.type}</h3>
+      <p>{details.summary}</p>
+      {details.entries.length > 0 && <div className="scanner-detail-list">{details.entries.map((entry,index) => <div className="scanner-detail-row" key={entry.label + index}><b>{entry.label}</b><span>{entry.value}</span></div>)}</div>}
+      <details className="scanner-raw-data"><summary>View complete original QR data</summary><pre>{details.raw}</pre></details>
+      <div className="scanner-result-actions">
+        <button className="quiet-button" onClick={() => navigator.clipboard?.writeText(details.raw)}><Copy size={14}/> Copy all information</button>
+        {details.link && <button className="quiet-button" onClick={() => window.open(details.link, "_blank", "noopener,noreferrer")}>Open destination</button>}
+        <button className="quiet-button" onClick={() => onDetected?.(details.raw)}>Use result</button>
+      </div>
+    </div>}
+    <p className="scanner-note">Grand-Lumen displays the information actually encoded in the QR code, including supported contact, Wi-Fi, location, email, link and structured-data formats. A code containing only a number cannot reveal extra details that were never encoded.</p>
   </div>;
 }
-
 function CreativeStudio() {
   const [file, setFile] = useState<File | null>(null);
   const [source, setSource] = useState("");
