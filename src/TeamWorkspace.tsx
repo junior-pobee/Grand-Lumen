@@ -1,0 +1,197 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
+import { supabase } from "./auth";
+
+type Profile = { id: string; display_name: string | null; email: string | null; avatar_url: string | null };
+type Connection = { id: string; user_low: string; user_high: string };
+type RequestRow = { id: string; requester_id: string; recipient_id: string; status: string; created_at: string };
+type Message = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string };
+
+export default function TeamWorkspace({ userId, email }: { userId: string; email: string }) {
+  const [invite, setInvite] = useState("");
+  const [inviteExpiry, setInviteExpiry] = useState("");
+  const [inviteInput, setInviteInput] = useState("");
+  const [connections, setConnections] = useState<Connection[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, Profile>>({});
+  const [requests, setRequests] = useState<RequestRow[]>([]);
+  const [selected, setSelected] = useState<Connection | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [draft, setDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  const loadTeam = useCallback(async () => {
+    if (!supabase) return;
+    const [connectionResult, requestResult] = await Promise.all([
+      supabase.from("grand_lumen_team_connections").select("*").order("created_at", { ascending: false }),
+      supabase.from("grand_lumen_connection_requests").select("*").eq("recipient_id", userId).eq("status", "pending").order("created_at", { ascending: false })
+    ]);
+    if (connectionResult.error) setNotice(connectionResult.error.message);
+    if (requestResult.error) setNotice(requestResult.error.message);
+    const nextConnections = (connectionResult.data || []) as Connection[];
+    setConnections(nextConnections);
+    setRequests((requestResult.data || []) as RequestRow[]);
+    const ids = Array.from(new Set(nextConnections.flatMap(item => [item.user_low, item.user_high]).filter(id => id !== userId)));
+    if (ids.length) {
+      const result = await supabase.from("grand_lumen_profiles").select("id,display_name,email,avatar_url").in("id", ids);
+      if (!result.error) setProfiles(Object.fromEntries(((result.data || []) as Profile[]).map(profile => [profile.id, profile])));
+    } else {
+      setProfiles({});
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    void loadTeam();
+    if (!supabase) return;
+    const channel = supabase.channel("grand-lumen-team-" + userId)
+      .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_team_connections" }, () => void loadTeam())
+      .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_connection_requests", filter: "recipient_id=eq." + userId }, () => void loadTeam())
+      .subscribe();
+    return () => { void supabase?.removeChannel(channel); };
+  }, [loadTeam, userId]);
+
+  useEffect(() => {
+    if (!supabase || !selected) {
+      setMessages([]);
+      return;
+    }
+    let alive = true;
+    const loadMessages = async () => {
+      const conversation = await supabase.from("grand_lumen_team_conversations").select("id").eq("connection_id", selected.id).single();
+      if (conversation.error) { setNotice(conversation.error.message); return; }
+      const result = await supabase.from("grand_lumen_team_messages").select("*").eq("conversation_id", conversation.data.id).order("created_at", { ascending: true }).limit(150);
+      if (alive && !result.error) setMessages((result.data || []) as Message[]);
+    };
+    void loadMessages();
+    const channel = supabase.channel("grand-lumen-chat-" + selected.id)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_team_messages" }, payload => {
+        const message = payload.new as Message;
+        if (alive) setMessages(current => current.some(item => item.id === message.id) ? current : [...current, message]);
+      }).subscribe();
+    return () => { alive = false; void supabase?.removeChannel(channel); };
+  }, [selected]);
+
+  useEffect(() => {
+    if (!cameraOpen) {
+      streamRef.current?.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+      return;
+    }
+    let active = true;
+    const start = async () => {
+      try {
+        const detectorConstructor = (window as any).BarcodeDetector;
+        if (!detectorConstructor) throw new Error("QR camera scanning is not supported by this browser. Paste an invitation code instead.");
+        const detector = new detectorConstructor({ formats: ["qr_code"] });
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        if (!active) { stream.getTracks().forEach((track: MediaStreamTrack) => track.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) videoRef.current.srcObject = stream;
+        const scan = async () => {
+          if (!active || !videoRef.current) return;
+          try {
+            const found = await detector.detect(videoRef.current);
+            if (found.length) {
+              const raw = String(found[0].rawValue || "");
+              const parsed = JSON.parse(raw);
+              if (parsed.type === "grand-lumen-team-invite" && typeof parsed.token === "string") {
+                setInviteInput(parsed.token);
+                setCameraOpen(false);
+                setNotice("Invitation scanned. Review and connect when ready.");
+                return;
+              }
+            }
+          } catch {}
+          window.setTimeout(() => void scan(), 350);
+        };
+        await videoRef.current?.play();
+        void scan();
+      } catch (reason) {
+        setNotice(reason instanceof Error ? reason.message : "Camera access could not start.");
+        setCameraOpen(false);
+      }
+    };
+    void start();
+    return () => { active = false; streamRef.current?.getTracks().forEach(track => track.stop()); };
+  }, [cameraOpen]);
+
+  const createInvite = async () => {
+    if (!supabase) return;
+    setBusy(true);
+    setNotice("");
+    try {
+      const bytes = crypto.getRandomValues(new Uint8Array(32));
+      const token = Array.from(bytes).map(value => value.toString(16).padStart(2, "0")).join("");
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+      const tokenHash = Array.from(new Uint8Array(digest)).map(value => value.toString(16).padStart(2, "0")).join("");
+      const result = await supabase.rpc("grand_lumen_create_team_invite", { invite_token_hash: tokenHash, valid_minutes: 10 });
+      if (result.error) throw result.error;
+      setInvite(token);
+      setInviteExpiry(new Date(Date.now() + 10 * 60 * 1000).toLocaleTimeString());
+      setNotice("Your QR invitation is ready. It expires in 10 minutes.");
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : "Could not create an invitation.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const connectWithToken = async () => {
+    if (!supabase || !inviteInput.trim()) return;
+    setBusy(true);
+    setNotice("");
+    try {
+      const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(inviteInput.trim()));
+      const tokenHash = Array.from(new Uint8Array(digest)).map(value => value.toString(16).padStart(2, "0")).join("");
+      const result = await supabase.rpc("grand_lumen_redeem_team_invite", { invite_token_hash: tokenHash });
+      if (result.error) throw result.error;
+      setInviteInput("");
+      setNotice("Connection request sent. The other person must approve it.");
+      await loadTeam();
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : "Invitation could not be redeemed.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const respond = async (requestId: string, accept: boolean) => {
+    if (!supabase) return;
+    setBusy(true);
+    const result = await supabase.rpc("grand_lumen_respond_connection_request", { request_id: requestId, accept_request: accept });
+    if (result.error) setNotice(result.error.message);
+    else setNotice(accept ? "Connection accepted." : "Request declined.");
+    await loadTeam();
+    setBusy(false);
+  };
+
+  const sendMessage = async () => {
+    if (!supabase || !selected || !draft.trim()) return;
+    const conversation = await supabase.from("grand_lumen_team_conversations").select("id").eq("connection_id", selected.id).single();
+    if (conversation.error) { setNotice(conversation.error.message); return; }
+    const body = draft.trim();
+    setDraft("");
+    const result = await supabase.from("grand_lumen_team_messages").insert({ conversation_id: conversation.data.id, sender_id: userId, body }).select("*").single();
+    if (result.error) { setDraft(body); setNotice(result.error.message); }
+    else setMessages(current => current.some(item => item.id === result.data.id) ? current : [...current, result.data as Message]);
+  };
+
+  if (!supabase) return <div className="team-workspace"><div className="team-empty"><h3>Cloud account required</h3><p>Sign in with a Grand Lumen cloud account to connect with other people across devices. Local browser accounts cannot use Team.</p></div></div>;
+
+  return <div className="team-workspace">
+    <div className="team-intro"><div><span className="eyebrow">COLLABORATION NETWORK</span><h2>Build together.</h2><p>Connect by invitation, approve every request and collaborate in private conversations.</p></div><span className="team-account"><b>{email}</b><small>ACTIVE CLOUD ACCOUNT</small></span></div>
+    {notice && <div className="team-notice" role="status">{notice}</div>}
+    <div className="team-grid">
+      <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR IDENTITY</span><h3>Personal QR invitation</h3></div><span className="team-icon">QR</span></div><p>Create a temporary QR code. It contains a one-time invitation token, not your email address.</p><button className="team-primary" onClick={() => void createInvite()} disabled={busy}>Create my QR code</button>
+        {invite && <div className="team-qr"><QRCodeSVG value={JSON.stringify({ type: "grand-lumen-team-invite", token: invite })} size={190} level="M"/><b>Expires at {inviteExpiry}</b><button onClick={() => { void navigator.clipboard?.writeText(invite); setNotice("Invitation code copied."); }}>Copy invitation code</button></div>}
+      </section>
+      <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">FIND A MEMBER</span><h3>Scan or enter a code</h3></div><span className="team-icon">+</span></div><p>Scan another member's QR invitation or paste their invitation code.</p><textarea value={inviteInput} onChange={event => setInviteInput(event.target.value)} placeholder="Paste invitation token here" rows={3}/><div className="team-actions"><button className="team-secondary" onClick={() => setCameraOpen(value => !value)}>{cameraOpen ? "Close camera" : "Scan QR code"}</button><button className="team-primary" onClick={() => void connectWithToken()} disabled={busy || !inviteInput.trim()}>Send request</button></div>{cameraOpen && <video className="team-camera" ref={videoRef} muted playsInline/>}</section>
+    </div>
+    <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">CONNECTION REQUESTS</span><h3>Requests awaiting your approval</h3></div><span className="team-count">{requests.length}</span></div>{requests.length ? requests.map(request => <div className="team-request" key={request.id}><div><b>Grand Lumen member</b><small>Account ID · {request.requester_id.slice(0, 8)}</small></div><div className="team-actions"><button className="team-secondary" disabled={busy} onClick={() => void respond(request.id, false)}>Decline</button><button className="team-primary" disabled={busy} onClick={() => void respond(request.id, true)}>Accept</button></div></div>) : <p className="team-muted">No pending requests.</p>}</section>
+    <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR NETWORK</span><h3>Connected members</h3></div><span className="team-count">{connections.length}</span></div>{connections.length ? <div className="team-contacts">{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; const profile = profiles[memberId]; return <button className={selected?.id === connection.id ? "team-contact active" : "team-contact"} key={connection.id} onClick={() => setSelected(connection)}><span className="team-avatar">{(profile?.display_name || profile?.email || "GL").slice(0, 1).toUpperCase()}</span><span><b>{profile?.display_name || "Grand Lumen member"}</b><small>{profile?.email || "Connected account"}</small></span></button>; })}</div> : <p className="team-muted">Your connections will appear here after they approve your requests.</p>}</section>
+    {selected && <section className="team-card team-chat"><div className="team-card-heading"><div><span className="eyebrow">PRIVATE CONVERSATION</span><h3>{(() => { const memberId = selected.user_low === userId ? selected.user_high : selected.user_low; return profiles[memberId]?.display_name || "Team member"; })()}</h3></div><button className="team-secondary" onClick={() => setSelected(null)}>Close chat</button></div><div className="team-message-list">{messages.map(message => <article className={message.sender_id === userId ? "team-message own" : "team-message"} key={message.id}><p>{message.body}</p><small>{new Date(message.created_at).toLocaleString()}</small></article>)}{!messages.length && <p className="team-muted">Start the conversation.</p>}</div><form className="team-compose" onSubmit={event => { event.preventDefault(); void sendMessage(); }}><input value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write a message…" maxLength={12000}/><button className="team-primary" disabled={!draft.trim()}>Send</button></form><div className="team-call-note">Voice and video calling require a configured call-signalling service. Chat and connection features are available here.</div></section>}
+  </div>;
+}
