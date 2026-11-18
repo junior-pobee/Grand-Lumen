@@ -447,3 +447,10 @@ body{top:0!important}
 .goog-te-gadget{font-size:0!important}
 .goog-tooltip,.goog-tooltip:hover{display:none!important}
 @media(max-width:650px){.language-settings-card{align-items:stretch;flex-direction:column}.language-setting-control{min-width:0;width:100%;grid-template-columns:minmax(0,1fr) auto}}
+
+.language-default-fab{position:fixed;right:18px;bottom:20px;z-index:9998;display:inline-flex;align-items:center;gap:7px;min-height:38px;padding:0 13px;border:1px solid color-mix(in srgb,var(--accent) 55%,transparent);border-radius:999px;background:var(--accent);color:#fff;box-shadow:0 8px 24px #0003;font:700 11px inherit;cursor:pointer;transition:transform .2s ease,box-shadow .2s ease}
+.language-default-fab:hover{transform:translateY(-2px);box-shadow:0 12px 28px #0004}
+.language-default-fab span{white-space:nowrap}
+.goog-te-banner-frame,.goog-te-balloon-frame,#goog-gt-tt,.goog-tooltip,.goog-tooltip:hover{display:none!important;visibility:hidden!important;pointer-events:none!important}
+body{top:0!important}
+@media(max-width:650px){.language-default-fab{right:12px;bottom:calc(14px + env(safe-area-inset-bottom));min-height:36px;padding:0 11px}}
