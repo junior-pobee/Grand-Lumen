@@ -666,7 +666,7 @@ function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup";
           });
           if (error) throw error;
           if (data.session) setNotice("Your account is ready. Opening your workspace…", "success");
-          else setNotice("Account created. Follow the sign-in instructions shown for your account.", "success");
+          else setNotice("Account created. Email confirmation is still required by the current authentication settings. Verify your email, then sign in.", "success");
         } else {
           const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
           if (error) throw error;
