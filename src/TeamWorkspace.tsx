@@ -12,6 +12,7 @@ type CallInvite = { id: string; connection_id: string; caller_id: string; recipi
 
 export default function TeamWorkspace({ userId, email }: { userId: string; email: string }) {
   const [invite, setInvite] = useState("");
+  const [inviteLoading, setInviteLoading] = useState(true);
   const [inviteInput, setInviteInput] = useState("");
   const [connections, setConnections] = useState<Connection[]>([]);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
@@ -90,19 +91,27 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   }, [userId]);
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) {
+      setInviteLoading(false);
+      return;
+    }
+    let active = true;
     const loadPersonalInvite = async () => {
+      setInviteLoading(true);
       try {
         const bytes = crypto.getRandomValues(new Uint8Array(32));
         const token = Array.from(bytes).map(value => value.toString(16).padStart(2, "0")).join("");
         const result = await supabase.rpc("grand_lumen_get_or_create_personal_team_invite", { invite_token: token });
         if (result.error) throw result.error;
-        setInvite(String(result.data || token));
+        if (active) setInvite(String(result.data || token));
       } catch (reason) {
-        setNotice(reason instanceof Error ? reason.message : "Could not load your personal QR invitation.");
+        if (active) setNotice(reason instanceof Error ? reason.message : "Could not load your personal QR invitation.");
+      } finally {
+        if (active) setInviteLoading(false);
       }
     };
     void loadPersonalInvite();
+    return () => { active = false; };
   }, []);
 
   useEffect(() => () => {
@@ -272,24 +281,6 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     return () => { active = false; streamRef.current?.getTracks().forEach(track => track.stop()); };
   }, [cameraOpen]);
 
-  const createInvite = async () => {
-    if (!supabase) return;
-    setBusy(true);
-    setNotice("");
-    try {
-      const bytes = crypto.getRandomValues(new Uint8Array(32));
-      const token = Array.from(bytes).map(value => value.toString(16).padStart(2, "0")).join("");
-      const result = await supabase.rpc("grand_lumen_get_or_create_personal_team_invite", { invite_token: token });
-      if (result.error) throw result.error;
-      setInvite(String(result.data || token));
-      setNotice("Your permanent personal QR invitation is ready. It can be reused and does not expire.");
-    } catch (reason) {
-      setNotice(reason instanceof Error ? reason.message : "Could not load your personal QR invitation.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const connectWithToken = async () => {
     if (!supabase || !inviteInput.trim()) return;
     setBusy(true);
@@ -360,8 +351,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     {incomingCall && <section className="team-incoming-call"><div><b>Incoming {incomingCall.media_type === "video" ? "video" : "voice"} call</b><small>Another connected Team member is calling you.</small></div><div className="team-actions"><button className="team-secondary" onClick={() => void declineCall()}>Decline</button><button className="team-primary" onClick={() => void acceptCall()}>Accept</button></div></section>}
     {callStatus && <section className="team-call-panel"><div className="team-card-heading"><div><span className="eyebrow">LIVE CALL</span><h3>{callStatus}</h3></div><button className="team-secondary" onClick={() => void finishCall()}>End call</button></div><div className="team-call-media">{remoteStream && <video ref={remoteVideoRef} autoPlay playsInline/>}{localStream && <video ref={localVideoRef} autoPlay playsInline muted/>}{activeMediaType === "audio" && <audio ref={remoteAudioRef} autoPlay/>}</div><small>Calls connect directly between devices. Browser camera and microphone permissions are required.</small></section>}
     <div className="team-grid">
-      <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR IDENTITY</span><h3>Personal QR invitation</h3></div><span className="team-icon">QR</span></div><p>Your permanent personal QR code. It can be scanned repeatedly and does not expire.</p><button className="team-primary" onClick={() => void createInvite()} disabled={busy}>{invite ? "Refresh my QR code" : "Create my QR code"}</button>
-        {invite && <div className="team-qr"><QRCodeSVG value={JSON.stringify({ type: "grand-lumen-team-invite", token: invite })} size={190} level="M"/><b>Permanent invitation · No expiry</b><button onClick={() => { void navigator.clipboard?.writeText(invite); setNotice("Invitation code copied."); }}>Copy invitation code</button></div>}
+      <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR IDENTITY</span><h3>Personal QR invitation</h3></div><span className="team-icon">QR</span></div><p>Your personal QR invitation stays available here. Other members can scan it repeatedly to send you a connection request.</p><div className="team-qr">{invite ? <><QRCodeSVG value={JSON.stringify({ type: "grand-lumen-team-invite", token: invite })} size={190} level="M"/><b>Permanent invitation · Reusable</b><button onClick={() => { void navigator.clipboard?.writeText(invite); setNotice("Invitation code copied."); }}>Copy invitation code</button></> : <p>{inviteLoading ? "Loading your permanent QR invitation…" : "Your QR invitation could not load. Check the message above and reload the Team section."}</p>}</div>
       </section>
       <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">FIND A MEMBER</span><h3>Scan or enter a code</h3></div><span className="team-icon">+</span></div><p>Scan another member's QR invitation or paste their invitation code.</p><textarea value={inviteInput} onChange={event => setInviteInput(event.target.value)} placeholder="Paste invitation token here" rows={3}/><div className="team-actions"><button className="team-secondary" onClick={() => setCameraOpen(value => !value)}>{cameraOpen ? "Close camera" : "Scan QR code"}</button><button className="team-primary" onClick={() => void connectWithToken()} disabled={busy || !inviteInput.trim()}>Send request</button></div>{cameraOpen && <video className="team-camera" ref={videoRef} muted playsInline/>}</section>
     </div>
