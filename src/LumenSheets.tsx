@@ -115,18 +115,34 @@ export default function LumenSheets({ userId }: { userId: string }) {
   };
 
   const createWorkbook = async () => {
-    if (!supabase || !newName.trim()) return;
+    if (!supabase || !newName.trim() || busy) return;
     setBusy(true);
-    const result = await supabase.from("grand_lumen_workbooks").insert({ owner_id: userId, name: newName.trim() }).select("*").single();
-    if (result.error) setNotice(result.error.message);
-    else {
+    setNotice("");
+    try {
+      const { data: authData, error: authError } = await supabase.auth.getUser();
+      if (authError) throw authError;
+      const activeUserId = authData.user?.id;
+      if (!activeUserId) {
+        setNotice("Please sign in with your Grand Lumen account before creating a cloud workbook. Guest sessions cannot save workbooks.");
+        return;
+      }
+      const result = await supabase.from("grand_lumen_workbooks").insert({ owner_id: activeUserId, name: newName.trim() }).select("*").single();
+      if (result.error) throw new Error("Workbook creation failed: " + result.error.message);
       const created = result.data as Workbook;
       const firstSheet = await supabase.from("grand_lumen_sheets").insert({ workbook_id: created.id, name: "Sheet 1", position: 0 }).select("*").single();
-      if (firstSheet.error) setNotice(firstSheet.error.message);
-      else { await refreshWorkbooks(); await loadWorkbook(created); }
+      if (firstSheet.error) {
+        await supabase.from("grand_lumen_workbooks").delete().eq("id", created.id);
+        throw new Error("The workbook was created, but its first sheet could not be created: " + firstSheet.error.message);
+      }
       setNewName("");
+      await refreshWorkbooks();
+      await loadWorkbook(created);
+      setNotice("Workbook created successfully.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Something went wrong while creating the workbook. Please try again.");
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   };
 
   const saveCell = async () => {
