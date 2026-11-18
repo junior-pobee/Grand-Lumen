@@ -1,11 +1,10 @@
 const CACHE_PREFIX = "grand-lumen-";
-const CACHE_NAME = CACHE_PREFIX + "pwa-v8";
+const CACHE_NAME = CACHE_PREFIX + "pwa-v9";
 const APP_SCOPE = new URL(self.registration.scope);
 const APP_PATH = APP_SCOPE.pathname.endsWith("/") ? APP_SCOPE.pathname : APP_SCOPE.pathname + "/";
 const APP_SHELL = [
   APP_SCOPE.href,
   new URL("manifest.json", APP_SCOPE).href,
-  new URL("icons/grand-lumen-icon.svg", APP_SCOPE).href,
   new URL("icons/grand-lumen-192.png", APP_SCOPE).href,
   new URL("icons/grand-lumen-512.png", APP_SCOPE).href
 ];
