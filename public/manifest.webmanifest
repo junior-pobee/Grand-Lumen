@@ -14,15 +14,15 @@
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "/Grand-Lumen/icons/grand-lumen-192.png",
+      "src": "/Grand-Lumen/icons/grand-lumen-icon.svg",
       "sizes": "192x192",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/Grand-Lumen/icons/grand-lumen-512.png",
+      "src": "/Grand-Lumen/icons/grand-lumen-icon.svg",
       "sizes": "512x512",
-      "type": "image/png",
+      "type": "image/svg+xml",
       "purpose": "any"
     }
   ]
