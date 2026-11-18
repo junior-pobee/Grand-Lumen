@@ -11,7 +11,12 @@ const presets: Preset[] = [
   { name: "Ohm's law", equation: "5*x", xLabel: "Current (A)", yLabel: "Voltage (V)", description: "Voltage against current. The gradient represents resistance." },
   { name: "Hooke's law", equation: "12*x", xLabel: "Extension (m)", yLabel: "Force (N)", description: "Force against extension. The gradient represents the spring constant." },
   { name: "Radioactive decay", equation: "100*e^(-0.2*x)", xLabel: "Time", yLabel: "Remaining quantity", description: "An exponential decay model." },
-  { name: "Simple harmonic motion", equation: "3*cos(2*pi*x)", xLabel: "Time (s)", yLabel: "Displacement (m)", description: "A cosine model. Trigonometric functions use degrees only when DEG mode is selected." }
+  { name: "Simple harmonic motion", equation: "3*cos(2*pi*x)", xLabel: "Time (s)", yLabel: "Displacement (m)", description: "A cosine model. Trigonometric functions use degrees only when DEG mode is selected." },
+  { name: "Velocity and time", equation: "3*x", xLabel: "Time (s)", yLabel: "Velocity (m/s)", description: "The gradient represents acceleration." },
+  { name: "Boyle law", equation: "100/x", xLabel: "Volume", yLabel: "Pressure", description: "An inverse relationship at constant temperature." },
+  { name: "Inverse square law", equation: "1/x^2", xLabel: "Distance", yLabel: "Relative intensity", description: "A common inverse-square relationship." },
+  { name: "Wave profile", equation: "sin(2*pi*x)", xLabel: "Position", yLabel: "Amplitude", description: "A periodic wave profile." },
+  { name: "Charles law", equation: "2*x", xLabel: "Absolute temperature (K)", yLabel: "Volume", description: "Volume is proportional to absolute temperature at constant pressure." }
 ];
 
 function evaluateGraphExpression(source: string, x: number, angleUnit: "DEG" | "RAD"): number {
@@ -136,6 +141,7 @@ export default function GraphWorkspace() {
   const [selectedPreset, setSelectedPreset] = useState("");
   const [sampleX, setSampleX] = useState("2");
   const [sampleResult, setSampleResult] = useState<number | null>(null);
+  const [functionAnalysis, setFunctionAnalysis] = useState<{ derivative: number; integral: number; roots: number[] } | null>(null);
 
   const bounds = useMemo(() => {
     const values = [Number(xMin), Number(xMax), Number(yMin), Number(yMax)];
@@ -200,12 +206,52 @@ export default function GraphWorkspace() {
 
   const solveAtX = () => {
     try {
-      const value = evaluateGraphExpression(equation, Number(sampleX), angleUnit);
+      const at = Number(sampleX);
+      if (!Number.isFinite(at)) throw new Error("Enter a valid x-coordinate.");
+      const value = evaluateGraphExpression(equation, at, angleUnit);
       if (!Number.isFinite(value)) throw new Error("The result is outside the real finite range.");
+      const h = Math.max(0.000001, Math.abs(at) * 0.000001);
+      const derivative = (evaluateGraphExpression(equation, at + h, angleUnit) - evaluateGraphExpression(equation, at - h, angleUnit)) / (2 * h);
+      const lower = bounds?.xMin ?? -5;
+      const upper = bounds?.xMax ?? 5;
+      const slices = 1000;
+      const dx = (upper - lower) / slices;
+      let integral = 0;
+      for (let i = 0; i <= slices; i += 1) {
+        const y = evaluateGraphExpression(equation, lower + i * dx, angleUnit);
+        if (!Number.isFinite(y)) throw new Error("The integral crosses a point where the function is undefined.");
+        integral += (i === 0 || i === slices ? 0.5 : 1) * y * dx;
+      }
+      const roots: number[] = [];
+      let previousX = lower;
+      let previousY = evaluateGraphExpression(equation, previousX, angleUnit);
+      for (let i = 1; i <= slices; i += 1) {
+        const currentX = lower + i * dx;
+        const currentY = evaluateGraphExpression(equation, currentX, angleUnit);
+        if (Number.isFinite(previousY) && Number.isFinite(currentY)) {
+          if (Math.abs(previousY) < 1e-8) roots.push(previousX);
+          if (previousY * currentY < 0) {
+            let left = previousX;
+            let right = currentX;
+            for (let iteration = 0; iteration < 45; iteration += 1) {
+              const middle = (left + right) / 2;
+              const middleY = evaluateGraphExpression(equation, middle, angleUnit);
+              const leftY = evaluateGraphExpression(equation, left, angleUnit);
+              if (leftY * middleY <= 0) right = middle;
+              else left = middle;
+            }
+            roots.push((left + right) / 2);
+          }
+        }
+        previousX = currentX;
+        previousY = currentY;
+      }
       setSampleResult(value);
+      setFunctionAnalysis({ derivative, integral, roots: roots.filter((root, index) => index === 0 || Math.abs(root - roots[index - 1]) > 1e-4).slice(0, 12) });
       setError("");
     } catch (reason) {
       setSampleResult(null);
+      setFunctionAnalysis(null);
       setError(reason instanceof Error ? reason.message : "Unable to evaluate this function.");
     }
   };
@@ -230,12 +276,12 @@ export default function GraphWorkspace() {
         {mode === "function" ? <label>Function <span>Use x as the independent variable</span><input value={equation} onChange={e => setEquation(e.target.value)} placeholder="e.g. 2*x^2 - 3*x + 1"/></label> : <label>Coordinate data <span>Enter x,y pairs separated by commas or new lines</span><textarea value={dataText} onChange={e => setDataText(e.target.value)} rows={8}/></label>}
         <div className="gl-graph-field-grid"><label>X minimum<input value={xMin} onChange={e => setXMin(e.target.value)}/></label><label>X maximum<input value={xMax} onChange={e => setXMax(e.target.value)}/></label><label>Y minimum<input value={yMin} onChange={e => setYMin(e.target.value)}/></label><label>Y maximum<input value={yMax} onChange={e => setYMax(e.target.value)}/></label></div>
         <div className="gl-graph-field-grid"><label>X-axis label<input value={xLabel} onChange={e => setXLabel(e.target.value)}/></label><label>Y-axis label<input value={yLabel} onChange={e => setYLabel(e.target.value)}/></label></div>
-        {mode === "function" && <><label>Angle unit<select value={angleUnit} onChange={e => setAngleUnit(e.target.value as "DEG" | "RAD")}><option value="RAD">Radians</option><option value="DEG">Degrees</option></select></label><label>Evaluate at x<input value={sampleX} onChange={e => setSampleX(e.target.value)} inputMode="decimal"/></label><button className="solid-button" onClick={solveAtX}>Calculate y value</button>{sampleResult !== null && <div className="gl-graph-result"><span>FUNCTION VALUE</span><b>y = {Number(sampleResult.toPrecision(8))}</b></div>}</>}
+        {mode === "function" && <><label>Angle unit<select value={angleUnit} onChange={e => setAngleUnit(e.target.value as "DEG" | "RAD")}><option value="RAD">Radians</option><option value="DEG">Degrees</option></select></label><label>Evaluate at x<input value={sampleX} onChange={e => setSampleX(e.target.value)} inputMode="decimal"/></label><button className="solid-button" onClick={solveAtX}>Calculate y value</button>{sampleResult !== null && functionAnalysis && <div className="gl-graph-result"><span>FUNCTION ANALYSIS AT x = {sampleX}</span><b>y = {Number(sampleResult.toPrecision(8))}</b><span>Numerical gradient / derivative: {Number(functionAnalysis.derivative.toPrecision(7))}</span><span>Definite integral over [{xMin}, {xMax}]: {Number(functionAnalysis.integral.toPrecision(7))}</span><span>Approximate real roots in range: {functionAnalysis.roots.length ? functionAnalysis.roots.map(root => Number(root.toPrecision(6))).join(", ") : "No sign-changing roots detected"}</span></div>}</>}
         {mode === "data" && <><label className="gl-graph-check"><input type="checkbox" checked={showFit} onChange={e => setShowFit(e.target.checked)}/> Show line of best fit</label>{fit && showFit && <div className="gl-graph-result"><span>LINEAR REGRESSION</span><b>y = {Number(fit.slope.toPrecision(6))}x {fit.intercept < 0 ? "−" : "+"} {Math.abs(Number(fit.intercept.toPrecision(6)))}</b><span>Gradient: {Number(fit.slope.toPrecision(6))} · R²: {Number(fit.r2.toPrecision(5))}</span></div>}</>}
         {error && <p className="error-text">{error}</p>}
         {!bounds && <p className="error-text">Enter valid minimum and maximum values. Each minimum must be smaller than its maximum.</p>}
         {mode === "data" && <button className="quiet-button" onClick={() => setDataText(current => current + (current.trim() ? "\n" : "") + "5, 10")}><Plus size={14}/> Add sample row</button>}
-        <button className="quiet-button" onClick={() => { setEquation("x^2 - 4"); setDataText("0, 0\n1, 2\n2, 4\n3, 6\n4, 8"); setXMin("-5"); setXMax("5"); setYMin("-5"); setYMax("10"); setXLabel("x"); setYLabel("y"); setSelectedPreset(""); setSampleResult(null); setError(""); }}><RotateCcw size={14}/> Reset graph</button>
+        <button className="quiet-button" onClick={() => { setEquation("x^2 - 4"); setDataText("0, 0\n1, 2\n2, 4\n3, 6\n4, 8"); setXMin("-5"); setXMax("5"); setYMin("-5"); setYMax("10"); setXLabel("x"); setYLabel("y"); setSelectedPreset(""); setSampleResult(null); setFunctionAnalysis(null); setError(""); }}><RotateCcw size={14}/> Reset graph</button>
       </div>
       <div className="gl-graph-visual">
         <div className="gl-graph-visual-head"><b>{mode === "function" ? "FUNCTION GRAPH" : "DATA PLOT"}</b><span>{mode === "function" ? "y = " + equation : points.length + " data points"}</span></div>
