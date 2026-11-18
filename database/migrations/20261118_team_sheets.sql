@@ -49,6 +49,46 @@ create table if not exists public.grand_lumen_team_messages (
   created_at timestamptz not null default now()
 );
 
+
+create table if not exists public.grand_lumen_team_call_invites (
+  id uuid primary key default gen_random_uuid(),
+  connection_id uuid not null references public.grand_lumen_team_connections(id) on delete cascade,
+  caller_id uuid not null references auth.users(id) on delete cascade,
+  recipient_id uuid not null references auth.users(id) on delete cascade,
+  peer_id text not null,
+  media_type text not null check (media_type in ('audio', 'video')),
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'declined', 'ended', 'expired')),
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default now() + interval '2 minutes',
+  check (caller_id <> recipient_id)
+);
+
+create index if not exists grand_lumen_team_call_invites_recipient_idx
+on public.grand_lumen_team_call_invites (recipient_id, created_at desc);
+
+alter table public.grand_lumen_team_call_invites enable row level security;
+
+drop policy if exists "Call participants read invitations" on public.grand_lumen_team_call_invites;
+create policy "Call participants read invitations" on public.grand_lumen_team_call_invites
+for select to authenticated using (caller_id = auth.uid() or recipient_id = auth.uid());
+
+drop policy if exists "Connected members create call invitations" on public.grand_lumen_team_call_invites;
+create policy "Connected members create call invitations" on public.grand_lumen_team_call_invites
+for insert to authenticated with check (
+  caller_id = auth.uid()
+  and public.grand_lumen_are_connected(caller_id, recipient_id)
+);
+
+drop policy if exists "Recipients respond to call invitations" on public.grand_lumen_team_call_invites;
+create policy "Recipients respond to call invitations" on public.grand_lumen_team_call_invites
+for update to authenticated using (recipient_id = auth.uid() or caller_id = auth.uid())
+with check (
+  (recipient_id = auth.uid() and status in ('accepted', 'declined', 'ended', 'expired'))
+  or (caller_id = auth.uid() and status = 'ended')
+);
+
+grant select, insert, update on public.grand_lumen_team_call_invites to authenticated;
+
 create table if not exists public.grand_lumen_project_members (
   id uuid primary key default gen_random_uuid(),
   project_id uuid not null references public.grand_lumen_projects(id) on delete cascade,
@@ -459,6 +499,9 @@ begin
     end if;
     if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'grand_lumen_sheet_cells') then
       alter publication supabase_realtime add table public.grand_lumen_sheet_cells;
+    end if;
+    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'grand_lumen_team_call_invites') then
+      alter publication supabase_realtime add table public.grand_lumen_team_call_invites;
     end if;
   end if;
 end;
