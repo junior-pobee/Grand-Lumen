@@ -82,6 +82,10 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_team_call_invites", filter: "recipient_id=eq." + userId }, payload => {
         const invitation = payload.new as CallInvite;
         if (invitation.status === "pending" && new Date(invitation.expires_at).getTime() > Date.now()) setIncomingCall(invitation);
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "grand_lumen_team_call_invites", filter: "recipient_id=eq." + userId }, payload => {
+        const invitation = payload.new as CallInvite;
+        if (invitation.status !== "pending") setIncomingCall(current => current?.id === invitation.id ? null : current);
       }).subscribe();
     return () => { void supabase?.removeChannel(channel); };
   }, [userId]);
