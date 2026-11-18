@@ -46,7 +46,8 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     if (!supabase) return;
     const [connectionResult, requestResult, projectResult] = await Promise.all([
       supabase.from("grand_lumen_team_connections").select("*").order("created_at", { ascending: false }),
-      supabase.from("grand_lumen_connection_requests").select("*").eq("recipient_id", userId).eq("status", "pending").order("created_at", { ascending: false })
+      supabase.from("grand_lumen_connection_requests").select("*").eq("recipient_id", userId).eq("status", "pending").order("created_at", { ascending: false }),
+      supabase.from("grand_lumen_projects").select("*").order("updated_at", { ascending: false })
     ]);
     if (connectionResult.error) setNotice(connectionResult.error.message);
     if (requestResult.error) setNotice(requestResult.error.message);
