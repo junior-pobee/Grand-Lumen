@@ -1,22 +1,22 @@
 const CACHE_PREFIX = "grand-lumen-pwa-";
-const CACHE_NAME = CACHE_PREFIX + "v5";
+const CACHE_NAME = CACHE_PREFIX + "v6";
 const SCOPE_URL = new URL(self.registration.scope);
 const BASE_PATH = SCOPE_URL.pathname.endsWith("/") ? SCOPE_URL.pathname : SCOPE_URL.pathname + "/";
 const APP_SHELL = [
-  new URL("./", SCOPE_URL).href,
+  SCOPE_URL.href,
   new URL("manifest.webmanifest", SCOPE_URL).href,
   new URL("icons/grand-lumen-icon.svg", SCOPE_URL).href,
   new URL("icons/grand-lumen-192.png", SCOPE_URL).href,
-  new URL("icons/grand-lumen-512.png", SCOPE_URL).href,
-  new URL("icons/grand-lumen-maskable-512.png", SCOPE_URL).href
+  new URL("icons/grand-lumen-512.png", SCOPE_URL).href
 ];
 
 self.addEventListener("install", event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    await Promise.allSettled(APP_SHELL.map(async url => {
+    await Promise.all(APP_SHELL.map(async url => {
       const response = await fetch(url, { cache: "reload" });
-      if (response.ok) await cache.put(url, response);
+      if (!response.ok) throw new Error("Grand-Lumen app shell request failed: " + url + " (" + response.status + ")");
+      await cache.put(url, response);
     }));
     await self.skipWaiting();
   })());
@@ -45,7 +45,7 @@ self.addEventListener("fetch", event => {
         }
         return response;
       } catch {
-        return await caches.match(request) || await caches.match(new URL("./", SCOPE_URL).href) || new Response("Grand-Lumen is unavailable offline.", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } });
+        return await caches.match(request) || await caches.match(SCOPE_URL.href) || new Response("Grand-Lumen is unavailable offline.", { status: 503, headers: { "Content-Type": "text/plain; charset=utf-8" } });
       }
     })());
     return;
