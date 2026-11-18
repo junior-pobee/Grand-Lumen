@@ -41,7 +41,6 @@ async function hashLocalPassword(password: string, salt: string): Promise<string
 
 type Section = "Lumen Hub" | "Home" | "Search" | "Research" | "News" | "Images" | "Videos" | "Maps" | "Code Lab" | "Learn" | "API Library" | "Tools" | "Scanner" | "Share" | "Saved" | "Projects" | "Creative Studio" | "Messages" | "Settings";
 const sections: { name: Section; icon: any; group: string }[] = [
-  { name: "Lumen Hub", icon: Boxes, group: "Workspace" },
   { name: "Home", icon: Compass, group: "Workspace" },
   { name: "Search", icon: Search, group: "Workspace" },
   { name: "Research", icon: FlaskConical, group: "Workspace" },
@@ -59,6 +58,7 @@ const sections: { name: Section; icon: any; group: string }[] = [
   { name: "Saved", icon: Bookmark, group: "Personal" },
   { name: "Projects", icon: Boxes, group: "Personal" },
   { name: "Creative Studio", icon: Image, group: "Create" },
+  { name: "Lumen Hub", icon: Boxes, group: "Create" },
   { name: "Settings", icon: Settings, group: "Personal" }
 ];
 const apiCatalog = [
