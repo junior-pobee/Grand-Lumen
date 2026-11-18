@@ -349,7 +349,11 @@ export default function ExpansionHub({ onOpenScanner, language = "en" }: { onOpe
     }
   };
 
-  useEffect(() => {\n    if (active === "Pulse" && pulseResults.length > 0) void loadPulse();\n  }, [language]);\n\n  const translate = async () => {
+  useEffect(() => {
+    if (active === "Pulse" && pulseResults.length > 0) void loadPulse();
+  }, [language]);
+
+  const translate = async () => {
     if (!translateText.trim()) return;
     setTranslateBusy(true);
     setTranslated("");
@@ -403,7 +407,14 @@ export default function ExpansionHub({ onOpenScanner, language = "en" }: { onOpe
     setFiles(current => [{ id: makeId(), name: file.name, type: file.type, size: file.size, data, savedAt: new Date().toISOString() }, ...current]);
   };
 
-  useEffect(() => {\n    if (!previewFile) { setPreviewText(""); return; }\n    const isText = previewFile.type.startsWith("text/") || /\\.(txt|md|csv|json|js|ts|tsx|jsx|css|html|xml|log)$/i.test(previewFile.name);\n    if (!isText) { setPreviewText(""); return; }\n    fetch(previewFile.data).then(response => response.text()).then(setPreviewText).catch(() => setPreviewText("Preview unavailable for this file."));\n  }, [previewFile]);\n\n  const downloadVaultFile = (file: SavedFile) => {
+  useEffect(() => {
+    if (!previewFile) { setPreviewText(""); return; }
+    const isText = previewFile.type.startsWith("text/") || /\.(txt|md|csv|json|js|ts|tsx|jsx|css|html|xml|log)$/i.test(previewFile.name);
+    if (!isText) { setPreviewText(""); return; }
+    fetch(previewFile.data).then(response => response.text()).then(setPreviewText).catch(() => setPreviewText("Preview unavailable for this file."));
+  }, [previewFile]);
+
+  const downloadVaultFile = (file: SavedFile) => {
     const anchor = document.createElement("a");
     anchor.href = file.data;
     anchor.download = file.name;
