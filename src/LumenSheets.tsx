@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "./auth";
+import * as XLSX from "xlsx";
 
 type Workbook = { id: string; owner_id: string; name: string; description: string; updated_at: string };
 type Sheet = { id: string; workbook_id: string; name: string; position: number };
@@ -158,6 +159,45 @@ export default function LumenSheets({ userId }: { userId: string }) {
     else { setMemberEmail(""); setNotice("Workbook shared with " + (profile.data.display_name || profile.data.email) + "."); await loadWorkbook(workbook); }
   };
 
+  const exportXlsx = () => {
+    const workbookFile = XLSX.utils.book_new();
+    const worksheet = XLSX.utils.aoa_to_sheet([]);
+    rows.forEach(row => columns.forEach(column => {
+      const ref = column + row;
+      const cell = cells[ref];
+      if (!cell || (!cell.value && !cell.formula)) return;
+      const address = XLSX.utils.encode_cell({ r: row - 1, c: columnIndex(ref) });
+      if (cell.formula) worksheet[address] = { t: "n", f: cell.formula.replace(/^=/, ""), v: Number(calculated[ref]) || 0 };
+      else worksheet[address] = { t: "s", v: cell.value };
+    }));
+    worksheet["!ref"] = "A1:L30";
+    XLSX.utils.book_append_sheet(workbookFile, worksheet, sheet?.name || "Sheet1");
+    XLSX.writeFile(workbookFile, (workbook?.name || "lumen-workbook") + ".xlsx");
+  };
+
+  const importXlsx = async (file: File) => {
+    if (!sheet || !supabase) return;
+    const workbookFile = XLSX.read(await file.arrayBuffer(), { type: "array", cellFormula: true });
+    const firstName = workbookFile.SheetNames[0];
+    if (!firstName) return;
+    const worksheet = workbookFile.Sheets[firstName];
+    const range = XLSX.utils.decode_range(worksheet["!ref"] || "A1");
+    const inserts: Cell[] = [];
+    for (let row = range.s.r; row <= Math.min(range.e.r, 29); row += 1) {
+      for (let col = range.s.c; col <= Math.min(range.e.c, 11); col += 1) {
+        const address = XLSX.utils.encode_cell({ r: row, c: col });
+        const source = worksheet[address];
+        if (!source) continue;
+        const cellRef = columns[col] + (row + 1);
+        inserts.push({ sheet_id: sheet.id, cell_ref: cellRef, value: source.f ? "" : String(source.v ?? ""), formula: source.f ? "=" + source.f : null, format: {}, updated_by: userId });
+      }
+    }
+    if (!inserts.length) return;
+    const result = await supabase.from("grand_lumen_sheet_cells").upsert(inserts, { onConflict: "sheet_id,cell_ref" });
+    if (result.error) setNotice(result.error.message);
+    else { await loadSheet(sheet); setNotice("Excel workbook imported into the current sheet."); }
+  };
+
   const exportCsv = () => {
     const matrix = rows.map(row => columns.map(column => {
       const cell = cells[column + row];
@@ -211,7 +251,7 @@ export default function LumenSheets({ userId }: { userId: string }) {
   if (!supabase) return <div className="sheets-workspace"><div className="team-empty"><h3>Cloud account required</h3><p>Sign in with your Grand Lumen cloud account to save business records and access them on other devices.</p></div></div>;
 
   return <div className="sheets-workspace">
-    <div className="sheets-header"><div><span className="eyebrow">BUSINESS & RECORDS WORKSPACE</span><h2>Lumen Sheets</h2><p>Organise business records, budgets, account registers and calculations.</p></div><div className="sheets-toolbar"><button className="team-secondary" onClick={exportCsv} disabled={!sheet}>Export CSV</button><label className="team-secondary sheets-import">Import CSV<input type="file" accept=".csv,text/csv" onChange={event => { const file = event.target.files?.[0]; if (file) void importCsv(file); event.currentTarget.value = ""; }} disabled={!sheet}/></label></div></div>
+    <div className="sheets-header"><div><span className="eyebrow">BUSINESS & RECORDS WORKSPACE</span><h2>Lumen Sheets</h2><p>Organise business records, budgets, account registers and calculations.</p></div><div className="sheets-toolbar"><button className="team-secondary" onClick={exportXlsx} disabled={!sheet}>Export Excel</button><label className="team-secondary sheets-import">Import Excel<input type="file" accept=".xlsx,.xls" onChange={event => { const file = event.target.files?.[0]; if (file) void importXlsx(file); event.currentTarget.value = ""; }} disabled={!sheet}/></label><button className="team-secondary" onClick={exportCsv} disabled={!sheet}>Export CSV</button></div></div>
     {notice && <div className="team-notice">{notice}</div>}
     <div className="sheets-create"><input value={newName} onChange={event => setNewName(event.target.value)} placeholder="New workbook name e.g. Business Accounts"/><button className="team-primary" onClick={() => void createWorkbook()} disabled={busy || !newName.trim()}>Create workbook</button></div>
     <div className="sheets-layout"><aside className="sheets-library"><h3>Your workbooks</h3>{workbooks.map(item => <button key={item.id} className={workbook?.id === item.id ? "active" : ""} onClick={() => void loadWorkbook(item)}><b>{item.name}</b><small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}{!workbooks.length && <p className="team-muted">No workbooks yet.</p>}</aside>
