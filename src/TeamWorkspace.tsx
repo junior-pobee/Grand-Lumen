@@ -6,6 +6,7 @@ type Profile = { id: string; display_name: string | null; email: string | null; 
 type Connection = { id: string; user_low: string; user_high: string };
 type RequestRow = { id: string; requester_id: string; recipient_id: string; status: string; created_at: string };
 type Message = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string };
+type Project = { id: string; user_id: string; name: string; description: string; status: string };
 
 export default function TeamWorkspace({ userId, email }: { userId: string; email: string }) {
   const [invite, setInvite] = useState("");
@@ -16,6 +17,11 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [selected, setSelected] = useState<Connection | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectName, setProjectName] = useState("");
+  const [projectDescription, setProjectDescription] = useState("");
+  const [projectMember, setProjectMember] = useState("");
+  const [projectRole, setProjectRole] = useState<"viewer" | "editor" | "manager">("editor");
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
@@ -25,12 +31,14 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
 
   const loadTeam = useCallback(async () => {
     if (!supabase) return;
-    const [connectionResult, requestResult] = await Promise.all([
+    const [connectionResult, requestResult, projectResult] = await Promise.all([
       supabase.from("grand_lumen_team_connections").select("*").order("created_at", { ascending: false }),
       supabase.from("grand_lumen_connection_requests").select("*").eq("recipient_id", userId).eq("status", "pending").order("created_at", { ascending: false })
     ]);
     if (connectionResult.error) setNotice(connectionResult.error.message);
     if (requestResult.error) setNotice(requestResult.error.message);
+    if (projectResult.error) setNotice(projectResult.error.message);
+    setProjects((projectResult.data || []) as Project[]);
     const nextConnections = (connectionResult.data || []) as Connection[];
     setConnections(nextConnections);
     setRequests((requestResult.data || []) as RequestRow[]);
@@ -169,6 +177,28 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     setBusy(false);
   };
 
+  const createProject = async () => {
+    if (!supabase || !projectName.trim()) return;
+    const result = await supabase.from("grand_lumen_projects").insert({ user_id: userId, name: projectName.trim(), description: projectDescription.trim() }).select("*").single();
+    if (result.error) setNotice(result.error.message);
+    else { setProjects(current => [result.data as Project, ...current]); setProjectName(""); setProjectDescription(""); setNotice("Cloud project created."); }
+  };
+
+  const shareProject = async (projectId: string) => {
+    if (!supabase || !projectMember) return;
+    const result = await supabase.from("grand_lumen_project_members").insert({ project_id: projectId, owner_id: userId, member_id: projectMember, role: projectRole });
+    if (result.error) setNotice(result.error.message);
+    else { setProjectMember(""); setNotice("Project access granted."); }
+  };
+
+  const openWhatsApp = () => {
+    const entered = window.prompt("Enter the connected member’s WhatsApp number with country code. Example: 233XXXXXXXXX");
+    if (!entered) return;
+    const phone = entered.replace(/\\D/g, "");
+    if (phone.length < 8 || phone.length > 15) { setNotice("Enter a valid international phone number."); return; }
+    window.open("https://wa.me/" + phone, "_blank", "noopener,noreferrer");
+  };
+
   const sendMessage = async () => {
     if (!supabase || !selected || !draft.trim()) return;
     const conversation = await supabase.from("grand_lumen_team_conversations").select("id").eq("connection_id", selected.id).single();
@@ -193,6 +223,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     </div>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">CONNECTION REQUESTS</span><h3>Requests awaiting your approval</h3></div><span className="team-count">{requests.length}</span></div>{requests.length ? requests.map(request => <div className="team-request" key={request.id}><div><b>Grand Lumen member</b><small>Account ID · {request.requester_id.slice(0, 8)}</small></div><div className="team-actions"><button className="team-secondary" disabled={busy} onClick={() => void respond(request.id, false)}>Decline</button><button className="team-primary" disabled={busy} onClick={() => void respond(request.id, true)}>Accept</button></div></div>) : <p className="team-muted">No pending requests.</p>}</section>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR NETWORK</span><h3>Connected members</h3></div><span className="team-count">{connections.length}</span></div>{connections.length ? <div className="team-contacts">{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; const profile = profiles[memberId]; return <button className={selected?.id === connection.id ? "team-contact active" : "team-contact"} key={connection.id} onClick={() => setSelected(connection)}><span className="team-avatar">{(profile?.display_name || profile?.email || "GL").slice(0, 1).toUpperCase()}</span><span><b>{profile?.display_name || "Grand Lumen member"}</b><small>{profile?.email || "Connected account"}</small></span></button>; })}</div> : <p className="team-muted">Your connections will appear here after they approve your requests.</p>}</section>
-    {selected && <section className="team-card team-chat"><div className="team-card-heading"><div><span className="eyebrow">PRIVATE CONVERSATION</span><h3>{(() => { const memberId = selected.user_low === userId ? selected.user_high : selected.user_low; return profiles[memberId]?.display_name || "Team member"; })()}</h3></div><button className="team-secondary" onClick={() => setSelected(null)}>Close chat</button></div><div className="team-message-list">{messages.map(message => <article className={message.sender_id === userId ? "team-message own" : "team-message"} key={message.id}><p>{message.body}</p><small>{new Date(message.created_at).toLocaleString()}</small></article>)}{!messages.length && <p className="team-muted">Start the conversation.</p>}</div><form className="team-compose" onSubmit={event => { event.preventDefault(); void sendMessage(); }}><input value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write a message…" maxLength={12000}/><button className="team-primary" disabled={!draft.trim()}>Send</button></form><div className="team-call-note">Voice and video calling require a configured call-signalling service. Chat and connection features are available here.</div></section>}
+    <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">SHARED WORK</span><h3>Team projects</h3></div><span className="team-count">{projects.length}</span></div><div className="team-project-create"><input value={projectName} onChange={event => setProjectName(event.target.value)} placeholder="Project name"/><input value={projectDescription} onChange={event => setProjectDescription(event.target.value)} placeholder="Short project description"/><button className="team-primary" onClick={() => void createProject()} disabled={!projectName.trim()}>Create project</button></div>{projects.map(project => <article className="team-project-row" key={project.id}><div><b>{project.name}</b><small>{project.description || "No description"} · {project.user_id === userId ? "Owner" : "Shared with you"}</small></div>{project.user_id === userId && connections.length > 0 && <div className="team-project-share"><select value={projectMember} onChange={event => setProjectMember(event.target.value)}><option value="">Choose member</option>{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; return <option key={memberId} value={memberId}>{profiles[memberId]?.display_name || profiles[memberId]?.email || memberId.slice(0, 8)}</option>; })}</select><select value={projectRole} onChange={event => setProjectRole(event.target.value as "viewer" | "editor" | "manager")}><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="manager">Manager</option></select><button className="team-secondary" onClick={() => void shareProject(project.id)} disabled={!projectMember}>Share</button></div>}</article>)}{!projects.length && <p className="team-muted">Create a cloud project, then share it with connected members.</p>}</section>
+    {selected && <section className="team-card team-chat"><div className="team-card-heading"><div><span className="eyebrow">PRIVATE CONVERSATION</span><h3>{(() => { const memberId = selected.user_low === userId ? selected.user_high : selected.user_low; return profiles[memberId]?.display_name || "Team member"; })()}</h3></div><div className="team-actions"><button className="team-secondary" onClick={openWhatsApp}>WhatsApp</button><button className="team-secondary" onClick={() => setSelected(null)}>Close chat</button></div></div><div className="team-message-list">{messages.map(message => <article className={message.sender_id === userId ? "team-message own" : "team-message"} key={message.id}><p>{message.body}</p><small>{new Date(message.created_at).toLocaleString()}</small></article>)}{!messages.length && <p className="team-muted">Start the conversation.</p>}</div><form className="team-compose" onSubmit={event => { event.preventDefault(); void sendMessage(); }}><input value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write a message…" maxLength={12000}/><button className="team-primary" disabled={!draft.trim()}>Send</button></form><div className="team-call-note">Voice and video calling require a configured call-signalling service. Chat and connection features are available here.</div></section>}
   </div>;
 }
