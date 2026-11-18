@@ -160,47 +160,65 @@ export default function LumenSheets({ userId }: { userId: string }) {
   };
 
   const exportXlsx = async () => {
+    if (!supabase || !workbook) return;
     const workbookFile = new ExcelJS.Workbook();
-    const worksheet = workbookFile.addWorksheet(sheet?.name || "Sheet1");
-    rows.forEach(row => columns.forEach(column => {
-      const ref = column + row;
-      const cell = cells[ref];
-      if (!cell || (!cell.value && !cell.formula)) return;
-      const target = worksheet.getCell(ref);
-      if (cell.formula) target.value = { formula: cell.formula.replace(/^=/, ""), result: Number(calculated[ref]) || 0 };
-      else target.value = cell.value;
-    }));
+    for (const tab of sheets) {
+      const result = await supabase.from("grand_lumen_sheet_cells").select("*").eq("sheet_id", tab.id);
+      if (result.error) { setNotice(result.error.message); return; }
+      const worksheet = workbookFile.addWorksheet(tab.name.slice(0, 31));
+      ((result.data || []) as Cell[]).forEach(cell => {
+        const target = worksheet.getCell(cell.cell_ref);
+        if (cell.formula) target.value = { formula: cell.formula.replace(/^=/, ""), result: tab.id === sheet?.id ? Number(calculated[cell.cell_ref]) || 0 : 0 };
+        else target.value = cell.value;
+      });
+    }
     const buffer = await workbookFile.xlsx.writeBuffer();
     const url = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
     const anchor = document.createElement("a");
     anchor.href = url;
-    anchor.download = (workbook?.name || "lumen-workbook") + ".xlsx";
+    anchor.download = (workbook.name || "lumen-workbook") + ".xlsx";
     anchor.click();
     URL.revokeObjectURL(url);
   };
 
   const importXlsx = async (file: File) => {
-    if (!sheet || !supabase) return;
+    if (!sheet || !workbook || !supabase) return;
     const workbookFile = new ExcelJS.Workbook();
     await workbookFile.xlsx.load(await file.arrayBuffer());
-    const worksheet = workbookFile.worksheets[0];
-    if (!worksheet) return;
-    const inserts: Cell[] = [];
-    worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber > 30) return;
-      row.eachCell((source, columnNumber) => {
-        if (columnNumber > 12) return;
-        const cellRef = columns[columnNumber - 1] + rowNumber;
-        const sourceValue = source.value;
-        const formula = sourceValue && typeof sourceValue === "object" && "formula" in sourceValue ? "=" + String(sourceValue.formula) : null;
-        const value = formula ? "" : source.text || String(sourceValue ?? "");
-        inserts.push({ sheet_id: sheet.id, cell_ref: cellRef, value, formula, format: {}, updated_by: userId });
+    const importedSheets = workbookFile.worksheets.slice(0, 12);
+    if (!importedSheets.length) return;
+    const updatedSheets = [...sheets];
+    for (let sheetIndex = 0; sheetIndex < importedSheets.length; sheetIndex += 1) {
+      const sourceSheet = importedSheets[sheetIndex];
+      let targetSheet = sheetIndex === 0 ? sheet : null;
+      if (!targetSheet) {
+        let targetName = sourceSheet.name.slice(0, 80) || "Imported sheet";
+        if (updatedSheets.some(item => item.name === targetName)) targetName = (targetName.slice(0, 65) + " " + (sheetIndex + 1)).slice(0, 80);
+        const created = await supabase.from("grand_lumen_sheets").insert({ workbook_id: workbook.id, name: targetName, position: updatedSheets.length }).select("*").single();
+        if (created.error) { setNotice(created.error.message); return; }
+        targetSheet = created.data as Sheet;
+        updatedSheets.push(targetSheet);
+      }
+      const inserts: Cell[] = [];
+      sourceSheet.eachRow((row, rowNumber) => {
+        if (rowNumber > 30) return;
+        row.eachCell((source, columnNumber) => {
+          if (columnNumber > 12) return;
+          const cellRef = columns[columnNumber - 1] + rowNumber;
+          const sourceValue = source.value;
+          const formula = sourceValue && typeof sourceValue === "object" && "formula" in sourceValue ? "=" + String(sourceValue.formula) : null;
+          const value = formula ? "" : source.text || String(sourceValue ?? "");
+          inserts.push({ sheet_id: targetSheet!.id, cell_ref: cellRef, value, formula, format: {}, updated_by: userId });
+        });
       });
-    });
-    if (!inserts.length) return;
-    const result = await supabase.from("grand_lumen_sheet_cells").upsert(inserts, { onConflict: "sheet_id,cell_ref" });
-    if (result.error) setNotice(result.error.message);
-    else { await loadSheet(sheet); setNotice("Excel workbook imported into the current sheet."); }
+      if (inserts.length) {
+        const result = await supabase.from("grand_lumen_sheet_cells").upsert(inserts, { onConflict: "sheet_id,cell_ref" });
+        if (result.error) { setNotice(result.error.message); return; }
+      }
+    }
+    setSheets(updatedSheets);
+    await loadSheet(sheet);
+    setNotice("All worksheets imported. The first worksheet was placed in your currently selected sheet.");
   };
 
   const exportCsv = () => {
