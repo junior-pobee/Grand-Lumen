@@ -9,6 +9,28 @@ type SavedFile = { id: string; name: string; type: string; size: number; data: s
 type Reminder = { id: string; title: string; when: string; notified: boolean };
 type Resource = { title: string; description: string; url: string; source: string };
 
+async function loadExternalScript(src: string, globalName: string): Promise<any> {
+  const root = window as any;
+  if (root[globalName]) return root[globalName];
+  await new Promise<void>((resolve, reject) => {
+    const existing = document.querySelector<HTMLScriptElement>(`script[data-lumen-library="${globalName}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error("A document-reading library could not be loaded.")), { once: true });
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.dataset.lumenLibrary = globalName;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("A document-reading library could not be loaded. Check your internet connection and try again."));
+    document.head.appendChild(script);
+  });
+  if (!root[globalName]) throw new Error("The document-reading library did not initialise.");
+  return root[globalName];
+}
+
 const modules: { name: ModuleName; group: string; description: string }[] = [
   { name: "Knowledge Graph", group: "Knowledge", description: "Explore connected concepts and source-backed topic relationships." },
   { name: "Verify", group: "Knowledge", description: "Compare claims with independent sources before drawing conclusions." },
