@@ -1,12 +1,12 @@
 const CACHE_PREFIX = "grand-lumen-pwa-";
-const CACHE_NAME = CACHE_PREFIX + "v5";
+const CACHE_NAME = CACHE_PREFIX + "v6";
 const SCOPE_URL = new URL(self.registration.scope);
 const BASE_PATH = SCOPE_URL.pathname.endsWith("/") ? SCOPE_URL.pathname : SCOPE_URL.pathname + "/";
 const APP_SHELL = [
   new URL("./", SCOPE_URL).href,
   new URL("manifest.webmanifest", SCOPE_URL).href,
-  new URL("icons/grand-lumen-192.png", SCOPE_URL).href,
-  new URL("icons/grand-lumen-512.png", SCOPE_URL).href
+  new URL("icons/grand-lumen-icon.svg", SCOPE_URL).href,
+
 ];
 
 self.addEventListener("install", event => {
