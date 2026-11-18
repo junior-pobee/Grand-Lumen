@@ -146,6 +146,23 @@ export default function ExpansionHub({ onOpenScanner }: { onOpenScanner?: () => 
   const [reminderWhen, setReminderWhen] = useState("");
   const [networkOnline, setNetworkOnline] = useState(navigator.onLine);
   const [notice, setNotice] = useState("");
+  const [coreActivity, setCoreActivity] = useState("Core ready");
+
+  useEffect(() => {
+    const localUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ key?: string }>).detail;
+      setCoreActivity(detail?.key ? "Updated " + detail.key : "Local module updated");
+    };
+    const crossTabUpdate = (event: StorageEvent) => {
+      if (event.key) setCoreActivity("Synced " + event.key + " from another tab");
+    };
+    window.addEventListener("lumen-core-update", localUpdate);
+    window.addEventListener("storage", crossTabUpdate);
+    return () => {
+      window.removeEventListener("lumen-core-update", localUpdate);
+      window.removeEventListener("storage", crossTabUpdate);
+    };
+  }, []);
 
   useEffect(() => {
     const online = () => setNetworkOnline(true);
@@ -487,6 +504,6 @@ export default function ExpansionHub({ onOpenScanner }: { onOpenScanner?: () => 
 
     {active === "Alerts" && <Panel title="Personal reminders" description="Create reminders. Browser notifications are optional and require your permission."><div className="lh-input-row"><input value={reminderTitle} onChange={e => setReminderTitle(e.target.value)} placeholder="Reminder title"/><input type="datetime-local" value={reminderWhen} onChange={e => setReminderWhen(e.target.value)}/><ActionButton onClick={() => void addReminder()}><Plus size={14}/> Add reminder</ActionButton></div><div className="lh-task-list">{reminders.map(item => <article key={item.id}><CalendarDays size={14}/><span>{item.title}<small>{new Date(item.when).toLocaleString()}</small></span><small>{item.notified ? "Notified" : "Scheduled"}</small><button onClick={() => setReminders(current => current.filter(reminder => reminder.id !== item.id))}><Trash2 size={14}/></button></article>)}</div></Panel>}
 
-    <div className="lh-footer"><span><ShieldCheck size={14}/> Your personal data is stored locally in this browser unless a feature explicitly uses an external public service.</span><span><Activity size={14}/> Lumen Core · Local module coordination</span></div>
+    <div className="lh-footer"><span><ShieldCheck size={14}/> Your personal data is stored locally in this browser unless a feature explicitly uses an external public service.</span><span><Activity size={14}/> Lumen Core · {coreActivity}</span></div>
   </div>;
 }
