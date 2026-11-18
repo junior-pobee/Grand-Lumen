@@ -1803,9 +1803,9 @@ function App() {
     const applyLanguage = () => {
       const selector = document.querySelector<HTMLSelectElement>(".goog-te-combo");
       if (appLanguage === "en") {
-        document.cookie = "googtrans=/en/en;path=/;max-age=31536000;SameSite=Lax";
         document.cookie = "googtrans=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT;SameSite=Lax";
         document.cookie = "googtrans=;path=/;domain=" + window.location.hostname + ";expires=Thu, 01 Jan 1970 00:00:00 GMT;SameSite=Lax";
+        document.cookie = "googtrans=/en/en;path=/;max-age=31536000;SameSite=Lax";
         if (selector) {
           selector.value = "";
           selector.dispatchEvent(new Event("change", { bubbles: true }));
