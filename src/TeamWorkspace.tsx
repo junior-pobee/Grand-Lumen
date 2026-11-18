@@ -95,13 +95,14 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       setInviteLoading(false);
       return;
     }
+    const client = supabase;
     let active = true;
     const loadPersonalInvite = async () => {
       setInviteLoading(true);
       try {
         const bytes = crypto.getRandomValues(new Uint8Array(32));
         const token = Array.from(bytes).map(value => value.toString(16).padStart(2, "0")).join("");
-        const result = await supabase.rpc("grand_lumen_get_or_create_personal_team_invite", { invite_token: token });
+        const result = await client.rpc("grand_lumen_get_or_create_personal_team_invite", { invite_token: token });
         if (result.error) throw result.error;
         if (active) setInvite(String(result.data || token));
       } catch (reason) {
