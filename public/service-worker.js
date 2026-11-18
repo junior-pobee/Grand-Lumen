@@ -1,22 +1,24 @@
 const CACHE_PREFIX = "grand-lumen-";
-const CACHE_NAME = CACHE_PREFIX + "pwa-v10";
+const CACHE_NAME = CACHE_PREFIX + "pwa-v11";
 const APP_SCOPE = new URL(self.registration.scope);
 const APP_PATH = APP_SCOPE.pathname.endsWith("/") ? APP_SCOPE.pathname : APP_SCOPE.pathname + "/";
 const APP_SHELL = [
   APP_SCOPE.href,
-  new URL("manifest.json", APP_SCOPE).href,
   new URL("icons/grand-lumen-192.png", APP_SCOPE).href,
   new URL("icons/grand-lumen-512.png", APP_SCOPE).href
 ];
 
 self.addEventListener("install", event => {
   event.waitUntil((async () => {
-    const cache = await caches.open(CACHE_NAME);
-    for (const asset of APP_SHELL) {
-      const response = await fetch(new Request(asset, { cache: "reload" }));
-      if (!response.ok) throw new Error("Unable to precache " + asset + ": HTTP " + response.status);
-      await cache.put(asset, response);
-    }
+    try {
+      const cache = await caches.open(CACHE_NAME);
+      await Promise.all(APP_SHELL.map(async asset => {
+        try {
+          const response = await fetch(new Request(asset, { cache: "reload" }));
+          if (response.ok) await cache.put(asset, response);
+        } catch {}
+      }));
+    } catch {}
     await self.skipWaiting();
   })());
 });
@@ -52,7 +54,7 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  const isAppAsset = ["script", "style", "image", "font"].includes(request.destination) || requestUrl.pathname.endsWith("/manifest.json");
+  const isAppAsset = ["script", "style", "image", "font"].includes(request.destination);
   if (!isAppAsset) return;
 
   event.respondWith((async () => {
