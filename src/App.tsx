@@ -1774,7 +1774,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState<SearchItem[]>(() => readWorkspaceData("grandLumenSaved", []));
-  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [theme, setTheme] = useState<"dark" | "light">("light");
   const [fontScale, setFontScale] = useState(() => Number(localStorage.getItem("grandLumenFontScale") || "1"));
   const [interfaceScale, setInterfaceScale] = useState(() => Number(localStorage.getItem("grandLumenInterfaceScale") || "1"));
   const [fontFamily, setFontFamily] = useState(() => localStorage.getItem("grandLumenFontFamily") || "Manrope, sans-serif");
