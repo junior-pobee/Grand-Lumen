@@ -224,32 +224,12 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
   useEffect(() => localStorage.setItem("lumenMonthlyBudget", budget), [budget]);
 
   useEffect(() => {
-    const check = () => {
-      const now = Date.now();
-      setReminders(current => {
-        let changed = false;
-        const next = current.map(item => {
-          if (!item.notified && new Date(item.when).getTime() <= now) {
-            changed = true;
-            if ("Notification" in window && Notification.permission === "granted" && "serviceWorker" in navigator) {
-              void navigator.serviceWorker.ready.then(registration => registration.showNotification("Grand Lumen reminder", { body: item.title, tag: "lumen-reminder-" + item.id, data: { reminderId: item.id } })).catch(() => undefined);
-            }
-            return { ...item, notified: true, read: false };
-          }
-          return item;
-        });
-        return changed ? next : current;
-      });
-    };
-    check();
-    const timer = window.setInterval(check, 15000);
-    const onVisible = () => { if (document.visibilityState === "visible") check(); };
-    window.addEventListener("focus", check);
-    document.addEventListener("visibilitychange", onVisible);
+    const syncReminders = () => setReminders(readLocal("lumenReminders", initialReminders));
+    window.addEventListener("lumen-reminders-updated", syncReminders);
+    window.addEventListener("storage", syncReminders);
     return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("focus", check);
-      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("lumen-reminders-updated", syncReminders);
+      window.removeEventListener("storage", syncReminders);
     };
   }, []);
 
@@ -677,7 +657,7 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
 
     {active === "Alerts" && <Panel title="Personal reminders" description="Create reminders. Browser notifications are optional and require your permission."><div className="lh-input-row"><input value={reminderTitle} onChange={e => setReminderTitle(e.target.value)} placeholder="Reminder title"/><input type="datetime-local" value={reminderWhen} onChange={e => setReminderWhen(e.target.value)}/><ActionButton onClick={() => void addReminder()}><Plus size={14}/> Add reminder</ActionButton></div><div className="lh-task-list">{reminders.map(item => <article key={item.id}><CalendarDays size={14}/><span>{item.title}<small>{new Date(item.when).toLocaleString()}</small></span><small>{item.read ? "Read" : item.notified ? "Due" : "Scheduled"}</small><button onClick={() => setReminders(current => current.filter(reminder => reminder.id !== item.id))} aria-label="Delete reminder"><Trash2 size={14}/></button></article>)}</div></Panel>}
 
-    {dueReminders.length > 0 && <div className="lh-reminder-backdrop" role="presentation"><section className="lh-reminder-dialog" role="dialog" aria-modal="true" aria-labelledby="lh-reminder-title"><div className="lh-reminder-dialog-head"><CalendarDays size={22}/><span><b id="lh-reminder-title">Reminder alert</b><small>{dueReminders.length} reminder{dueReminders.length === 1 ? "" : "s"} due</small></span></div><p>You have reminders that are due. Mark each one as read to clear it from this alert.</p><div className="lh-reminder-due-list">{dueReminders.map(item => <article key={item.id}><div><b>{item.title}</b><small>{new Date(item.when).toLocaleString()}</small></div><button onClick={() => setReminders(current => current.map(reminder => reminder.id === item.id ? { ...reminder, read: true } : reminder))}><CheckCircle2 size={15}/> Mark as read</button></article>)}</div><button className="lh-reminder-mark-all" onClick={() => setReminders(current => current.map(item => item.notified && !item.read ? { ...item, read: true } : item))}>Mark all as read</button></section></div>}
+
     {!moduleOpened && <div className="lh-footer"><span><ShieldCheck size={14}/> Your personal data is stored locally in this browser unless a feature explicitly uses an external public service.</span><span><Activity size={14}/> Lumen Core · {coreActivity}</span></div>}
   </div>;
 }
