@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "./auth";
 import ExcelJS from "exceljs";
 
 type Workbook = { id: string; owner_id: string; name: string; description: string; updated_at: string };
 type Sheet = { id: string; workbook_id: string; name: string; position: number };
 type Cell = { id?: string; sheet_id: string; cell_ref: string; value: string; formula: string | null; format: Record<string, unknown>; updated_by: string };
-type Member = { id: string; display_name: string | null; email: string | null };
+type StoredBook = { workbook: Workbook; sheets: Sheet[]; cells: Record<string, Record<string, Cell>> };
 
 const columns = Array.from({ length: 12 }, (_, index) => String.fromCharCode(65 + index));
 const rows = Array.from({ length: 30 }, (_, index) => index + 1);
+const storageKey = (userId: string) => "grandLumenLocalSheets:" + userId;
 
 function columnIndex(ref: string) {
   let value = 0;
@@ -40,7 +40,8 @@ function evaluateFormula(source: string, cells: Record<string, Cell>, stack = ne
       for (let col = Math.min(startCol, endCol); col <= Math.max(startCol, endCol); col += 1) values.push(resolve(columns[col] + row));
     }
     const numeric = values.filter(value => Number.isFinite(value));
-    const result = range[1].toUpperCase() === "SUM" ? numeric.reduce((a, b) => a + b, 0) : range[1].toUpperCase() === "AVERAGE" ? numeric.length ? numeric.reduce((a, b) => a + b, 0) / numeric.length : 0 : range[1].toUpperCase() === "MIN" ? Math.min(...numeric) : range[1].toUpperCase() === "MAX" ? Math.max(...numeric) : numeric.filter(value => value !== 0).length;
+    const kind = range[1].toUpperCase();
+    const result = kind === "SUM" ? numeric.reduce((a, b) => a + b, 0) : kind === "AVERAGE" ? numeric.length ? numeric.reduce((a, b) => a + b, 0) / numeric.length : 0 : kind === "MIN" ? Math.min(...numeric) : kind === "MAX" ? Math.max(...numeric) : numeric.filter(value => value !== 0).length;
     return String(result);
   }
   const arithmetic = expression.replace(/\b([A-Z]{1,3}[1-9][0-9]*)\b/g, (_, ref: string) => String(resolve(ref)));
@@ -73,247 +74,190 @@ export default function LumenSheets({ userId }: { userId: string }) {
   const [input, setInput] = useState("");
   const [newName, setNewName] = useState("");
   const [notice, setNotice] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [memberEmail, setMemberEmail] = useState("");
+  const [members] = useState<{ id: string; display_name: string | null; email: string | null }[]>([]);
 
-  const refreshWorkbooks = async () => {
-    if (!supabase) return;
-    const result = await supabase.from("grand_lumen_workbooks").select("*").order("updated_at", { ascending: false });
-    if (result.error) setNotice(result.error.message);
-    else setWorkbooks((result.data || []) as Workbook[]);
+  const readStore = (): StoredBook[] => {
+    try { const value = JSON.parse(localStorage.getItem(storageKey(userId)) || "[]"); return Array.isArray(value) ? value : []; }
+    catch { return []; }
   };
 
-  useEffect(() => { void refreshWorkbooks(); }, []);
-
-  const loadWorkbook = async (item: Workbook) => {
-    if (!supabase) return;
-    setWorkbook(item);
-    setSheet(null);
-    setCells({});
-    const result = await supabase.from("grand_lumen_sheets").select("*").eq("workbook_id", item.id).order("position");
-    if (result.error) { setNotice(result.error.message); return; }
-    const list = (result.data || []) as Sheet[];
-    setSheets(list);
-    if (list.length) await loadSheet(list[0]);
-    else setSheet(null);
-    const membership = await supabase.from("grand_lumen_workbook_members").select("member_id").eq("workbook_id", item.id);
-    if (!membership.error && membership.data?.length) {
-      const ids = membership.data.map((entry: { member_id: string }) => entry.member_id);
-      const profileResult = await supabase.from("grand_lumen_profiles").select("id,display_name,email").in("id", ids);
-      if (!profileResult.error) setMembers((profileResult.data || []) as Member[]);
-    } else setMembers([]);
+  const writeStore = (items: StoredBook[]) => {
+    localStorage.setItem(storageKey(userId), JSON.stringify(items));
+    setWorkbooks(items.map(item => item.workbook).sort((a, b) => b.updated_at.localeCompare(a.updated_at)));
   };
 
-  const loadSheet = async (item: Sheet) => {
-    if (!supabase) return;
-    setSheet(item);
+  useEffect(() => {
+    const items = readStore();
+    setWorkbooks(items.map(item => item.workbook).sort((a, b) => b.updated_at.localeCompare(a.updated_at)));
+  }, [userId]);
+
+  const persistCurrent = (nextCells: Record<string, Cell>, nextSheets = sheets, nextWorkbook = workbook) => {
+    if (!nextWorkbook) return;
+    const items = readStore();
+    const index = items.findIndex(item => item.workbook.id === nextWorkbook.id);
+    if (index < 0) return;
+    items[index] = { workbook: { ...nextWorkbook, updated_at: new Date().toISOString() }, sheets: nextSheets, cells: { ...items[index].cells, [sheet?.id || nextSheets[0]?.id]: nextCells } };
+    writeStore(items);
+  };
+
+  const loadWorkbook = (item: Workbook) => {
+    const stored = readStore().find(entry => entry.workbook.id === item.id);
+    if (!stored) return;
+    setWorkbook(stored.workbook);
+    setSheets(stored.sheets);
+    const activeSheet = stored.sheets[0] || null;
+    setSheet(activeSheet);
+    setCells(activeSheet ? stored.cells[activeSheet.id] || {} : {});
     setSelected("A1");
-    const result = await supabase.from("grand_lumen_sheet_cells").select("*").eq("sheet_id", item.id);
-    if (result.error) { setNotice(result.error.message); return; }
-    setCells(Object.fromEntries(((result.data || []) as Cell[]).map(cell => [cell.cell_ref, cell])));
+    setMembers([]);
+    setNotice("Workbook loaded from this device.");
   };
 
-  const createWorkbook = async () => {
-    if (!supabase || !newName.trim() || busy) return;
-    setBusy(true);
-    setNotice("");
-    try {
-      const { data: authData, error: authError } = await supabase.auth.getUser();
-      if (authError) throw authError;
-      const activeUserId = authData.user?.id;
-      if (!activeUserId) {
-        setNotice("Please sign in with your Grand Lumen account before creating a cloud workbook. Guest sessions cannot save workbooks.");
-        return;
-      }
-      const result = await supabase.from("grand_lumen_workbooks").insert({ owner_id: activeUserId, name: newName.trim() }).select("*").single();
-      if (result.error) throw new Error("Workbook creation failed: " + result.error.message);
-      const created = result.data as Workbook;
-      const firstSheet = await supabase.from("grand_lumen_sheets").insert({ workbook_id: created.id, name: "Sheet 1", position: 0 }).select("*").single();
-      if (firstSheet.error) {
-        await supabase.from("grand_lumen_workbooks").delete().eq("id", created.id);
-        throw new Error("The workbook was created, but its first sheet could not be created: " + firstSheet.error.message);
-      }
-      setNewName("");
-      await refreshWorkbooks();
-      await loadWorkbook(created);
-      setNotice("Workbook created successfully.");
-    } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Something went wrong while creating the workbook. Please try again.");
-    } finally {
-      setBusy(false);
-    }
+  const loadSheet = (item: Sheet) => {
+    if (!workbook) return;
+    const stored = readStore().find(entry => entry.workbook.id === workbook.id);
+    setSheet(item);
+    setCells(stored?.cells[item.id] || {});
+    setSelected("A1");
   };
 
-  const saveCell = async () => {
-    if (!supabase || !sheet) return;
+  const createWorkbook = () => {
+    if (!newName.trim()) return;
+    const now = new Date().toISOString();
+    const created: Workbook = { id: crypto.randomUUID(), owner_id: userId, name: newName.trim(), description: "", updated_at: now };
+    const firstSheet: Sheet = { id: crypto.randomUUID(), workbook_id: created.id, name: "Sheet 1", position: 0 };
+    const items = readStore();
+    items.push({ workbook: created, sheets: [firstSheet], cells: { [firstSheet.id]: {} } });
+    writeStore(items);
+    setWorkbook(created);
+    setSheets([firstSheet]);
+    setSheet(firstSheet);
+    setCells({});
+    setSelected("A1");
+    setNewName("");
+    setNotice("Workbook created and saved on this device.");
+  };
+
+  const saveCell = () => {
+    if (!sheet) return;
     const formula = input.trim().startsWith("=") ? input.trim() : null;
-    const value = formula ? "" : input;
-    const record = { sheet_id: sheet.id, cell_ref: selected, value, formula, format: cells[selected]?.format || {}, updated_by: userId };
-    const result = await supabase.from("grand_lumen_sheet_cells").upsert(record, { onConflict: "sheet_id,cell_ref" }).select("*").single();
-    if (result.error) setNotice(result.error.message);
-    else {
-      setCells(current => ({ ...current, [selected]: result.data as Cell }));
-      setNotice("Cell saved.");
-    }
+    const next = { ...cells, [selected]: { sheet_id: sheet.id, cell_ref: selected, value: formula ? "" : input, formula, format: {}, updated_by: userId } };
+    setCells(next);
+    persistCurrent(next);
+    setNotice("Cell saved on this device.");
   };
 
-  const addSheet = async () => {
-    if (!supabase || !workbook) return;
-    const name = "Sheet " + (sheets.length + 1);
-    const result = await supabase.from("grand_lumen_sheets").insert({ workbook_id: workbook.id, name, position: sheets.length }).select("*").single();
-    if (result.error) setNotice(result.error.message);
-    else { setSheets(current => [...current, result.data as Sheet]); await loadSheet(result.data as Sheet); }
-  };
-
-  const addMember = async () => {
-    if (!supabase || !workbook || !memberEmail.trim()) return;
-    const profile = await supabase.from("grand_lumen_profiles").select("id,email,display_name").eq("email", memberEmail.trim().toLowerCase()).single();
-    if (profile.error) { setNotice("No visible connected account was found for that email. Connect with the member in Team first."); return; }
-    const result = await supabase.from("grand_lumen_workbook_members").insert({ workbook_id: workbook.id, member_id: profile.data.id, role: "editor" });
-    if (result.error) setNotice(result.error.message);
-    else { setMemberEmail(""); setNotice("Workbook shared with " + (profile.data.display_name || profile.data.email) + "."); await loadWorkbook(workbook); }
+  const addSheet = () => {
+    if (!workbook) return;
+    const item: Sheet = { id: crypto.randomUUID(), workbook_id: workbook.id, name: "Sheet " + (sheets.length + 1), position: sheets.length };
+    const nextSheets = [...sheets, item];
+    setSheets(nextSheets);
+    setSheet(item);
+    setCells({});
+    const items = readStore();
+    const index = items.findIndex(entry => entry.workbook.id === workbook.id);
+    if (index >= 0) { items[index].sheets = nextSheets; items[index].cells[item.id] = {}; writeStore(items); }
   };
 
   const exportXlsx = async () => {
-    if (!supabase || !workbook) return;
-    const workbookFile = new ExcelJS.Workbook();
-    for (const tab of sheets) {
-      const result = await supabase.from("grand_lumen_sheet_cells").select("*").eq("sheet_id", tab.id);
-      if (result.error) { setNotice(result.error.message); return; }
-      const worksheet = workbookFile.addWorksheet(tab.name.slice(0, 31));
-      ((result.data || []) as Cell[]).forEach(cell => {
+    if (!workbook) return;
+    const stored = readStore().find(entry => entry.workbook.id === workbook.id);
+    if (!stored) return;
+    const file = new ExcelJS.Workbook();
+    for (const tab of stored.sheets) {
+      const worksheet = file.addWorksheet(tab.name.slice(0, 31));
+      Object.values(stored.cells[tab.id] || {}).forEach(cell => {
         const target = worksheet.getCell(cell.cell_ref);
-        if (cell.formula) target.value = { formula: cell.formula.replace(/^=/, ""), result: tab.id === sheet?.id ? Number(calculated[cell.cell_ref]) || 0 : 0 };
+        if (cell.formula) target.value = { formula: cell.formula.replace(/^=/, "") };
         else target.value = cell.value;
       });
     }
-    const buffer = await workbookFile.xlsx.writeBuffer();
+    const buffer = await file.xlsx.writeBuffer();
     const url = URL.createObjectURL(new Blob([buffer], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = (workbook.name || "lumen-workbook") + ".xlsx";
-    anchor.click();
-    URL.revokeObjectURL(url);
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = workbook.name + ".xlsx"; anchor.click(); URL.revokeObjectURL(url);
   };
 
   const importXlsx = async (file: File) => {
-    if (!sheet || !workbook || !supabase) return;
-    const workbookFile = new ExcelJS.Workbook();
-    await workbookFile.xlsx.load(await file.arrayBuffer());
-    const importedSheets = workbookFile.worksheets.slice(0, 12);
-    if (!importedSheets.length) return;
-    const updatedSheets = [...sheets];
-    for (let sheetIndex = 0; sheetIndex < importedSheets.length; sheetIndex += 1) {
-      const sourceSheet = importedSheets[sheetIndex];
-      let targetSheet = sheetIndex === 0 ? sheet : null;
-      if (!targetSheet) {
-        let targetName = sourceSheet.name.slice(0, 80) || "Imported sheet";
-        if (updatedSheets.some(item => item.name === targetName)) targetName = (targetName.slice(0, 65) + " " + (sheetIndex + 1)).slice(0, 80);
-        const created = await supabase.from("grand_lumen_sheets").insert({ workbook_id: workbook.id, name: targetName, position: updatedSheets.length }).select("*").single();
-        if (created.error) { setNotice(created.error.message); return; }
-        targetSheet = created.data as Sheet;
-        updatedSheets.push(targetSheet);
+    if (!sheet || !workbook) return;
+    const imported = new ExcelJS.Workbook();
+    await imported.xlsx.load(await file.arrayBuffer());
+    const items = readStore();
+    const index = items.findIndex(entry => entry.workbook.id === workbook.id);
+    if (index < 0) return;
+    const nextSheets = [...sheets];
+    for (let sheetIndex = 0; sheetIndex < imported.worksheets.length && sheetIndex < 12; sheetIndex += 1) {
+      const source = imported.worksheets[sheetIndex];
+      let target = sheetIndex === 0 ? sheet : nextSheets.find(item => item.name === source.name);
+      if (!target) {
+        target = { id: crypto.randomUUID(), workbook_id: workbook.id, name: source.name.slice(0, 80), position: nextSheets.length };
+        nextSheets.push(target);
+        items[index].cells[target.id] = {};
       }
-      const inserts: Cell[] = [];
-      sourceSheet.eachRow((row, rowNumber) => {
+      const records: Record<string, Cell> = {};
+      source.eachRow((row, rowNumber) => {
         if (rowNumber > 30) return;
-        row.eachCell((source, columnNumber) => {
+        row.eachCell((sourceCell, columnNumber) => {
           if (columnNumber > 12) return;
-          const cellRef = columns[columnNumber - 1] + rowNumber;
-          const sourceValue = source.value;
-          const formula = sourceValue && typeof sourceValue === "object" && "formula" in sourceValue ? "=" + String(sourceValue.formula) : null;
-          const value = formula ? "" : source.text || String(sourceValue ?? "");
-          inserts.push({ sheet_id: targetSheet!.id, cell_ref: cellRef, value, formula, format: {}, updated_by: userId });
+          const ref = columns[columnNumber - 1] + rowNumber;
+          const value = sourceCell.value;
+          const formula = value && typeof value === "object" && "formula" in value ? "=" + String(value.formula) : null;
+          records[ref] = { sheet_id: target!.id, cell_ref: ref, value: formula ? "" : sourceCell.text || String(value ?? ""), formula, format: {}, updated_by: userId };
         });
       });
-      if (inserts.length) {
-        const result = await supabase.from("grand_lumen_sheet_cells").upsert(inserts, { onConflict: "sheet_id,cell_ref" });
-        if (result.error) { setNotice(result.error.message); return; }
-      }
+      items[index].cells[target.id] = records;
     }
-    setSheets(updatedSheets);
-    await loadSheet(sheet);
-    setNotice("All worksheets imported. The first worksheet was placed in your currently selected sheet.");
+    items[index].sheets = nextSheets;
+    items[index].workbook.updated_at = new Date().toISOString();
+    writeStore(items);
+    setSheets(nextSheets);
+    setCells(items[index].cells[sheet.id] || {});
+    setNotice("Excel workbook imported and saved locally.");
   };
 
   const exportCsv = () => {
-    const matrix = rows.map(row => columns.map(column => {
-      const cell = cells[column + row];
-      return cell?.formula ? "=" + cell.formula.replace(/^=/, "") : cell?.value || "";
-    }));
+    if (!sheet || !workbook) return;
+    const matrix = rows.map(row => columns.map(column => { const cell = cells[column + row]; return cell?.formula ? "=" + cell.formula.replace(/^=/, "") : cell?.value || ""; }));
     const csv = matrix.map(line => line.map(value => '"' + value.replace(/"/g, '""') + '"').join(",")).join("\r\n");
     const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = (workbook?.name || "lumen-workbook") + ".csv";
-    anchor.click();
-    URL.revokeObjectURL(url);
+    const anchor = document.createElement("a"); anchor.href = url; anchor.download = workbook.name + ".csv"; anchor.click(); URL.revokeObjectURL(url);
   };
 
   const importCsv = async (file: File) => {
-    if (!sheet || !supabase) return;
+    if (!sheet) return;
     const text = await file.text();
     const lines = text.split(/\r?\n/).filter(Boolean).slice(0, 30);
-    const records: Record<string, Cell> = {};
-    const inserts = lines.flatMap((line, rowIndex) => {
-      const values = line.match(/(?:^|,)("(?:[^"]|"")*"|[^,]*)/g) || [];
-      return values.slice(0, 12).map((raw, colIndex) => {
+    const next = { ...cells };
+    lines.forEach((line, rowIndex) => {
+      const values = line.match(/(?:^|,)(?:"(?:[^"]|"")*"|[^,]*)/g) || [];
+      values.slice(0, 12).forEach((raw, colIndex) => {
         const value = raw.replace(/^,/, "").replace(/^"|"$/g, "").replace(/""/g, '"');
-        const cellRef = columns[colIndex] + (rowIndex + 1);
-        const cell = { sheet_id: sheet.id, cell_ref: cellRef, value, formula: value.startsWith("=") ? value : null, format: {}, updated_by: userId };
-        records[cellRef] = cell as Cell;
-        return cell;
+        const ref = columns[colIndex] + (rowIndex + 1);
+        next[ref] = { sheet_id: sheet.id, cell_ref: ref, value: value.startsWith("=") ? "" : value, formula: value.startsWith("=") ? value : null, format: {}, updated_by: userId };
       });
     });
-    if (inserts.length) {
-      const result = await supabase.from("grand_lumen_sheet_cells").upsert(inserts, { onConflict: "sheet_id,cell_ref" });
-      if (result.error) setNotice(result.error.message);
-      else { setCells(current => ({ ...current, ...records })); setNotice("CSV imported."); }
-    }
+    setCells(next);
+    persistCurrent(next);
+    setNotice("CSV imported and saved locally.");
   };
 
   const calculated = useMemo(() => {
     const values: Record<string, string> = {};
     Object.entries(cells).forEach(([ref, cell]) => {
       if (!cell.formula) values[ref] = cell.value;
-      else {
-        try { values[ref] = evaluateFormula(cell.formula, cells); }
-        catch { values[ref] = "#ERROR"; }
-      }
+      else { try { values[ref] = evaluateFormula(cell.formula, cells); } catch { values[ref] = "#ERROR"; } }
     });
     return values;
   }, [cells]);
 
-  useEffect(() => {
-    if (!supabase || !sheet) return;
-    const channel = supabase.channel("lumen-sheet-live-" + sheet.id)
-      .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_sheet_cells", filter: "sheet_id=eq." + sheet.id }, payload => {
-        if (payload.eventType === "DELETE") {
-          const removed = payload.old as Cell;
-          setCells(current => {
-            const next = { ...current };
-            delete next[removed.cell_ref];
-            return next;
-          });
-        } else {
-          const updated = payload.new as Cell;
-          setCells(current => ({ ...current, [updated.cell_ref]: updated }));
-        }
-      }).subscribe();
-    return () => { void supabase?.removeChannel(channel); };
-  }, [sheet?.id]);
-
   useEffect(() => { setInput(cells[selected]?.formula || cells[selected]?.value || ""); }, [selected, cells]);
 
-  if (!supabase) return <div className="sheets-workspace"><div className="team-empty"><h3>Cloud account required</h3><p>Sign in with your Grand Lumen cloud account to save business records and access them on other devices.</p></div></div>;
+  const shareWorkbook = () => setNotice("This workbook is stored locally on this device. Cloud sharing is unavailable in offline mode. Export the Excel file to share a copy.");
 
   return <div className="sheets-workspace">
-    <div className="sheets-header"><div><span className="eyebrow">BUSINESS & RECORDS WORKSPACE</span><h2>Lumen Sheets</h2><p>Organise business records, budgets, account registers and calculations.</p></div><div className="sheets-toolbar"><button className="team-secondary" onClick={exportXlsx} disabled={!sheet}>Export Excel</button><label className="team-secondary sheets-import">Import Excel<input type="file" accept=".xlsx,.xls" onChange={event => { const file = event.target.files?.[0]; if (file) void importXlsx(file); event.currentTarget.value = ""; }} disabled={!sheet}/></label><button className="team-secondary" onClick={exportCsv} disabled={!sheet}>Export CSV</button></div></div>
+    <div className="sheets-header"><div><span className="eyebrow">BUSINESS & RECORDS WORKSPACE</span><h2>Lumen Sheets</h2><p>Organise business records, budgets, account registers and calculations. Saved locally on this device.</p></div><div className="sheets-toolbar"><button className="team-secondary" onClick={() => void exportXlsx()} disabled={!workbook}>Export Excel</button><label className="team-secondary sheets-import">Import Excel<input type="file" accept=".xlsx,.xls" onChange={event => { const file = event.target.files?.[0]; if (file) void importXlsx(file); event.currentTarget.value = ""; }}/></label><button className="team-secondary" onClick={exportCsv} disabled={!sheet}>Export CSV</button></div></div>
     {notice && <div className="team-notice">{notice}</div>}
-    <div className="sheets-create"><input value={newName} onChange={event => setNewName(event.target.value)} placeholder="New workbook name e.g. Business Accounts"/><button className="team-primary" onClick={() => void createWorkbook()} disabled={busy || !newName.trim()}>Create workbook</button></div>
-    <div className="sheets-layout"><aside className="sheets-library"><h3>Your workbooks</h3>{workbooks.map(item => <button key={item.id} className={workbook?.id === item.id ? "active" : ""} onClick={() => void loadWorkbook(item)}><b>{item.name}</b><small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}{!workbooks.length && <p className="team-muted">No workbooks yet.</p>}</aside>
-      <section className="sheets-editor">{workbook ? <><div className="sheets-book-title"><div><h3>{workbook.name}</h3><small>{members.length ? "Shared with " + members.length + " member(s)" : "Private workbook"}</small></div><button className="team-secondary" onClick={() => void addSheet()}>+ Add sheet</button></div><div className="sheets-tabs">{sheets.map(item => <button key={item.id} className={sheet?.id === item.id ? "active" : ""} onClick={() => void loadSheet(item)}>{item.name}</button>)}</div>{sheet && <><div className="sheets-cell-editor"><b>{selected}</b><input value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void saveCell(); }} placeholder="Enter a value or formula, e.g. =SUM(A1:A5)"/><button className="team-primary" onClick={() => void saveCell()}>Save cell</button></div><div className="sheets-grid-wrap"><table className="sheets-grid"><thead><tr><th></th>{columns.map(column => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map(row => <tr key={row}><th>{row}</th>{columns.map(column => { const ref = column + row; return <td key={ref}><button className={selected === ref ? "selected" : ""} onClick={() => setSelected(ref)} title={cells[ref]?.formula || cells[ref]?.value || ref}>{calculated[ref] || ""}</button></td>; })}</tr>)}</tbody></table></div></>}</> : <div className="sheets-empty"><h3>Select or create a workbook</h3><p>Your spreadsheet records are saved securely to your Grand Lumen account.</p></div>}</section></div>
-    {workbook && <section className="sheets-share"><div><b>Share workbook with a connected member</b><p>Only people already connected through Team can be added.</p></div><div><input type="email" value={memberEmail} onChange={event => setMemberEmail(event.target.value)} placeholder="Connected member's email"/><button className="team-primary" onClick={() => void addMember()}>Share</button></div></section>}
+    <div className="sheets-create"><input value={newName} onChange={event => setNewName(event.target.value)} placeholder="New workbook name e.g. Business Accounts"/><button className="team-primary" onClick={createWorkbook} disabled={!newName.trim()}>Create workbook</button></div>
+    <div className="sheets-layout"><aside className="sheets-library"><h3>Your workbooks</h3>{workbooks.map(item => <button key={item.id} className={workbook?.id === item.id ? "active" : ""} onClick={() => loadWorkbook(item)}><b>{item.name}</b><small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}{!workbooks.length && <p className="team-muted">No workbooks yet.</p>}</aside>
+      <section className="sheets-editor">{workbook ? <><div className="sheets-book-title"><div><h3>{workbook.name}</h3><small>Private · Stored on this device</small></div><button className="team-secondary" onClick={shareWorkbook}>Share workbook</button><button className="team-secondary" onClick={addSheet}>+ Add sheet</button></div><div className="sheets-tabs">{sheets.map(item => <button key={item.id} className={sheet?.id === item.id ? "active" : ""} onClick={() => loadSheet(item)}>{item.name}</button>)}</div>{sheet && <><div className="sheets-cell-editor"><b>{selected}</b><input value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === "Enter") saveCell(); }} placeholder="Enter a value or formula, e.g. =SUM(A1:A5)"/><button className="team-primary" onClick={saveCell}>Save cell</button></div><div className="sheets-grid-wrap"><table className="sheets-grid"><thead><tr><th></th>{columns.map(column => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map(row => <tr key={row}><th>{row}</th>{columns.map(column => { const ref = column + row; return <td key={ref}><button className={selected === ref ? "selected" : ""} onClick={() => setSelected(ref)} title={cells[ref]?.formula || cells[ref]?.value || ref}>{calculated[ref] || ""}</button></td>; })}</tr>)}</tbody></table></div></>}</> : <div className="sheets-empty"><h3>Select or create a workbook</h3><p>Your spreadsheet records are saved securely in this browser on this device.</p></div>}</section></div>
   </div>;
 }
