@@ -839,3 +839,20 @@ body{top:0!important}
 .activity-digest-privacy{display:flex;align-items:flex-start;gap:7px;margin:0;color:var(--muted);font-size:10px;line-height:1.6}
 .activity-digest-privacy svg{flex:0 0 auto;color:var(--accent)}
 @media(max-width:600px){.activity-digest-hero{align-items:flex-start;padding:16px}.activity-digest-stats{gap:7px}.activity-digest-stats article{padding:11px}.activity-digest-stats span{font-size:8px}.activity-digest-stats strong{font-size:21px}.activity-digest-panel{padding:13px}.activity-digest-actions button{flex:1}.activity-digest-saved article{align-items:flex-start;flex-direction:column}.activity-digest-saved-actions{width:100%}.activity-digest-saved-actions button{flex:1}}
+
+
+.activity-digest-heading-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.activity-digest-delete-all,.activity-digest-record-delete{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:1px solid var(--line);border-radius:9px;background:var(--surface-strong);color:var(--muted);font:inherit;font-size:10px;cursor:pointer}
+.activity-digest-delete-all{padding:8px 10px}
+.activity-digest-delete-all:disabled{opacity:.45;cursor:not-allowed}
+.activity-digest-record-delete{width:30px;height:30px;flex:0 0 30px;margin-left:auto}
+.activity-digest-record-delete:hover,.activity-digest-delete-all:hover{border-color:#dc5555;color:#dc5555}
+.activity-digest-security-backdrop{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:18px;background:rgba(4,10,22,.68);backdrop-filter:blur(8px)}
+.activity-digest-security-dialog{width:min(440px,100%);padding:24px;border:1px solid var(--line);border-radius:18px;background:var(--surface);color:var(--text);box-shadow:0 24px 80px rgba(0,0,0,.3)}
+.activity-digest-security-dialog h3{margin:8px 0;font-size:20px}
+.activity-digest-security-dialog>p{color:var(--muted);font-size:12px;line-height:1.7}
+.activity-digest-security-dialog label{display:block;margin:16px 0 7px;font-size:11px;font-weight:700}
+.activity-digest-security-dialog input{width:100%;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-strong);color:var(--text);font:inherit;font-size:13px}
+.activity-digest-security-error{color:#dc5555!important}
+.activity-digest-security-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+@media(max-width:520px){.activity-digest-heading-actions{justify-content:flex-end}.activity-digest-security-dialog{padding:18px}.activity-digest-security-actions button{flex:1}}
