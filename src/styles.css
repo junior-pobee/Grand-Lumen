@@ -1000,3 +1000,26 @@ body{top:0!important}
 .alert-center-mark-all{width:100%;margin-top:12px;padding:10px;border:0;border-radius:10px;background:var(--accent,#6475e8);color:white;font-weight:700;cursor:pointer}
 .theme-dark .alert-center-panel{background:#111827;color:#edf1fa;border-color:rgba(255,255,255,.12)}
 @media(max-width:640px){.alert-center-panel{position:fixed;top:68px;right:12px;width:calc(100vw - 24px);max-height:calc(100dvh - 84px)}}
+
+
+.desktop-alert-center{display:flex;align-items:center}
+.reminder-tools-workspace{display:grid;gap:18px}
+.reminder-tools-heading{display:flex;align-items:flex-start;gap:12px}
+.reminder-tools-heading>div{min-width:0}
+.reminder-tools-heading h3{margin:0 0 5px;font-size:19px}
+.reminder-tools-heading p{margin:0;color:var(--muted);font-size:12px;line-height:1.65}
+.reminder-tools-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;align-items:end;gap:10px;padding:15px;border:1px solid var(--line);border-radius:14px;background:var(--surface-strong)}
+.reminder-tools-form label{display:grid;gap:7px;color:var(--muted);font-size:11px;font-weight:750}
+.reminder-tools-form input{width:100%;min-width:0;min-height:42px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--text);font:inherit;font-size:12px}
+.reminder-tools-form button{min-height:42px;white-space:nowrap}
+.reminder-tools-message{margin:0;color:var(--accent);font-size:12px}
+.reminder-tools-list{display:grid;gap:9px}
+.reminder-tools-list-head{display:flex;align-items:center;justify-content:space-between;color:var(--text);font-size:13px}
+.reminder-tools-list-head span{color:var(--muted);font-size:11px}
+.reminder-tools-list article{display:flex;align-items:center;gap:10px;padding:11px;border:1px solid var(--line);border-radius:11px;background:var(--surface-strong)}
+.reminder-tools-list article>div{display:grid;gap:3px;min-width:0;flex:1}
+.reminder-tools-list article b{font-size:12px;overflow-wrap:anywhere}
+.reminder-tools-list article small,.reminder-tools-list article div span{color:var(--muted);font-size:10px}
+.reminder-tools-list article>button{width:34px;height:34px;display:grid;place-items:center;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--muted)}
+@media(max-width:760px){.desktop-alert-center{display:none}.reminder-tools-form{grid-template-columns:1fr}.reminder-tools-form button{width:100%}}
+@media(min-width:761px){.desktop-alert-center{display:flex}}
