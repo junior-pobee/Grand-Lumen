@@ -4,7 +4,7 @@ import LumenSheets from "./LumenSheets";
 import { connectionAwareMessage } from "./api";
 import { Activity, ArrowLeft, BookOpen, CalendarDays, CheckCircle2, Copy, Download, FileText, Globe2, Languages, Plus, Search, ShieldCheck, Trash2, Upload, Wifi, WifiOff } from "lucide-react";
 
-type ModuleName = "Knowledge Graph" | "Verify" | "Document Intelligence" | "Convert" | "World" | "Pulse" | "Scan" | "Workspace" | "Finance" | "Vault" | "Academy" | "Code" | "Lab" | "Create" | "Translate" | "Accessibility" | "Offline" | "Connect" | "Alerts" | "Sheets";
+type ModuleName = "Knowledge Graph" | "Verify" | "Document Intelligence" | "Convert" | "World" | "Pulse" | "Scan" | "Workspace" | "Finance" | "Vault" | "Academy" | "Code" | "Lab" | "Create" | "Translate" | "Accessibility" | "Offline" | "Connect" | "Alerts" | "Sheets" | "Browse";
 type Task = { id: string; title: string; due: string; done: boolean };
 type Entry = { id: string; name: string; amount: number; kind: "Income" | "Expense"; date: string };
 type SavedFile = { id: string; name: string; type: string; size: number; data: string; savedAt: string };
@@ -43,7 +43,8 @@ const modules: { name: ModuleName; group: string; description: string }[] = [
   { name: "Scan", group: "Utilities", description: "Create QR codes and open the existing camera scanner." },
   { name: "Workspace", group: "Productivity", description: "Tasks, notes and a personal schedule." },
   { name: "Finance", group: "Productivity", description: "Track income, expenses, budgets and balances locally." },
-  { name: "Sheets", group: "Productivity", description: "Create cloud spreadsheets for business records, budgets and accounts." },
+  { name: "Sheets", group: "Productivity", description: "Create spreadsheets for business records, budgets and accounts." },
+  { name: "Browse", group: "Access", description: "Open major shopping, marketplace, technology and service websites from one in-app directory." },
   { name: "Vault", group: "Productivity", description: "Keep personal files in this browser's local storage." },
   { name: "Academy", group: "Learning", description: "Study structured topics and test your understanding." },
   { name: "Code", group: "Learning", description: "Experiment with HTML, CSS and JavaScript in a live preview." },
@@ -71,6 +72,33 @@ const courses = [
   { title: "Statistics", topic: "Mathematics", lesson: "The mean is the sum divided by the count, the median is the middle ordered value, and the mode is the most frequent value.", question: "What is the median of 2, 4, 9?", answer: "4." },
   { title: "Ecosystems", topic: "Biology", lesson: "Energy flows through food chains while nutrients cycle. Producers convert energy into chemical energy that supports consumers.", question: "What is the role of a producer?", answer: "It makes organic food, usually through photosynthesis." }
 ];
+const shoppingSites = [
+  { name: "Amazon", category: "Global marketplace", url: "https://www.amazon.com/" },
+  { name: "Jumia", category: "African marketplace", url: "https://www.jumia.com.gh/" },
+  { name: "eBay", category: "Marketplace and auctions", url: "https://www.ebay.com/" },
+  { name: "AliExpress", category: "Global marketplace", url: "https://www.aliexpress.com/" },
+  { name: "Alibaba", category: "Wholesale marketplace", url: "https://www.alibaba.com/" },
+  { name: "Etsy", category: "Handmade and creative goods", url: "https://www.etsy.com/" },
+  { name: "Walmart", category: "Retail and groceries", url: "https://www.walmart.com/" },
+  { name: "Target", category: "Retail", url: "https://www.target.com/" },
+  { name: "Temu", category: "Online marketplace", url: "https://www.temu.com/" },
+  { name: "SHEIN", category: "Fashion and lifestyle", url: "https://www.shein.com/" },
+  { name: "Takealot", category: "South African marketplace", url: "https://www.takealot.com/" },
+  { name: "Best Buy", category: "Electronics and technology", url: "https://www.bestbuy.com/" },
+  { name: "Newegg", category: "Computers and electronics", url: "https://www.newegg.com/" },
+  { name: "IKEA", category: "Furniture and home", url: "https://www.ikea.com/" },
+  { name: "Nike", category: "Sportswear", url: "https://www.nike.com/" },
+  { name: "Google Shopping", category: "Product discovery", url: "https://shopping.google.com/" },
+  { name: "Facebook Marketplace", category: "Local marketplace", url: "https://www.facebook.com/marketplace/" },
+  { name: "Booking.com", category: "Travel bookings", url: "https://www.booking.com/" },
+  { name: "Expedia", category: "Travel bookings", url: "https://www.expedia.com/" },
+  { name: "Coursera", category: "Online learning", url: "https://www.coursera.org/" },
+  { name: "Udemy", category: "Online learning", url: "https://www.udemy.com/" },
+  { name: "GitHub", category: "Developer platform", url: "https://github.com/" },
+  { name: "YouTube", category: "Video platform", url: "https://www.youtube.com/" },
+  { name: "Google", category: "Search and services", url: "https://www.google.com/" }
+];
+
 const resources: Resource[] = [
   { title: "World Bank Open Data", description: "Development indicators and country-level datasets.", url: "https://data.worldbank.org/", source: "World Bank" },
   { title: "NASA Open Science", description: "Space science missions, data and educational material.", url: "https://science.nasa.gov/open-science/", source: "NASA" },
@@ -111,6 +139,8 @@ function ActionButton({ children, onClick, disabled = false }: { children: React
 export default function ExpansionHub({ onOpenScanner, language = "en", userId = "" }: { onOpenScanner?: () => void; language?: string; userId?: string }) {
   const [active, setActive] = useState<ModuleName>("Knowledge Graph");
   const [moduleOpened, setModuleOpened] = useState(false);
+  const [browseQuery, setBrowseQuery] = useState("");
+  const [browseSite, setBrowseSite] = useState<(typeof shoppingSites)[number] | null>(null);
   const [tasks, setTasks] = useState<Task[]>(() => readLocal("lumenTasks", initialTasks));
   const [entries, setEntries] = useState<Entry[]>(() => readLocal("lumenFinanceEntries", initialEntries));
   const [files, setFiles] = useState<SavedFile[]>(() => readLocal("lumenVaultFiles", initialFiles));
@@ -653,6 +683,8 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
     {active === "Offline" && <div className="lh-two-col"><Panel title="Offline readiness" description="Your local notes, tasks and stored files remain in this browser. Network-only services need a connection."><div className="lh-network"><span className={networkOnline ? "lh-online" : "lh-offline"}/>{networkOnline ? "Connection available" : "Offline mode"}</div><p>Offline reading list: {readLocal<Resource[]>("lumenOfflineResources", []).length} saved links.</p><ActionButton onClick={exportOfflineNotes}><Download size={14}/> Export offline pack</ActionButton></Panel><Panel title="Save resources for later" description="Keep useful source links in your local reading list."><div className="lh-results">{resources.slice(0, 5).map(resource => <article key={resource.url}><a href={resource.url} target="_blank" rel="noreferrer">{resource.title}</a><p>{resource.description}</p><button onClick={() => saveOfflineResource(resource)}>Save for offline list</button></article>)}</div></Panel></div>}
 
     {active === "Connect" && <Panel title="Global digital directory" description="A curated starting point for public knowledge, science, development and learning services."><div className="lh-connect-grid">{resources.map(resource => <article key={resource.url}><span>{resource.source}</span><h4>{resource.title}</h4><p>{resource.description}</p><a href={resource.url} target="_blank" rel="noreferrer">Visit resource ↗</a><button onClick={() => saveOfflineResource(resource)}>Save resource</button></article>)}</div></Panel>}
+
+    {active === "Browse" && <div className="lh-browse-workspace"><Panel title="Global app and website directory" description="Find major shopping platforms, marketplaces, travel services, learning sites and developer tools. Choose a service to try opening it inside Grand Lumen."><div className="lh-browse-search"><Search size={17}/><input value={browseQuery} onChange={e => setBrowseQuery(e.target.value)} placeholder="Search Amazon, Jumia, travel, learning…"/></div><div className="lh-browse-grid">{shoppingSites.filter(site => (site.name + " " + site.category).toLowerCase().includes(browseQuery.toLowerCase())).map(site => <article key={site.name}><div><span>{site.category}</span><h4>{site.name}</h4></div><button onClick={() => setBrowseSite(site)}>Open in Lumen <Globe2 size={14}/></button><a href={site.url} target="_blank" rel="noopener noreferrer">Open full website ↗</a></article>)}</div></Panel>{browseSite && <Panel title={browseSite.name + " · In-app browser"} description="Some websites block embedded browsing for security reasons. If the page does not load here, use Open full website."><div className="lh-browser-actions"><button className="lh-secondary" onClick={() => setBrowseSite(null)}>Close browser</button><a className="lh-action" href={browseSite.url} target="_blank" rel="noopener noreferrer">Open full website <Globe2 size={14}/></a></div><iframe className="lh-browser-frame" key={browseSite.url} src={browseSite.url} title={browseSite.name + " website"} loading="lazy" referrerPolicy="strict-origin-when-cross-origin" sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation"/></Panel>}</div>}
 
     {active === "Sheets" && <LumenSheets userId={userId}/>}
 
