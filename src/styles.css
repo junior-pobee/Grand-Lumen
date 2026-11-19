@@ -856,3 +856,20 @@ body{top:0!important}
 .activity-digest-security-error{color:#dc5555!important}
 .activity-digest-security-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
 @media(max-width:520px){.activity-digest-heading-actions{justify-content:flex-end}.activity-digest-security-dialog{padding:18px}.activity-digest-security-actions button{flex:1}}
+
+
+.clear-data-backdrop{position:fixed;inset:0;z-index:1200;display:grid;place-items:center;padding:20px;background:rgba(3,7,18,.76);backdrop-filter:blur(12px)}
+.clear-data-dialog{position:relative;width:min(100%,480px);padding:30px;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:22px;background:var(--panel,#101827);color:var(--text,#f4f6ff);box-shadow:0 28px 90px rgba(0,0,0,.42)}
+.clear-data-icon{width:46px;height:46px;display:grid;place-items:center;margin-bottom:18px;border-radius:14px;background:rgba(239,68,68,.12);color:#f87171}
+.clear-data-close{position:absolute;top:18px;right:18px;width:36px;height:36px;display:grid;place-items:center;border:1px solid var(--line,rgba(255,255,255,.12));border-radius:10px;background:transparent;color:inherit}
+.clear-data-dialog h2{margin:8px 0 10px;font-size:24px;letter-spacing:-.7px}
+.clear-data-dialog>p{margin:0 0 20px;color:var(--muted,#aab6ca);font-size:13px;line-height:1.7}
+.clear-data-dialog>label{display:block;margin-bottom:8px;font-size:12px;font-weight:800}
+.clear-data-dialog>input{width:100%;min-height:48px;padding:0 14px;border:1px solid var(--line,rgba(255,255,255,.16));border-radius:12px;background:var(--surface,rgba(255,255,255,.04));color:inherit;font:inherit;outline:none}
+.clear-data-dialog>input:focus{border-color:var(--accent,#8bbcff);box-shadow:0 0 0 3px rgba(139,188,255,.12)}
+.clear-data-error{margin-top:10px;padding:10px 12px;border-radius:10px;background:rgba(239,68,68,.1);color:#fca5a5;font-size:12px;line-height:1.5}
+.clear-data-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:20px}
+.clear-data-confirm{min-height:42px;padding:0 16px;border:0;border-radius:10px;background:#dc4545;color:white;font-weight:800}
+.clear-data-confirm:disabled{opacity:.45;cursor:not-allowed}
+.clear-data-dialog>small{display:block;margin-top:15px;color:var(--muted,#9aa8bd);font-size:11px;line-height:1.5}
+@media(max-width:520px){.clear-data-dialog{padding:24px 20px}.clear-data-dialog h2{font-size:21px}.clear-data-actions{flex-direction:column-reverse}.clear-data-actions button{width:100%;min-height:44px}}
