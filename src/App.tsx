@@ -1846,7 +1846,11 @@ function App() {
     if (!password) return false;
     if (session && supabase && session.user.email) {
       const { error: authError } = await supabase.auth.signInWithPassword({ email: session.user.email, password });
-      return !authError;
+      if (authError) {
+        if (authError.status === 0 || authError.name === "AuthRetryableFetchError" || /network|fetch failed|failed to fetch|load failed|connection|timeout/i.test(authError.message)) throw authError;
+        return false;
+      }
+      return true;
     }
     const email = (localProfile?.email || "").trim().toLowerCase();
     if (!email) return false;
