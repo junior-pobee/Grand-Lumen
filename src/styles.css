@@ -551,7 +551,7 @@ body{top:0!important}
 }
 
 
-.gl-graph{display:grid;gap:16px;min-width:0;color:var(--text)}
+.gl-graph{display:grid;gap:16px;min-width:0;width:100%;max-width:none;margin:0;color:var(--text)}
 .gl-graph-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px}
 .gl-graph-head h3{margin:6px 0;font-size:clamp(19px,2.5vw,26px)}
 .gl-graph-head p{margin:0;color:var(--muted);font-size:12px;line-height:1.7}
@@ -579,10 +579,10 @@ body{top:0!important}
 .gl-graph-result>span{color:var(--muted);font-size:9px}
 .gl-graph-result>b{font-size:13px}
 .gl-graph-visual{display:grid;gap:10px}
-.gl-graph-visual-head{display:flex;justify-content:space-between;align-items:center;gap:10px;min-width:0}
+.gl-graph-visual-head{display:flex;justify-content:space-between;align-items:center;gap:10px;min-width:0}.gl-graph-visual-head>div{display:grid;gap:5px;min-width:0}.gl-graph-visual-head small{color:var(--muted);font-size:11px;overflow-wrap:anywhere}
 .gl-graph-visual-head b{font:700 9px "DM Mono",monospace;letter-spacing:.1em}
 .gl-graph-visual-head span{overflow:hidden;color:var(--muted);font-size:10px;text-overflow:ellipsis;white-space:nowrap}
-.gl-graph-svg{display:block;width:100%;height:clamp(420px,68vh,780px);min-height:420px;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:var(--glass);touch-action:pan-y}
+.gl-graph-svg{display:block;width:100%;height:clamp(560px,78vh,980px);min-height:560px;overflow:hidden;border:1px solid var(--line);border-radius:10px;background:var(--glass);touch-action:none;cursor:grab}.gl-graph-svg:active{cursor:grabbing}.gl-graph-typebar{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.gl-graph-typebar>span{color:var(--muted);font:700 9px "DM Mono",monospace;letter-spacing:.12em;margin-right:5px}.gl-graph-typebar button{padding:8px 12px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--muted);font:inherit;font-size:10px;cursor:pointer}.gl-graph-typebar button.active{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 13%,var(--surface));color:var(--text)}.gl-area-fill{fill:color-mix(in srgb,var(--accent) 22%,transparent);stroke:var(--accent);stroke-width:3}.gl-bar{fill:color-mix(in srgb,var(--accent) 78%,#fff);stroke:var(--accent);stroke-width:1}.gl-chart-legend{display:flex;gap:10px;flex-wrap:wrap}.gl-chart-legend span{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:10px}.gl-chart-legend i{width:9px;height:9px;border-radius:50%}
 .gl-grid-line{stroke:var(--line);stroke-width:1}
 .gl-axis-line{stroke:var(--muted);stroke-width:1.5}
 .gl-axis-tick{fill:var(--muted);font-size:12px}
@@ -597,7 +597,7 @@ body{top:0!important}
 .gl-graph-footnote,.gl-graph-notice{margin:0;color:var(--muted);font-size:10px;line-height:1.7}
 .gl-graph-notice{padding:14px;border:1px dashed var(--line);border-radius:9px}
 @media(max-width:850px){.gl-graph-layout{grid-template-columns:minmax(0,1fr)}.gl-graph-controls{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.gl-graph-controls>label:first-child,.gl-graph-controls>.gl-graph-field-grid,.gl-graph-controls>.gl-graph-result,.gl-graph-controls>.error-text,.gl-graph-controls>.solid-button,.gl-graph-controls>.quiet-button{grid-column:1/-1}}
-@media(max-width:560px){.gl-graph-head{flex-direction:column}.gl-graph-head>.quiet-button{width:100%;justify-content:center}.gl-graph-controls{grid-template-columns:minmax(0,1fr)}.gl-graph-controls>*{grid-column:1!important}.gl-graph-svg{height:clamp(360px,62vh,560px);min-height:360px}.gl-graph-visual{padding:9px}.gl-axis-tick{font-size:15px}.gl-point-label{font-size:12px}.gl-graph-analysis{display:grid;gap:7px}}
+@media(min-width:1400px){.gl-graph-svg{height:clamp(700px,82vh,1100px);min-height:700px}.gl-graph-visual{padding:22px}.gl-graph-controls{grid-template-columns:repeat(4,minmax(0,1fr))}}\n@media(max-width:560px){.gl-graph-svg{height:clamp(430px,66vh,620px);min-height:430px}.gl-graph-head{flex-direction:column}.gl-graph-head>.quiet-button{width:100%;justify-content:center}.gl-graph-controls{grid-template-columns:minmax(0,1fr)}.gl-graph-controls>*{grid-column:1!important}.gl-graph-svg{height:clamp(360px,62vh,560px);min-height:360px}.gl-graph-visual{padding:9px}.gl-axis-tick{font-size:15px}.gl-point-label{font-size:12px}.gl-graph-analysis{display:grid;gap:7px}}
 
 
 .lumen-hub{display:grid;gap:18px;min-width:0;color:var(--text)}
