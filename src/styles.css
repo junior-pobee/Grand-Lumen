@@ -1043,14 +1043,14 @@ body{top:0!important}
 .gl-welcome-tour-progress span{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#73a8ff,#a5e4ff);transition:width .35s ease}
 .gl-welcome-tour-actions>span{color:rgba(223,232,250,.62);font-size:9px}
 .gl-welcome-tour-actions>button{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:27px;padding:5px 10px;border:1px solid rgba(145,184,255,.3);border-radius:8px;background:rgba(103,151,237,.18);color:#e8f1ff;font-size:10px;font-weight:800;cursor:pointer}
-.theme-light .gl-welcome-tour{border-color:rgba(89,117,165,.22);background:rgba(249,252,255,.9);color:#17243b;box-shadow:0 16px 48px rgba(36,55,87,.17),inset 0 1px 0 rgba(255,255,255,.85)}
-.theme-light .gl-welcome-tour-topline>span{color:#466eae}
-.theme-light .gl-welcome-tour-topline>button{border-color:rgba(50,70,110,.14);background:rgba(35,55,90,.06);color:#24334d}
-.theme-light .gl-welcome-tour-count{color:#71809a}
-.theme-light .gl-welcome-tour-copy p{color:#52627a}
-.theme-light .gl-welcome-tour-progress{background:rgba(47,68,104,.12)}
-.theme-light .gl-welcome-tour-actions>span{color:#7a879b}
-.theme-light .gl-welcome-tour-actions>button{border-color:rgba(74,115,184,.24);background:rgba(94,143,220,.12);color:#244c85}
+html[data-theme="light"] .gl-welcome-tour{border-color:rgba(89,117,165,.22);background:rgba(249,252,255,.9);color:#17243b;box-shadow:0 16px 48px rgba(36,55,87,.17),inset 0 1px 0 rgba(255,255,255,.85)}
+html[data-theme="light"] .gl-welcome-tour-topline>span{color:#466eae}
+html[data-theme="light"] .gl-welcome-tour-topline>button{border-color:rgba(50,70,110,.14);background:rgba(35,55,90,.06);color:#24334d}
+html[data-theme="light"] .gl-welcome-tour-count{color:#71809a}
+html[data-theme="light"] .gl-welcome-tour-copy p{color:#52627a}
+html[data-theme="light"] .gl-welcome-tour-progress{background:rgba(47,68,104,.12)}
+html[data-theme="light"] .gl-welcome-tour-actions>span{color:#7a879b}
+html[data-theme="light"] .gl-welcome-tour-actions>button{border-color:rgba(74,115,184,.24);background:rgba(94,143,220,.12);color:#244c85}
 @keyframes gl-tour-card-in{from{opacity:0;transform:translateY(-8px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes gl-tour-copy-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:760px){.gl-welcome-tour-layer{padding:calc(env(safe-area-inset-top,0px) + 64px) 9px 9px}.gl-welcome-tour{width:calc(100vw - 18px);max-height:min(180px,calc(100dvh - 82px));padding:10px 11px 9px;border-radius:14px}.gl-welcome-tour-copy h2{font-size:14px}.gl-welcome-tour-copy p{font-size:10px;line-height:1.48}.gl-welcome-tour-topline>button{width:25px;height:25px;flex-basis:25px}}
