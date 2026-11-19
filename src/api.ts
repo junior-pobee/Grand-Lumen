@@ -182,3 +182,10 @@ export async function searchGlobalNews(query: string, country = "all"): Promise<
   }
   return Array.from(unique.values());
 }
+
+
+export function connectionAwareMessage(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : String(error || "");
+  const networkFailure = typeof navigator !== "undefined" && !navigator.onLine || error instanceof TypeError || /failed to fetch|networkerror|network request failed|load failed|fetch failed|internet connection|connection (?:was )?lost|offline/i.test(message);
+  return networkFailure ? "Connect to the internet to use this feature." : message || fallback;
+}
