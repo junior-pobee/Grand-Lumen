@@ -2190,7 +2190,7 @@ function App() {
     if (localProfile && image !== localProfile.profileImage) setLocalProfile(current => current ? { ...current, profileImage: image } : current);
   }, [localProfile?.email, session?.user.email]);
 
-  const completeWelcomeTour = async () => {
+  const completeWelcomeTour = () => {
     setWelcomeTourOpen(false);
     if (localProfile?.email) {
       const accounts = JSON.parse(localStorage.getItem("grandLumenLocalAccounts") || "[]") as { email: string; onboardingPending?: boolean; [key: string]: unknown }[];
@@ -2201,7 +2201,7 @@ function App() {
     }
     if (session && supabase) {
       localStorage.setItem("grandLumenTourCompleted:" + session.user.id, "true");
-      await supabase.auth.updateUser({ data: { grand_lumen_onboarding_pending: false, grand_lumen_onboarding_completed: true } });
+      void supabase.auth.updateUser({ data: { grand_lumen_onboarding_pending: false, grand_lumen_onboarding_completed: true } }).catch(() => undefined);
     }
   };
 
@@ -2246,7 +2246,7 @@ function App() {
   };
 
   const handleLogout = async () => {
-    if (welcomeTourOpen) await completeWelcomeTour();
+    if (welcomeTourOpen) completeWelcomeTour();
     if (session && supabase) {
       const { error: signOutError } = await supabase.auth.signOut();
       if (signOutError) { alert(signOutError.message); return; }
