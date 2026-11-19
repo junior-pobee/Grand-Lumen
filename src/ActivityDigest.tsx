@@ -113,8 +113,11 @@ export default function ActivityDigest({ entries, storageKey, onEntriesChange, v
       setNotice(deleteTarget.kind === "all" ? "All activity records cleared." : "The selected record was deleted.");
       setDeleteTarget(null);
       setDeletePassword("");
-    } catch {
-      setDeleteError("Password verification is unavailable. Nothing was deleted.");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const offline = typeof navigator !== "undefined" && !navigator.onLine;
+      const networkFailure = offline || error instanceof TypeError || /network|fetch failed|failed to fetch|load failed|connection|timeout|authretryablefetch/i.test(message);
+      setDeleteError(networkFailure ? "Connect to the internet to verify your password. Nothing was deleted." : "Password verification is temporarily unavailable. Nothing was deleted.");
     } finally {
       setDeleteBusy(false);
     }
