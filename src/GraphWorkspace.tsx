@@ -177,8 +177,8 @@ export default function GraphWorkspace() {
     { x: bounds.xMax, y: fit.slope * bounds.xMax + fit.intercept }
   ] : [];
 
-  const width = 900;
-  const height = 520;
+  const width = 1200;
+  const height = 720;
   const left = 76;
   const right = 24;
   const top = 24;
@@ -287,7 +287,7 @@ export default function GraphWorkspace() {
         <div className="gl-graph-visual-head"><b>{mode === "function" ? "FUNCTION GRAPH" : "DATA PLOT"}</b><span>{mode === "function" ? "y = " + equation : points.length + " data points"}</span></div>
         {mode === "function" && !curve.length && <div className="gl-graph-notice">Enter a valid function to display its curve.</div>}
         {mode === "data" && !points.length && <div className="gl-graph-notice">Enter coordinate pairs to plot your experiment.</div>}
-        <svg className="gl-graph-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Cartesian graph">
+        <svg className="gl-graph-svg" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="Cartesian graph">
           {bounds && <>
             {tickValues(bounds.xMin, bounds.xMax).map((v, i) => <g key={"x" + i}><line x1={sx(v)} x2={sx(v)} y1={top} y2={height - bottom} className="gl-grid-line"/><text x={sx(v)} y={height - bottom + 22} className="gl-axis-tick" textAnchor="middle">{Number(v.toPrecision(4))}</text></g>)}
             {tickValues(bounds.yMin, bounds.yMax).map((v, i) => <g key={"y" + i}><line x1={left} x2={width - right} y1={sy(v)} y2={sy(v)} className="gl-grid-line"/><text x={left - 12} y={sy(v) + 4} className="gl-axis-tick" textAnchor="end">{Number(v.toPrecision(4))}</text></g>)}
