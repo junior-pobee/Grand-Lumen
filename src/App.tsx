@@ -1869,6 +1869,18 @@ function App() {
     document.documentElement.style.setProperty("--gl-interface-scale", String(interfaceScale));
     document.documentElement.style.setProperty("--gl-font-family", fontFamily);
     document.documentElement.style.setProperty("--gl-font-weight", fontWeight);
+    const appShell = document.querySelector<HTMLElement>(".app-shell");
+    if (appShell) {
+      appShell.style.setProperty("--gl-font-family", fontFamily);
+      appShell.style.setProperty("--gl-font-weight", fontWeight);
+      appShell.style.setProperty("font-family", fontFamily, "important");
+      appShell.style.setProperty("font-weight", fontWeight, "important");
+      appShell.querySelectorAll<HTMLElement>("*").forEach(element => {
+        if (element.closest("pre, code, .lh-code-editor")) return;
+        element.style.setProperty("font-family", fontFamily, "important");
+        element.style.setProperty("font-weight", fontWeight, "important");
+      });
+    }
   }, [fontScale, interfaceScale, fontFamily, fontWeight]);
 
   useEffect(() => {
