@@ -18,6 +18,8 @@ type SavedDigest = {
 type Props = {
   entries: ActivityEntry[];
   storageKey: string;
+  onEntriesChange: (entries: ActivityEntry[]) => void;
+  verifyPassword: (password: string) => Promise<boolean>;
 };
 
 function readSavedDigests(key: string): SavedDigest[] {
@@ -42,10 +44,14 @@ function downloadText(filename: string, content: string) {
   URL.revokeObjectURL(url);
 }
 
-export default function ActivityDigest({ entries, storageKey }: Props) {
+export default function ActivityDigest({ entries, storageKey, onEntriesChange, verifyPassword }: Props) {
   const [range, setRange] = useState("7");
   const [savedDigests, setSavedDigests] = useState<SavedDigest[]>(() => readSavedDigests(storageKey + "_saved"));
   const [notice, setNotice] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<{ kind: "entry" | "saved" | "all"; id?: string } | null>(null);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
   const filteredEntries = useMemo(() => {
     if (range === "all") return entries;
     const days = Number(range);
@@ -78,6 +84,40 @@ export default function ActivityDigest({ entries, storageKey }: Props) {
   const persistSaved = (next: SavedDigest[]) => {
     setSavedDigests(next);
     localStorage.setItem(storageKey + "_saved", JSON.stringify(next));
+  };
+  const requestDelete = (target: { kind: "entry" | "saved" | "all"; id?: string }) => {
+    setDeleteTarget(target);
+    setDeletePassword("");
+    setDeleteError("");
+  };
+  const confirmDelete = async () => {
+    if (!deleteTarget || !deletePassword) {
+      setDeleteError("Enter your account password to continue.");
+      return;
+    }
+    setDeleteBusy(true);
+    setDeleteError("");
+    try {
+      const verified = await verifyPassword(deletePassword);
+      if (!verified) {
+        setDeleteError("Password verification failed. Nothing was deleted.");
+        return;
+      }
+      if (deleteTarget.kind === "all") {
+        onEntriesChange([]);
+      } else if (deleteTarget.kind === "entry") {
+        onEntriesChange(entries.filter(entry => entry.id !== deleteTarget.id));
+      } else {
+        persistSaved(savedDigests.filter(item => item.id !== deleteTarget.id));
+      }
+      setNotice(deleteTarget.kind === "all" ? "All activity records cleared." : "The selected record was deleted.");
+      setDeleteTarget(null);
+      setDeletePassword("");
+    } catch {
+      setDeleteError("Password verification is unavailable. Nothing was deleted.");
+    } finally {
+      setDeleteBusy(false);
+    }
   };
   const copyText = async (content: string) => {
     try {
@@ -135,13 +175,14 @@ export default function ActivityDigest({ entries, storageKey }: Props) {
       {notice && <p className="activity-digest-notice" role="status">{notice}</p>}
     </div>
     <div className="activity-digest-panel">
-      <div className="activity-digest-heading"><div><span className="eyebrow">RECENT WORKSPACE EVENTS</span><h3>Activity timeline</h3></div><span className="activity-digest-count">{filteredEntries.length} events</span></div>
-      {filteredEntries.length ? <div className="activity-digest-timeline">{filteredEntries.slice(0, 100).map(entry => <article key={entry.id}><span className="activity-digest-dot"/><div><b>{entry.action}</b><small>{entry.section} · {new Date(entry.timestamp).toLocaleString()}</small></div></article>)}</div> : <div className="activity-digest-empty">Your activities will appear here as you use Grand Lumen.</div>}
+      <div className="activity-digest-heading"><div><span className="eyebrow">RECENT WORKSPACE EVENTS</span><h3>Activity timeline</h3></div><div className="activity-digest-heading-actions"><span className="activity-digest-count">{filteredEntries.length} events</span><button className="activity-digest-delete-all" onClick={() => requestDelete({ kind: "all" })} disabled={!entries.length}><Trash2 size={14}/> Clear all</button></div></div>
+      {filteredEntries.length ? <div className="activity-digest-timeline">{filteredEntries.slice(0, 100).map(entry => <article key={entry.id}><span className="activity-digest-dot"/><div><b>{entry.action}</b><small>{entry.section} · {new Date(entry.timestamp).toLocaleString()}</small></div><button className="activity-digest-record-delete" aria-label="Delete activity record" title="Delete activity record" onClick={() => requestDelete({ kind: "entry", id: entry.id })}><Trash2 size={14}/></button></article>)}</div> : <div className="activity-digest-empty">Your activities will appear here as you use Grand Lumen.</div>}
     </div>
     <div className="activity-digest-panel">
       <div className="activity-digest-heading"><div><span className="eyebrow">YOUR ARCHIVE</span><h3>Saved summaries</h3></div><FileText size={20}/></div>
-      {savedDigests.length ? <div className="activity-digest-saved">{savedDigests.map(item => <article key={item.id}><div><b>{item.title}</b><small>{new Date(item.createdAt).toLocaleString()}</small></div><div className="activity-digest-saved-actions"><button aria-label="Copy saved summary" onClick={() => void copyText(item.content)}><Copy size={14}/></button><button aria-label="Download saved summary" onClick={() => downloadText("grand-lumen-saved-summary.txt", item.content)}><Download size={14}/></button><button aria-label="Delete saved summary" onClick={() => persistSaved(savedDigests.filter(digest => digest.id !== item.id))}><Trash2 size={14}/></button></div></article>)}</div> : <div className="activity-digest-empty">Summaries you save will be kept here on this device.</div>}
+      {savedDigests.length ? <div className="activity-digest-saved">{savedDigests.map(item => <article key={item.id}><div><b>{item.title}</b><small>{new Date(item.createdAt).toLocaleString()}</small></div><div className="activity-digest-saved-actions"><button aria-label="Copy saved summary" onClick={() => void copyText(item.content)}><Copy size={14}/></button><button aria-label="Download saved summary" onClick={() => downloadText("grand-lumen-saved-summary.txt", item.content)}><Download size={14}/></button><button aria-label="Delete saved summary" title="Delete saved summary" onClick={() => requestDelete({ kind: "saved", id: item.id })}><Trash2 size={14}/></button></div></article>)}</div> : <div className="activity-digest-empty">Summaries you save will be kept here on this device.</div>}
     </div>
-    <p className="activity-digest-privacy"><Check size={14}/> Activity records and saved summaries are stored locally in this browser. They are not uploaded to Grand Lumen's servers.</p>
+    {deleteTarget && <div className="activity-digest-security-backdrop" role="presentation"><section className="activity-digest-security-dialog" role="dialog" aria-modal="true" aria-labelledby="activity-digest-security-title"><span className="eyebrow">OWNER CONSENT REQUIRED</span><h3 id="activity-digest-security-title">{deleteTarget.kind === "all" ? "Clear all activity records?" : deleteTarget.kind === "entry" ? "Delete this activity record?" : "Delete this saved summary?"}</h3><p>{deleteTarget.kind === "all" ? "This permanently removes all recorded activity from this browser for the current account. Saved summaries will remain." : "This action permanently removes the selected item from this browser."} Verify your account password to confirm that you authorize this change.</p><label htmlFor="activity-digest-delete-password">Account password</label><input id="activity-digest-delete-password" type="password" autoComplete="current-password" value={deletePassword} onChange={event => setDeletePassword(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void confirmDelete(); }} placeholder="Enter your password"/>{deleteError && <p className="activity-digest-security-error" role="alert">{deleteError}</p>}<div className="activity-digest-security-actions"><button className="quiet-button" onClick={() => setDeleteTarget(null)} disabled={deleteBusy}>Cancel</button><button className="solid-button" onClick={() => void confirmDelete()} disabled={deleteBusy || !deletePassword}>{deleteBusy ? "Verifying…" : "Verify & delete"}</button></div></section></div>}
+    <p className="activity-digest-privacy"><Check size={14}/> Activity records and saved summaries are stored locally in this browser. They are not uploaded to Grand Lumen's servers. Destructive actions require account-password verification.</p>
   </div>;
 }
