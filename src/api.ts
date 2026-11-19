@@ -189,3 +189,46 @@ export function connectionAwareMessage(error: unknown, fallback: string): string
   const networkFailure = typeof navigator !== "undefined" && !navigator.onLine || error instanceof TypeError || /failed to fetch|networkerror|network request failed|load failed|fetch failed|internet connection|connection (?:was )?lost|offline/i.test(message);
   return networkFailure ? "Connect to the internet to use this feature." : message || fallback;
 }
+
+
+export type LumenSearchResult = {
+  title: string;
+  description: string;
+  url: string;
+  source: string;
+  kind: string;
+};
+
+export async function searchLumenServices(query: string): Promise<LumenSearchResult[]> {
+  const term = query.trim();
+  if (!term) return [];
+  const requests = await Promise.allSettled([
+    fetch("https://en.wikipedia.org/w/rest.php/v1/search/page?q=" + encodeURIComponent(term) + "&limit=5").then(async response => {
+      if (!response.ok) throw new Error("Knowledge search unavailable");
+      const data = await response.json();
+      return (data.pages || []).map((item: any) => ({ title: item.title, description: item.description || item.excerpt?.replace(/<[^>]*>/g, "") || "Knowledge article", url: "https://en.wikipedia.org/wiki/" + encodeURIComponent(item.key), source: "Wikipedia", kind: "Knowledge" }));
+    }),
+    fetch("https://api.github.com/search/repositories?q=" + encodeURIComponent(term) + "&sort=stars&per_page=5", { headers: { Accept: "application/vnd.github+json" } }).then(async response => {
+      if (!response.ok) throw new Error("Developer search unavailable");
+      const data = await response.json();
+      return (data.items || []).map((item: any) => ({ title: item.full_name, description: item.description || "GitHub repository", url: item.html_url, source: "GitHub", kind: "Developer" }));
+    }),
+    fetch("https://hn.algolia.com/api/v1/search?query=" + encodeURIComponent(term) + "&tags=story").then(async response => {
+      if (!response.ok) throw new Error("Discussion search unavailable");
+      const data = await response.json();
+      return (data.hits || []).slice(0, 5).map((item: any) => ({ title: item.title || "Community discussion", description: item.author ? "Posted by " + item.author : "Hacker News discussion", url: item.url || "https://news.ycombinator.com/item?id=" + item.objectID, source: "Hacker News", kind: "Discussion" }));
+    }),
+    fetch("https://openlibrary.org/search.json?q=" + encodeURIComponent(term) + "&limit=5").then(async response => {
+      if (!response.ok) throw new Error("Book search unavailable");
+      const data = await response.json();
+      return (data.docs || []).map((item: any) => ({ title: item.title || "Untitled book", description: [item.author_name?.slice(0, 2).join(", "), item.first_publish_year].filter(Boolean).join(" · ") || "Book record", url: item.key ? "https://openlibrary.org" + item.key : "https://openlibrary.org/search?q=" + encodeURIComponent(term), source: "Open Library", kind: "Books" }));
+    })
+  ]);
+  const results = requests.flatMap(item => item.status === "fulfilled" ? item.value : []);
+  const unique = new Map<string, LumenSearchResult>();
+  results.forEach(item => {
+    if (item.url && !unique.has(item.url)) unique.set(item.url, item);
+  });
+  if (!unique.size) throw new Error("Search services are temporarily unavailable. Connect to the internet and try again.");
+  return Array.from(unique.values());
+}
