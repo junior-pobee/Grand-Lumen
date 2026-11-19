@@ -1677,7 +1677,7 @@ function GlobalReminderMonitor() {
   if (!due.length) return null;
   return <div className="lh-reminder-backdrop" role="presentation" style={{ position: "fixed", inset: 0, zIndex: 100000, display: "grid", placeItems: "center" }}>
     <section className="lh-reminder-dialog" role="dialog" aria-modal="true" aria-labelledby="lh-global-reminder-title">
-      <div className="lh-reminder-dialog-head"><CalendarDays size={22}/><span><b id="lh-global-reminder-title">Reminder alert</b><small>{due.length} reminder{due.length === 1 ? "" : "s"} due</small></span></div>
+      <div className="lh-reminder-dialog-head"><CheckCircle2 size={22}/><span><b id="lh-global-reminder-title">Reminder alert</b><small>{due.length} reminder{due.length === 1 ? "" : "s"} due</small></span></div>
       <p>You have reminders that are due. Mark each one as read to clear it from this alert.</p>
       <div className="lh-reminder-due-list">{due.map(item => <article key={item.id}><div><b>{item.title}</b><small>{new Date(item.when).toLocaleString()}</small></div><button onClick={() => markRead(item.id)}><CheckCircle2 size={15}/> Mark as read</button></article>)}</div>
       <button className="lh-reminder-mark-all" onClick={() => markRead()}>Mark all as read</button>
