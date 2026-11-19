@@ -110,9 +110,9 @@ npm run preview
 
 Grand Lumen is published through GitHub Pages using the repository's GitHub Actions workflow.
 
-- **Live application:** https://junior-pobee.github.io/Grand-Lumen/
-- **Source repository:** https://github.com/junior-pobee/Grand-Lumen
-- **Deployment workflow:** https://github.com/junior-pobee/Grand-Lumen/actions
+- **Live application:** [Open Grand Lumen](https://junior-pobee.github.io/Grand-Lumen/)
+- **Source repository:** [View the GitHub repository](https://github.com/junior-pobee/Grand-Lumen)
+- **Deployment workflow:** [View deployment runs](https://github.com/junior-pobee/Grand-Lumen/actions)
 
 ## ✦ Current implementation notes
 
