@@ -889,3 +889,22 @@ body{top:0!important}
 .clear-data-confirm:disabled{opacity:.45;cursor:not-allowed}
 .clear-data-dialog>small{display:block;margin-top:15px;color:var(--muted,#9aa8bd);font-size:11px;line-height:1.5}
 @media(max-width:520px){.clear-data-dialog{padding:24px 20px}.clear-data-dialog h2{font-size:21px}.clear-data-actions{flex-direction:column-reverse}.clear-data-actions button{width:100%;min-height:44px}}
+
+.lh-error{padding:10px 12px;border:1px solid rgba(220,75,75,.35);border-radius:9px;background:rgba(220,75,75,.09);color:var(--text);font-size:11px;line-height:1.6}
+.lh-reminder-backdrop{position:fixed;inset:0;z-index:15000;display:grid;place-items:center;padding:18px;background:rgba(9,18,34,.34);backdrop-filter:blur(9px);-webkit-backdrop-filter:blur(9px);animation:lh-reminder-fade .22s ease both}
+.lh-reminder-dialog{width:min(560px,100%);max-height:min(82vh,720px);overflow:auto;padding:22px;border:1px solid rgba(255,255,255,.52);border-radius:20px;background:rgba(247,250,255,.88);color:#172033;box-shadow:0 24px 90px rgba(7,18,38,.28);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);animation:lh-reminder-rise .24s ease both}
+.lh-reminder-dialog-head{display:flex;align-items:center;gap:12px;color:#245a9d}
+.lh-reminder-dialog-head>span{display:grid;gap:3px}
+.lh-reminder-dialog-head b{font-size:17px}
+.lh-reminder-dialog-head small,.lh-reminder-dialog>p{color:#58677d;font-size:11px;line-height:1.6}
+.lh-reminder-dialog>p{margin:12px 0 16px}
+.lh-reminder-due-list{display:grid;gap:9px}
+.lh-reminder-due-list article{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px;border:1px solid rgba(80,105,140,.2);border-radius:12px;background:rgba(255,255,255,.68)}
+.lh-reminder-due-list article>div{display:grid;gap:4px;min-width:0}
+.lh-reminder-due-list article b{font-size:12px;overflow-wrap:anywhere}
+.lh-reminder-due-list article small{color:#64748b;font-size:10px}
+.lh-reminder-due-list button,.lh-reminder-mark-all{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:35px;padding:8px 11px;border:1px solid rgba(48,111,190,.24);border-radius:9px;background:rgba(55,130,220,.12);color:#174c87;font:inherit;font-size:10px;font-weight:750;cursor:pointer;white-space:nowrap}
+.lh-reminder-mark-all{width:100%;margin-top:12px;background:#2675c9;color:#fff;border-color:#2675c9}
+@keyframes lh-reminder-fade{from{opacity:0}to{opacity:1}}
+@keyframes lh-reminder-rise{from{opacity:0;transform:translateY(12px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:520px){.lh-reminder-dialog{padding:17px;border-radius:16px}.lh-reminder-due-list article{align-items:stretch;flex-direction:column}.lh-reminder-due-list button{width:100%}}
