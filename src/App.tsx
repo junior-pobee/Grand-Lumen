@@ -1797,8 +1797,19 @@ function App() {
       if (!action || action.length < 2) return;
       recordActivity(action.slice(0, 100));
     };
+    const captureFieldChange = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) return;
+      if (target instanceof HTMLInputElement && ["password", "hidden", "file"].includes(target.type)) return;
+      const label = target.getAttribute("aria-label") || target.getAttribute("placeholder") || target.name || target.closest("label")?.innerText || target.tagName.toLowerCase();
+      recordActivity("Updated " + label.replace(/\s+/g, " ").trim().slice(0, 70));
+    };
     document.addEventListener("click", captureActivity, true);
-    return () => document.removeEventListener("click", captureActivity, true);
+    document.addEventListener("change", captureFieldChange, true);
+    return () => {
+      document.removeEventListener("click", captureActivity, true);
+      document.removeEventListener("change", captureFieldChange, true);
+    };
   }, [activityStorageKey, section]);
   useEffect(() => {
     const captureInstall = (event: Event) => {
