@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Activity, Newspaper, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, CheckCircle2, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, Eye, EyeOff, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, LocateFixed, LockKeyhole, LogIn, LogOut, Mail, MapPin, Maximize2, Menu, Moon, MonitorSmartphone, Navigation, Play, Plus, Search, Send, Settings, ShieldCheck, Sparkles, Sun, Terminal, UserRound, Video, Wallet, X, Zap, QrCode, ScanLine, Share2, Upload, Download, Smartphone } from "lucide-react";
+import { Activity, Bell, Newspaper, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, CheckCircle2, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, Eye, EyeOff, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, LocateFixed, LockKeyhole, LogIn, LogOut, Mail, MapPin, Maximize2, Menu, Moon, MonitorSmartphone, Navigation, Play, Plus, Search, Send, Settings, ShieldCheck, Sparkles, Sun, Terminal, UserRound, Video, Wallet, X, Zap, QrCode, ScanLine, Share2, Upload, Download, Smartphone } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import Peer from "peerjs";
 import GraphWorkspace from "./GraphWorkspace";
@@ -1707,6 +1707,41 @@ function GlobalReminderMonitor() {
     </section>
   </div>;
 }
+
+function AlertCenter() {
+  const [items, setItems] = useState<ReminderRecord[]>([]);
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const refresh = () => {
+      try { setItems(JSON.parse(localStorage.getItem("lumenReminders") || "[]") as ReminderRecord[]); } catch { setItems([]); }
+    };
+    refresh();
+    window.addEventListener("storage", refresh);
+    window.addEventListener("lumen-reminders-updated", refresh);
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("lumen-reminders-updated", refresh);
+    };
+  }, []);
+  const unread = items.filter(item => item.notified && !item.read);
+  const markRead = (id?: string) => {
+    const next = items.map(item => item.notified && !item.read && (!id || item.id === id) ? { ...item, read: true } : item);
+    localStorage.setItem("lumenReminders", JSON.stringify(next));
+    setItems(next);
+    window.dispatchEvent(new CustomEvent("lumen-reminders-updated"));
+  };
+  return <div className="alert-center">
+    <button className="icon-button alert-center-trigger" onClick={() => setOpen(value => !value)} aria-label="Open alerts" aria-expanded={open}>
+      <Bell size={17}/>{unread.length > 0 && <span className="alert-center-count">{unread.length > 99 ? "99+" : unread.length}</span>}
+    </button>
+    {open && <><button className="alert-center-dismiss" aria-label="Close alerts" onClick={() => setOpen(false)}/><section className="alert-center-panel" aria-label="Alerts">
+      <div className="alert-center-heading"><div><span className="eyebrow">GRAND-LUMEN</span><h3>Alerts</h3><p>{unread.length ? unread.length + " unread reminder" + (unread.length === 1 ? "" : "s") : "You're all caught up."}</p></div><button className="quiet-button" onClick={() => setOpen(false)} aria-label="Close alerts"><X size={16}/></button></div>
+      {items.length ? <div className="alert-center-list">{[...items].sort((a,b) => new Date(b.when).getTime() - new Date(a.when).getTime()).map(item => <article className={item.notified && !item.read ? "alert-center-item unread" : "alert-center-item"} key={item.id}><span className="alert-center-item-icon"><Bell size={15}/></span><div><b>{item.title}</b><small>{new Date(item.when).toLocaleString()}</small><span>{item.notified ? item.read ? "Read" : "Due · Unread" : "Scheduled"}</span></div>{item.notified && !item.read && <button onClick={() => markRead(item.id)}>Mark read</button>}</article>)}</div> : <div className="alert-center-empty"><Bell size={24}/><b>No alerts yet</b><span>Reminders created in Lumen Hub will appear here when they become due.</span></div>}
+      {unread.length > 1 && <button className="alert-center-mark-all" onClick={() => markRead()}>Mark all as read</button>}
+    </section></>}
+  </div>;
+}
+
 function App() {
   const [section, setSection] = useState<Section>("Home");
   const [session, setSession] = useState<Session | null>(null);
@@ -2279,7 +2314,7 @@ function App() {
           <header className="topbar">
             <button className="icon-button mobile-only" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle navigation"><Menu size={19} /></button>
             <div className="breadcrumb"><span>GRAND-LUMEN</span><ArrowRight size={13} /><b>{section.toUpperCase()}</b></div>
-            <div className="top-actions"><span className="system-status"><i /> SYSTEM READY</span><span className="signed-in-email">{session?.user.email || localProfile?.email || "LOCAL WORKSPACE"}</span><button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => void handleLogout()} aria-label="Sign out"><LogOut size={16} /></button></div>
+            <div className="top-actions"><span className="system-status"><i /> SYSTEM READY</span><AlertCenter /><span className="signed-in-email">{session?.user.email || localProfile?.email || "LOCAL WORKSPACE"}</span><button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => void handleLogout()} aria-label="Sign out"><LogOut size={16} /></button></div>
           </header>
           <div className="content-wrap">
             {section === "Lumen Hub" && <section><PageTitle eyebrow="GLOBAL DIGITAL UTILITY PLATFORM" title={heading["Lumen Hub"]} description="Connected knowledge, everyday utilities, productivity, learning and accessibility tools. AI is intentionally excluded from this release."/><ExpansionHub language={appLanguage} userId={session?.user.id || ""} onOpenScanner={() => selectSection("Scanner")}/></section>}
