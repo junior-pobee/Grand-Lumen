@@ -1869,18 +1869,13 @@ function App() {
     document.documentElement.style.setProperty("--gl-interface-scale", String(interfaceScale));
     document.documentElement.style.setProperty("--gl-font-family", fontFamily);
     document.documentElement.style.setProperty("--gl-font-weight", fontWeight);
-    const appShell = document.querySelector<HTMLElement>(".app-shell");
-    if (appShell) {
-      appShell.style.setProperty("--gl-font-family", fontFamily);
-      appShell.style.setProperty("--gl-font-weight", fontWeight);
-      appShell.style.setProperty("font-family", fontFamily, "important");
-      appShell.style.setProperty("font-weight", fontWeight, "important");
-      appShell.querySelectorAll<HTMLElement>("*").forEach(element => {
-        if (element.closest("pre, code, .lh-code-editor")) return;
-        element.style.setProperty("font-family", fontFamily, "important");
-        element.style.setProperty("font-weight", fontWeight, "important");
-      });
+    let typographyStyle = document.getElementById("gl-typography-overrides") as HTMLStyleElement | null;
+    if (!typographyStyle) {
+      typographyStyle = document.createElement("style");
+      typographyStyle.id = "gl-typography-overrides";
+      document.head.appendChild(typographyStyle);
     }
+    typographyStyle.textContent = `.app-shell,.app-shell *:not(svg):not(path):not(i):not(pre):not(code):not(.lh-code-editor){font-family:${fontFamily}!important;font-weight:${fontWeight}!important}.app-shell .preference-preview,.app-shell .preference-preview *{font-family:${fontFamily}!important;font-weight:${fontWeight}!important}.app-shell pre,.app-shell code,.app-shell .lh-code-editor{font-family:ui-monospace,monospace!important}`;
   }, [fontScale, interfaceScale, fontFamily, fontWeight]);
 
   useEffect(() => {
