@@ -2130,14 +2130,15 @@ function App() {
     let active = true;
     supabase.auth.getSession().then(({ data }) => {
       if (active) {
-        setSession(data.session);
-        setWelcomeTourOpen(Boolean(data.session?.user.user_metadata?.grand_lumen_onboarding_pending && localStorage.getItem("grandLumenTourCompleted:" + data.session.user.id) !== "true"));
+        const activeSession = data.session;
+        setSession(activeSession);
+        setWelcomeTourOpen(Boolean(activeSession && activeSession.user.user_metadata?.grand_lumen_onboarding_pending && localStorage.getItem("grandLumenTourCompleted:" + activeSession.user.id) !== "true"));
         setAuthReady(true);
       }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
-      setWelcomeTourOpen(Boolean(nextSession?.user.user_metadata?.grand_lumen_onboarding_pending && localStorage.getItem("grandLumenTourCompleted:" + nextSession.user.id) !== "true"));
+      setWelcomeTourOpen(Boolean(nextSession && nextSession.user.user_metadata?.grand_lumen_onboarding_pending && localStorage.getItem("grandLumenTourCompleted:" + nextSession.user.id) !== "true"));
       setAuthReady(true);
     });
     return () => {
@@ -2465,7 +2466,7 @@ function App() {
           <footer className="app-footer"><span>GRAND-LUMEN</span><span>EXPLORE BEYOND · BUILD WHAT COMES NEXT</span><span>FOUNDATION 1.0</span></footer>
         </main>
       </div>
-      {welcomeTourOpen && <WelcomeTour name={session?.user.user_metadata?.full_name || localProfile?.fullName || session?.user.email || "explorer"} onComplete={completeWelcomeTour} />}
+      {!loading && welcomeTourOpen && <WelcomeTour name={session?.user.user_metadata?.full_name || localProfile?.fullName || session?.user.email || "explorer"} onComplete={completeWelcomeTour} />}
     </>
   );
 }
