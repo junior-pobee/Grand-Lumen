@@ -2105,7 +2105,7 @@ function App() {
     Scanner: "Scan the physical world.",
     Share: "Send it across.",
     Saved: "Your knowledge vault.",
-    "Activity Digest": "Your workspace, remembered."
+    "Activity Digest": "Your workspace, remembered.",
     Projects: "Your creation space.",
     "Creative Studio": "Create beyond limits.",
     Messages: "Connect and communicate.",
