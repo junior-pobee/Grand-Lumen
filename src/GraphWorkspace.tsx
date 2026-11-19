@@ -203,9 +203,6 @@ export default function GraphWorkspace() {
     return acc + (index === 0 || !Number.isFinite(curve[index - 1]?.y) ? "M" : "L") + sx(point.x).toFixed(2) + "," + sy(point.y).toFixed(2) + " ";
   }, "");
   const pointPath = plotPoints.map((p, i) => ({ ...p, cx: sx(p.x), cy: sy(p.y), index: i }));
-  const pieTotal = points.reduce((sum, point) => sum + Math.max(0, point.y), 0);
-  const pieSegments = points.filter(point => point.y > 0 && pieTotal > 0).reduce<{label:string;value:number;offset:number}[]>((items, point) => { const offset = items.reduce((sum, item) => sum + item.value, 0); items.push({label:String(point.x),value:point.y / pieTotal * 100,offset}); return items; }, []);
-  const barWidth = Math.max(8, (width - left - right) / Math.max(points.length, 1) * 0.58);
   const fitPath = fitLine.length ? "M" + fitLine.map(p => sx(p.x).toFixed(2) + "," + sy(p.y).toFixed(2)).join(" L") : "";
 
   const applyPreset = (name: string) => {
