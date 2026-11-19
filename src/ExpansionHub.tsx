@@ -358,11 +358,33 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
     setCountryError("");
     setCountryData(null);
     try {
-      const response = await fetch("https://restcountries.com/v3.1/name/" + encodeURIComponent(query));
-      const data = await response.json();
-      if (!response.ok || !Array.isArray(data) || !data.length) throw new Error(data?.message || "No matching country was found. Check the spelling and try again.");
-      const match = data.find((item: any) => item.name?.common?.toLowerCase() === query.toLowerCase()) || data[0];
-      setCountryData(match);
+      const response = await fetch("https://countries.dev/name/" + encodeURIComponent(query), { headers: { Accept: "application/json" } });
+      if (!response.ok) {
+        if (response.status === 404) throw new Error("No matching country was found. Check the spelling and try again.");
+        if (response.status === 429) throw new Error("Country lookup is busy. Please wait a moment and try again.");
+        throw new Error("Country information is temporarily unavailable. Please try again.");
+      }
+      const payload = await response.json();
+      const raw = Array.isArray(payload) ? payload[0] : payload?.data?.country || payload?.data || payload;
+      if (!raw || !(raw.name || raw.country)) throw new Error("The country service returned an incomplete result. Please try again.");
+      const currencyList = Array.isArray(raw.currencies) ? raw.currencies : [];
+      const languageList = Array.isArray(raw.languages) ? raw.languages : [];
+      const currencyMap = Object.fromEntries(currencyList.map((item: any) => [item.code || item.isoCode || item.name, { name: item.name || item.code, symbol: item.symbol || "" }]));
+      const languageMap = Object.fromEntries(languageList.map((item: any, index: number) => [item.code || item.iso639_1 || String(index), item.name || String(item)]));
+      const normalized = {
+        name: { common: raw.name || raw.country },
+        flag: raw.flagEmoji || raw.emoji || "",
+        flags: { svg: typeof raw.flag === "string" && raw.flag.startsWith("http") ? raw.flag : "" },
+        capital: raw.capital ? [raw.capital] : [],
+        region: raw.region || "",
+        subregion: raw.subregion || "",
+        population: Number(raw.population || 0),
+        area: Number(raw.area || 0),
+        currencies: currencyMap,
+        languages: languageMap,
+        maps: raw.maps || {}
+      };
+      setCountryData(normalized);
     } catch (error) {
       setCountryError(error instanceof Error ? error.message : "Country lookup failed. Check your connection and try again.");
     } finally {
