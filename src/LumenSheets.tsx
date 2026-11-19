@@ -109,7 +109,6 @@ export default function LumenSheets({ userId }: { userId: string }) {
     setSheet(activeSheet);
     setCells(activeSheet ? stored.cells[activeSheet.id] || {} : {});
     setSelected("A1");
-    setMembers([]);
     setNotice("Workbook loaded from this device.");
   };
 
