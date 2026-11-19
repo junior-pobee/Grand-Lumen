@@ -1055,3 +1055,8 @@ html[data-theme="light"] .gl-welcome-tour-actions>button{border-color:rgba(74,11
 @keyframes gl-tour-copy-in{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:760px){.gl-welcome-tour-layer{padding:calc(env(safe-area-inset-top,0px) + 64px) 9px 9px}.gl-welcome-tour{width:calc(100vw - 18px);max-height:min(180px,calc(100dvh - 82px));padding:10px 11px 9px;border-radius:14px}.gl-welcome-tour-copy h2{font-size:14px}.gl-welcome-tour-copy p{font-size:10px;line-height:1.48}.gl-welcome-tour-topline>button{width:25px;height:25px;flex-basis:25px}}
 @media(prefers-reduced-motion:reduce){.gl-welcome-tour,.gl-welcome-tour-copy,.gl-welcome-tour-copy h2,.gl-welcome-tour-copy p,.gl-welcome-tour-progress span{animation:none!important;transition:none!important}.gl-welcome-tour-copy h2,.gl-welcome-tour-copy p{clip-path:none!important}.gl-welcome-tour-copy h2:not(.is-visible),.gl-welcome-tour-copy p:not(.is-visible){opacity:1}}
+
+
+.portal-auth-card .portal-input input{color:#b9f6d0!important;-webkit-text-fill-color:#b9f6d0!important;caret-color:#b9f6d0}
+.portal-auth-card .portal-input input::placeholder{color:rgba(185,246,208,.58)!important;-webkit-text-fill-color:rgba(185,246,208,.58)!important;opacity:1}
+.portal-auth-card .portal-input input:-webkit-autofill,.portal-auth-card .portal-input input:-webkit-autofill:hover,.portal-auth-card .portal-input input:-webkit-autofill:focus{-webkit-text-fill-color:#b9f6d0!important;caret-color:#b9f6d0;transition:background-color 999999s ease-out 0s;box-shadow:0 0 0 1000px rgba(2,9,20,.3) inset}
