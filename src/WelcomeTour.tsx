@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRight, Sparkles, X } from "lucide-react";
 
 type WelcomeTourProps = {
@@ -32,6 +32,11 @@ const tourSteps = [
 
 export default function WelcomeTour({ name, onComplete }: WelcomeTourProps) {
   const [step, setStep] = useState(-1);
+  const onCompleteRef = useRef(onComplete);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
   const [visibleText, setVisibleText] = useState(false);
   const total = tourSteps.length + 1;
   const current = step < 0
@@ -43,17 +48,17 @@ export default function WelcomeTour({ name, onComplete }: WelcomeTourProps) {
     const reveal = window.setTimeout(() => setVisibleText(true), 80);
     const advance = window.setTimeout(() => {
       if (step < tourSteps.length - 1) setStep(value => value + 1);
-      else onComplete();
+      else onCompleteRef.current();
     }, 5200);
     return () => {
       window.clearTimeout(reveal);
       window.clearTimeout(advance);
     };
-  }, [step, onComplete]);
+  }, [step]);
 
   const next = () => {
     if (step < tourSteps.length - 1) setStep(value => value + 1);
-    else onComplete();
+    else onCompleteRef.current();
   };
 
   return (
