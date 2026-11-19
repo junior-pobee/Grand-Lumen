@@ -1624,6 +1624,66 @@ function NewsWorkspace() {
     {selected && <div className="news-detail-backdrop" onClick={()=>setSelected(null)}><article className="news-detail" onClick={event=>event.stopPropagation()}><button className="news-detail-close" onClick={()=>setSelected(null)} aria-label="Close"><X size={18}/></button>{selected.image&&<img src={selected.image} alt=""/>}<span className="eyebrow">{selected.country} · {selected.source}</span><h2>{selected.title}</h2><p>{selected.description}</p><div className="news-publisher-note">This result is indexed from its original publisher or digitised archive. The full article, newspaper scan, images and any available video are provided by the source.</div><a className="solid-button news-open-publisher" href={selected.url} target="_blank" rel="noreferrer">Open complete source <ExternalLink size={15}/></a></article></div>}
   </div>;
 }
+type ReminderRecord = { id: string; title: string; when: string; notified: boolean; read?: boolean };
+
+function GlobalReminderMonitor() {
+  const [items, setItems] = useState<ReminderRecord[]>(() => {
+    try { return JSON.parse(localStorage.getItem("lumenReminders") || "[]") as ReminderRecord[]; } catch { return []; }
+  });
+  useEffect(() => {
+    const readItems = () => {
+      try { setItems(JSON.parse(localStorage.getItem("lumenReminders") || "[]") as ReminderRecord[]); } catch { setItems([]); }
+    };
+    const checkDue = () => {
+      let current: ReminderRecord[] = [];
+      try { current = JSON.parse(localStorage.getItem("lumenReminders") || "[]") as ReminderRecord[]; } catch { current = []; }
+      let changed = false;
+      const now = Date.now();
+      const next = current.map(item => {
+        const dueAt = new Date(item.when).getTime();
+        if (!item.notified && Number.isFinite(dueAt) && dueAt <= now) {
+          changed = true;
+          if ("Notification" in window && Notification.permission === "granted" && "serviceWorker" in navigator) {
+            void navigator.serviceWorker.ready.then(registration => registration.showNotification("Grand Lumen reminder", { body: item.title, tag: "lumen-reminder-" + item.id, data: { reminderId: item.id } })).catch(() => undefined);
+          }
+          return { ...item, notified: true, read: false };
+        }
+        return item;
+      });
+      if (changed) { localStorage.setItem("lumenReminders", JSON.stringify(next)); window.dispatchEvent(new CustomEvent("lumen-reminders-updated")); }
+      setItems(next);
+    };
+    checkDue();
+    const timer = window.setInterval(checkDue, 1000);
+    window.addEventListener("focus", checkDue);
+    document.addEventListener("visibilitychange", checkDue);
+    window.addEventListener("storage", readItems);
+    window.addEventListener("lumen-reminders-updated", readItems);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", checkDue);
+      document.removeEventListener("visibilitychange", checkDue);
+      window.removeEventListener("storage", readItems);
+      window.removeEventListener("lumen-reminders-updated", readItems);
+    };
+  }, []);
+  const due = items.filter(item => item.notified && !item.read);
+  const markRead = (id?: string) => {
+    const next = items.map(item => item.notified && !item.read && (!id || item.id === id) ? { ...item, read: true } : item);
+    localStorage.setItem("lumenReminders", JSON.stringify(next));
+    setItems(next);
+    window.dispatchEvent(new CustomEvent("lumen-reminders-updated"));
+  };
+  if (!due.length) return null;
+  return <div className="lh-reminder-backdrop" role="presentation" style={{ position: "fixed", inset: 0, zIndex: 100000, display: "grid", placeItems: "center" }}>
+    <section className="lh-reminder-dialog" role="dialog" aria-modal="true" aria-labelledby="lh-global-reminder-title">
+      <div className="lh-reminder-dialog-head"><CalendarDays size={22}/><span><b id="lh-global-reminder-title">Reminder alert</b><small>{due.length} reminder{due.length === 1 ? "" : "s"} due</small></span></div>
+      <p>You have reminders that are due. Mark each one as read to clear it from this alert.</p>
+      <div className="lh-reminder-due-list">{due.map(item => <article key={item.id}><div><b>{item.title}</b><small>{new Date(item.when).toLocaleString()}</small></div><button onClick={() => markRead(item.id)}><CheckCircle2 size={15}/> Mark as read</button></article>)}</div>
+      <button className="lh-reminder-mark-all" onClick={() => markRead()}>Mark all as read</button>
+    </section>
+  </div>;
+}
 function App() {
   const [section, setSection] = useState<Section>("Home");
   const [session, setSession] = useState<Session | null>(null);
@@ -2174,6 +2234,7 @@ function App() {
         <div className="ls-status-text">{status}</div>
         <div className="ls-credit">A NEW WORLD OF POSSIBILITIES</div>
       </div>}
+      <GlobalReminderMonitor />
       <div className={theme === "light" ? "app-shell theme-light" : "app-shell theme-dark"} style={{ "--gl-font-scale": fontScale, "--gl-interface-scale": interfaceScale, "--gl-font-family": fontFamily, "--gl-font-weight": fontWeight } as React.CSSProperties}>
         {appLanguage !== "en" && <button className="language-default-fab" onClick={resetToEnglish} aria-label="Switch back to English"><Globe2 size={15} /><span>English</span><ArrowRight size={13} /></button>}
         <aside className={mobileMenu ? "sidebar open" : "sidebar"}>
