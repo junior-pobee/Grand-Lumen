@@ -188,7 +188,8 @@ const toolCards = [
   ["Weather","Current conditions and forecast",Globe2],
   ["Currency","Live reference-rate conversion",Wallet],
   ["Pokédex","Explore Pokémon data",Atom],
-  ["Public Holidays","Explore national holiday calendars",Activity]
+  ["Public Holidays","Explore national holiday calendars",Activity],
+  ["Alerts","Create and manage reminders",Bell]
 ] as const;
 
 
@@ -1742,6 +1743,52 @@ function AlertCenter() {
   </div>;
 }
 
+function ReminderToolsWorkspace() {
+  const [items, setItems] = useState<ReminderRecord[]>(() => {
+    try { return JSON.parse(localStorage.getItem("lumenReminders") || "[]") as ReminderRecord[]; } catch { return []; }
+  });
+  const [title, setTitle] = useState("");
+  const [when, setWhen] = useState("");
+  const [message, setMessage] = useState("");
+  useEffect(() => {
+    const refresh = () => {
+      try { setItems(JSON.parse(localStorage.getItem("lumenReminders") || "[]") as ReminderRecord[]); } catch { setItems([]); }
+    };
+    window.addEventListener("lumen-reminders-updated", refresh);
+    window.addEventListener("storage", refresh);
+    return () => {
+      window.removeEventListener("lumen-reminders-updated", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
+  const saveItems = (next: ReminderRecord[]) => {
+    localStorage.setItem("lumenReminders", JSON.stringify(next));
+    setItems(next);
+    window.dispatchEvent(new CustomEvent("lumen-reminders-updated"));
+  };
+  const createReminder = async () => {
+    const dueAt = new Date(when).getTime();
+    if (!title.trim() || !when || !Number.isFinite(dueAt) || dueAt <= Date.now()) {
+      setMessage("Enter a reminder title and a future date and time.");
+      return;
+    }
+    if ("Notification" in window && Notification.permission === "default") {
+      try { await Notification.requestPermission(); } catch {}
+    }
+    saveItems([{ id: crypto.randomUUID(), title: title.trim(), when: new Date(dueAt).toISOString(), notified: false }, ...items]);
+    setTitle("");
+    setWhen("");
+    setMessage("Reminder saved. Grand-Lumen will alert you when it is due.");
+  };
+  const removeReminder = (id: string) => saveItems(items.filter(item => item.id !== id));
+  return <div className="reminder-tools-workspace">
+    <div className="reminder-tools-heading"><span className="alert-center-item-icon"><Bell size={18}/></span><div><h3>Notification settings</h3><p>Create and manage reminders across Grand-Lumen. These reminders are shared with Lumen Hub.</p></div></div>
+    <div className="reminder-tools-form"><label>Reminder title<input value={title} onChange={event => setTitle(event.target.value)} placeholder="What should Grand-Lumen remind you about?"/></label><label>Date and time<input type="datetime-local" value={when} onChange={event => setWhen(event.target.value)} min={new Date(Date.now() + 60000).toISOString().slice(0,16)}/></label><button className="solid-button" onClick={() => void createReminder()}><Plus size={15}/> Create reminder</button></div>
+    {message && <p className="reminder-tools-message" role="status">{message}</p>}
+    <div className="reminder-tools-list"><div className="reminder-tools-list-head"><b>Your reminders</b><span>{items.length} saved</span></div>{items.length ? [...items].sort((a,b) => new Date(a.when).getTime() - new Date(b.when).getTime()).map(item => <article key={item.id}><span className="alert-center-item-icon"><Bell size={15}/></span><div><b>{item.title}</b><small>{new Date(item.when).toLocaleString()}</small><span>{item.notified ? item.read ? "Read" : "Due · Unread" : "Scheduled"}</span></div><button onClick={() => removeReminder(item.id)} aria-label={"Delete reminder: " + item.title}><X size={16}/></button></article>) : <div className="alert-center-empty"><Bell size={24}/><b>No reminders yet</b><span>Create your first reminder above. It will also appear in Lumen Hub Alerts.</span></div>}</div>
+  </div>;
+}
+
 function App() {
   const [section, setSection] = useState<Section>("Home");
   const [session, setSession] = useState<Session | null>(null);
@@ -2314,7 +2361,7 @@ function App() {
           <header className="topbar">
             <button className="icon-button mobile-only" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle navigation"><Menu size={19} /></button>
             <div className="breadcrumb"><span>GRAND-LUMEN</span><ArrowRight size={13} /><b>{section.toUpperCase()}</b></div>
-            <div className="top-actions"><span className="system-status"><i /> SYSTEM READY</span><AlertCenter /><span className="signed-in-email">{session?.user.email || localProfile?.email || "LOCAL WORKSPACE"}</span><button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => void handleLogout()} aria-label="Sign out"><LogOut size={16} /></button></div>
+            <div className="top-actions"><span className="system-status"><i /> SYSTEM READY</span><div className="desktop-alert-center"><AlertCenter /></div><span className="signed-in-email">{session?.user.email || localProfile?.email || "LOCAL WORKSPACE"}</span><button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => void handleLogout()} aria-label="Sign out"><LogOut size={16} /></button></div>
           </header>
           <div className="content-wrap">
             {section === "Lumen Hub" && <section><PageTitle eyebrow="GLOBAL DIGITAL UTILITY PLATFORM" title={heading["Lumen Hub"]} description="Connected knowledge, everyday utilities, productivity, learning and accessibility tools. AI is intentionally excluded from this release."/><ExpansionHub language={appLanguage} userId={session?.user.id || ""} onOpenScanner={() => selectSection("Scanner")}/></section>}
@@ -2344,7 +2391,7 @@ function App() {
             {section === "Videos" && <section><PageTitle eyebrow="VIDEO DISCOVERY" title={heading.Videos} description="Search public video collections and preview available items inside your workspace." /><div className="search-panel"><Video size={18} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search documentaries, tutorials, science..." onKeyDown={e => e.key === "Enter" && runMediaSearch("videos")} /><button onClick={() => runMediaSearch("videos")} disabled={mediaBusy}>{mediaBusy ? "Searching..." : "Search videos"}</button></div><div className="quick-tags">{["Science","Technology","History","Education"].map(tag => <button key={tag} onClick={() => { setQuery(tag); runMediaSearch("videos", tag); }}>{tag}</button>)}</div><MediaResults items={mediaResults} busy={mediaBusy} error={error} kind="videos" onSave={toggleSave} onShare={item => openShare(item.title + "\n" + item.description + "\nVideo: " + item.url)} /></section>}
             {section === "Maps" && <section><PageTitle eyebrow="LOCATION & NAVIGATION" title={heading.Maps} description="Explore places with Google Maps, search destinations and use your device location when you choose to share it." /><MapWorkspace /></section>}
             {section === "Code Lab" && <section className="code-section"><PageTitle eyebrow="PROFESSIONAL DEVELOPMENT ENVIRONMENT" title="Build beyond limits." description="A multi-file coding workspace with project explorer, editor tabs, local terminal, live browser preview and project export."/><CodeStudioWorkspace /></section>}{section === "Learn" && <section><PageTitle eyebrow="GRAND-LUMEN ACADEMY" title="Learn by doing." description="Ten guided courses with lessons, examples and separate practice activities."/><LearnWorkspace/></section>}{section === "API Library" && <section><PageTitle eyebrow="INTEGRATION DIRECTORY" title={heading["API Library"]} description="A curated catalogue of public APIs and developer services for in-app experiences." /><div className="api-search"><Search size={17} /><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Find an API or capability..." /></div><div className="api-categories">{["All","Knowledge","Technology","Environment","Finance","Development","Science","Images","Media","AI","Language","Geography","Food","Utilities","Entertainment","Research","News"].map(item => <button className={apiFilter === item ? "selected" : ""} key={item} onClick={() => setApiFilter(item)}>{item}</button>)}</div><div className="api-grid">{filteredApis.map(item => <div className="api-card" key={item[0]}><div className="api-card-top"><span className="api-symbol"><Database size={17} /></span><span className={item[3] === "No key" ? "keyless" : "key-needed"}>{item[3]}</span></div><h3>{item[0]}</h3><p>{item[1]}</p><div className="api-card-bottom"><span>{item[2]}</span><div className="api-card-actions"><a className="api-source-link" href={apiSourceUrls[item[0]]} target="_blank" rel="noopener noreferrer" aria-label={`Open ${item[0]} official source documentation`}>Source link <ExternalLink size={13} /></a><button onClick={() => { setQuery(item[0]); setToolInput(item[0]); selectSection("Tools"); }}>Explore <ArrowRight size={13} /></button></div></div></div>)}</div></section>}
-            {section === "Tools" && <section><PageTitle eyebrow="UTILITY DECK" title={heading.Tools} description="A set of connected utilities that return useful information inside Grand-Lumen." /><div className="tool-layout"><div className="tool-list">{toolCards.map(([name,detail,Icon]) => <button className={tool === name ? "tool-option active" : "tool-option"} key={name} onClick={() => { setTool(name); setToolOutput(null); setError(""); }}><Icon size={17} /><span><b>{name}</b><small>{detail}</small></span><ChevronDown size={14} /></button>)}</div><div className="glass-card tool-workspace">{tool === "Calculator" ? <CalculatorWorkspace /> : tool === "Graph Studio" ? <GraphWorkspace /> : <><span className="eyebrow">ACTIVE UTILITY</span><h3>{tool}</h3>{tool === "Currency" && <div className="currency-row"><select value={currencyBase} onChange={e => setCurrencyBase(e.target.value)}>{["USD","GHS","EUR","GBP","NGN","CAD","JPY","INR","ZAR"].map(x => <option key={x}>{x}</option>)}</select><ArrowRight size={16} /><select value={currencyTarget} onChange={e => setCurrencyTarget(e.target.value)}>{["GHS","USD","EUR","GBP","NGN","CAD","JPY","INR","ZAR"].map(x => <option key={x}>{x}</option>)}</select></div>}<div className="tool-input-row"><input value={toolInput} onChange={e => setToolInput(e.target.value)} onKeyDown={e => e.key === "Enter" && runTool()} placeholder={tool === "Calculator" ? "Example: (25 * 4) / 2" : tool === "Weather" ? "Enter a city, e.g. Accra" : tool === "Pokédex" ? "Enter a Pokémon name" : tool === "Public Holidays" ? "Country code, e.g. GH" : "Enter a word"} /><button className="solid-button" onClick={runTool} disabled={busy}>{busy ? "Working..." : "Run tool"}</button></div>{error && <p className="error-text">{error}</p>}<ToolOutput output={toolOutput} tool={tool} /></>}</div></div></section>}
+            {section === "Tools" && <section><PageTitle eyebrow="UTILITY DECK" title={heading.Tools} description="A set of connected utilities that return useful information inside Grand-Lumen." /><div className="tool-layout"><div className="tool-list">{toolCards.map(([name,detail,Icon]) => <button className={tool === name ? "tool-option active" : "tool-option"} key={name} onClick={() => { setTool(name); setToolOutput(null); setError(""); }}><Icon size={17} /><span><b>{name}</b><small>{detail}</small></span><ChevronDown size={14} /></button>)}</div><div className="glass-card tool-workspace">{tool === "Alerts" ? <ReminderToolsWorkspace /> : tool === "Calculator" ? <CalculatorWorkspace /> : tool === "Graph Studio" ? <GraphWorkspace /> : <><span className="eyebrow">ACTIVE UTILITY</span><h3>{tool}</h3>{tool === "Currency" && <div className="currency-row"><select value={currencyBase} onChange={e => setCurrencyBase(e.target.value)}>{["USD","GHS","EUR","GBP","NGN","CAD","JPY","INR","ZAR"].map(x => <option key={x}>{x}</option>)}</select><ArrowRight size={16} /><select value={currencyTarget} onChange={e => setCurrencyTarget(e.target.value)}>{["GHS","USD","EUR","GBP","NGN","CAD","JPY","INR","ZAR"].map(x => <option key={x}>{x}</option>)}</select></div>}<div className="tool-input-row"><input value={toolInput} onChange={e => setToolInput(e.target.value)} onKeyDown={e => e.key === "Enter" && runTool()} placeholder={tool === "Calculator" ? "Example: (25 * 4) / 2" : tool === "Weather" ? "Enter a city, e.g. Accra" : tool === "Pokédex" ? "Enter a Pokémon name" : tool === "Public Holidays" ? "Country code, e.g. GH" : "Enter a word"} /><button className="solid-button" onClick={runTool} disabled={busy}>{busy ? "Working..." : "Run tool"}</button></div>{error && <p className="error-text">{error}</p>}<ToolOutput output={toolOutput} tool={tool} /></>}</div></div></section>}
             {section === "Saved" && <section><PageTitle eyebrow="PERSONAL KNOWLEDGE VAULT" title={heading.Saved} description="Keep useful discoveries close. Saved items remain in this browser." /><div className="saved-list"><Results items={saved} saved={saved} onSave={toggleSave} onShare={item => openShare(item.title + "\n\n" + item.description + "\n\n" + item.url)} busy={false} error="" /></div>{!saved.length && <EmptyState title="Your vault is ready." detail="Save search results to build your personal knowledge collection." />}</section>}
             {section === "Activity Digest" && <section><PageTitle eyebrow="WORKSPACE ACTIVITY" title={heading["Activity Digest"]} description="Review your recorded Grand Lumen activity and create summaries to copy, share or save."/><ActivityDigest entries={activityEntries} storageKey={activityStorageKey} onEntriesChange={next => { setActivityEntries(next); try { localStorage.setItem(activityStorageKey, JSON.stringify(next)); } catch { setError("Activity records could not be saved on this device."); } }} verifyPassword={verifyActivityPassword}/></section>}
             {section === "Creative Studio" && <section><PageTitle eyebrow="LUMEN CREATIVE" title="Creative Studio" description="Edit photographs and video clips with detailed controls, then export your finished work."/><CreativeStudio/></section>}{section === "Projects" && <section><PageTitle eyebrow="PROJECT MANAGEMENT" title={heading.Projects} description="Keep track of ideas and projects you are developing." /><div className="project-create"><input value={projectName} onChange={e => setProjectName(e.target.value)} onKeyDown={e => e.key === "Enter" && projectName.trim() && (setProjects([projectName.trim(), ...projects]), setProjectName(""))} placeholder="Name a project or idea..." /><button className="solid-button" onClick={() => { if (projectName.trim()) { setProjects([projectName.trim(), ...projects]); setProjectName(""); } }}><Plus size={15} /> Add project</button></div><div className="project-grid">{projects.map((name,index) => <div className="glass-card project-card" key={name + index}><span className="feature-icon"><Layers3 size={19} /></span><h3>{name}</h3><span className="muted">PERSONAL PROJECT</span><button onClick={() => setProjects(projects.filter((_,i) => i !== index))}>Remove <X size={13} /></button></div>)}</div>{!projects.length && <EmptyState title="A space for your next big idea." detail="Create your first project to start organising your work." />}</section>}
