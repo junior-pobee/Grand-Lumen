@@ -2166,17 +2166,6 @@ function App() {
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
-  useEffect(() => {
-    const smallScreen = window.matchMedia("(max-width: 760px)").matches;
-    localStorage.setItem(smallScreen ? "grandLumenFontScaleMobile" : "grandLumenFontScale", String(fontScale));
-    localStorage.setItem(smallScreen ? "grandLumenInterfaceScaleMobile" : "grandLumenInterfaceScale", String(interfaceScale));
-    localStorage.setItem("grandLumenFontFamily", fontFamily);
-    localStorage.setItem("grandLumenFontWeight", fontWeight);
-    document.documentElement.style.setProperty("--gl-font-scale", String(fontScale));
-    document.documentElement.style.setProperty("--gl-interface-scale", String(interfaceScale));
-    document.documentElement.style.setProperty("--gl-font-family", fontFamily);
-    document.documentElement.style.setProperty("--gl-font-weight", fontWeight);
-  }, [fontScale, interfaceScale, fontFamily, fontWeight]);
 
   useEffect(() => {
     const email = localProfile?.email || session?.user.email;
