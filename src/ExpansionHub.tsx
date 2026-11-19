@@ -7,7 +7,7 @@ type ModuleName = "Knowledge Graph" | "Verify" | "Document Intelligence" | "Conv
 type Task = { id: string; title: string; due: string; done: boolean };
 type Entry = { id: string; name: string; amount: number; kind: "Income" | "Expense"; date: string };
 type SavedFile = { id: string; name: string; type: string; size: number; data: string; savedAt: string };
-type Reminder = { id: string; title: string; when: string; notified: boolean };
+type Reminder = { id: string; title: string; when: string; notified: boolean; read?: boolean };
 type Resource = { title: string; description: string; url: string; source: string };
 
 async function loadExternalScript(src: string, globalName: string): Promise<any> {
@@ -151,9 +151,13 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
   const [currencyFrom, setCurrencyFrom] = useState("USD");
   const [currencyTo, setCurrencyTo] = useState("GHS");
   const [currencyData, setCurrencyData] = useState<any>(null);
+  const [currencyBusy, setCurrencyBusy] = useState(false);
+  const [currencyError, setCurrencyError] = useState("");
   const [worldTime, setWorldTime] = useState("Africa/Accra");
   const [countryQuery, setCountryQuery] = useState("");
   const [countryData, setCountryData] = useState<any>(null);
+  const [countryBusy, setCountryBusy] = useState(false);
+  const [countryError, setCountryError] = useState("");
   const [holidayCountry, setHolidayCountry] = useState("GH");
   const [holidayYear, setHolidayYear] = useState(String(new Date().getFullYear()));
   const [holidayData, setHolidayData] = useState<any[]>([]);
@@ -183,6 +187,7 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
   const [networkOnline, setNetworkOnline] = useState(navigator.onLine);
   const [notice, setNotice] = useState("");
   const [coreActivity, setCoreActivity] = useState("Core ready");
+  const dueReminders = reminders.filter(item => item.notified && !item.read);
 
   useEffect(() => {
     const localUpdate = (event: Event) => {
@@ -221,17 +226,31 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
   useEffect(() => {
     const check = () => {
       const now = Date.now();
-      setReminders(current => current.map(item => {
-        if (!item.notified && new Date(item.when).getTime() <= now) {
-          if ("Notification" in window && Notification.permission === "granted" && "serviceWorker" in navigator) { void navigator.serviceWorker.ready.then(registration => registration.showNotification("Grand Lumen reminder", { body: item.title })).catch(() => setNotice("The reminder is due, but this browser could not display its notification.")); }
-          return { ...item, notified: true };
-        }
-        return item;
-      }));
+      setReminders(current => {
+        let changed = false;
+        const next = current.map(item => {
+          if (!item.notified && new Date(item.when).getTime() <= now) {
+            changed = true;
+            if ("Notification" in window && Notification.permission === "granted" && "serviceWorker" in navigator) {
+              void navigator.serviceWorker.ready.then(registration => registration.showNotification("Grand Lumen reminder", { body: item.title, tag: "lumen-reminder-" + item.id, data: { reminderId: item.id } })).catch(() => undefined);
+            }
+            return { ...item, notified: true, read: false };
+          }
+          return item;
+        });
+        return changed ? next : current;
+      });
     };
-    const timer = window.setInterval(check, 30000);
     check();
-    return () => window.clearInterval(timer);
+    const timer = window.setInterval(check, 15000);
+    const onVisible = () => { if (document.visibilityState === "visible") check(); };
+    window.addEventListener("focus", check);
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", check);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, []);
 
   const balance = entries.reduce((sum, item) => sum + (item.kind === "Income" ? item.amount : -item.amount), 0);
@@ -329,14 +348,25 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
   }, [pdfPreviewUrl]);
 
   const lookupCountry = async () => {
-    if (!countryQuery.trim()) return;
+    const query = countryQuery.trim();
+    if (!query) {
+      setCountryError("Enter a country name first.");
+      setCountryData(null);
+      return;
+    }
+    setCountryBusy(true);
+    setCountryError("");
+    setCountryData(null);
     try {
-      const response = await fetch("https://restcountries.com/v3.1/name/" + encodeURIComponent(countryQuery) + "?fields=name,capital,region,subregion,population,area,currencies,languages,flags,maps");
-      if (!response.ok) throw new Error("Country information was not found.");
+      const response = await fetch("https://restcountries.com/v3.1/name/" + encodeURIComponent(query));
       const data = await response.json();
-      setCountryData(data[0] || null);
+      if (!response.ok || !Array.isArray(data) || !data.length) throw new Error(data?.message || "No matching country was found. Check the spelling and try again.");
+      const match = data.find((item: any) => item.name?.common?.toLowerCase() === query.toLowerCase()) || data[0];
+      setCountryData(match);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Country lookup failed.");
+      setCountryError(error instanceof Error ? error.message : "Country lookup failed. Check your connection and try again.");
+    } finally {
+      setCountryBusy(false);
     }
   };
 
@@ -375,13 +405,35 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
   };
 
   const convertCurrency = async () => {
+    const amount = Number(currencyAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setCurrencyError("Enter an amount greater than zero.");
+      setCurrencyData(null);
+      return;
+    }
+    setCurrencyBusy(true);
+    setCurrencyError("");
+    setCurrencyData(null);
     try {
-      const response = await fetch("https://api.frankfurter.dev/v1/latest?base=" + currencyFrom + "&symbols=" + currencyTo);
-      if (!response.ok) throw new Error("Exchange rates are unavailable.");
-      const data = await response.json();
-      setCurrencyData({ ...data, converted: Number(currencyAmount) * data.rates[currencyTo] });
+      let rate: number | undefined;
+      let rateDate = "";
+      if (currencyFrom === currencyTo) {
+        rate = 1;
+        rateDate = new Date().toISOString().slice(0, 10);
+      } else {
+        const response = await fetch("https://open.er-api.com/v6/latest/" + encodeURIComponent(currencyFrom));
+        if (!response.ok) throw new Error("The exchange-rate service could not be reached.");
+        const data = await response.json();
+        if (data.result !== "success") throw new Error(data["error-type"] || "Exchange rates are temporarily unavailable.");
+        rate = Number(data.rates?.[currencyTo]);
+        rateDate = data.time_last_update_utc || data.time_last_update_unix || "";
+      }
+      if (!Number.isFinite(rate)) throw new Error("This currency pair is not currently supported.");
+      setCurrencyData({ converted: amount * rate, rate, date: rateDate, base: currencyFrom, target: currencyTo });
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Currency conversion failed.");
+      setCurrencyError(error instanceof Error ? error.message : "Currency conversion failed. Check your connection and try again.");
+    } finally {
+      setCurrencyBusy(false);
     }
   };
 
@@ -571,7 +623,7 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
 
     {active === "Convert" && <Panel title="Universal unit converter" description="Convert length, mass, volume, speed, area, time, data size and temperature. Currency reference conversion is available in World."><div className="lh-input-row"><label className="lh-field">Category<select value={convertCategory} onChange={e => { const category = e.target.value; setConvertCategory(category); const first = category === "Temperature" ? "°C" : category === "Length" ? "m" : category === "Mass" ? "kg" : category === "Volume" ? "L" : category === "Speed" ? "m/s" : category === "Area" ? "m²" : category === "Time" ? "second" : "B"; const second = category === "Temperature" ? "°F" : category === "Length" ? "km" : category === "Mass" ? "g" : category === "Volume" ? "mL" : category === "Speed" ? "km/h" : category === "Area" ? "km²" : category === "Time" ? "minute" : "KB"; setConvertFrom(first); setConvertTo(second); setConvertResult(""); }}><option>Length</option><option>Mass</option><option>Volume</option><option>Speed</option><option>Area</option><option>Time</option><option>Data</option><option>Temperature</option></select></label><label className="lh-field">Value<input type="number" value={convertValue} onChange={e => setConvertValue(e.target.value)}/></label></div><div className="lh-input-row"><label className="lh-field">From<select value={convertFrom} onChange={e => setConvertFrom(e.target.value)}>{(convertCategory === "Temperature" ? ["°C","°F","K"] : Object.keys(({Length:{m:1,km:1,cm:1,mm:1,mi:1,ft:1,in:1,yd:1},Mass:{kg:1,g:1,mg:1,tonne:1,lb:1,oz:1},Volume:{L:1,mL:1,m3:1,"US gal":1,"UK gal":1},Speed:{"m/s":1,"km/h":1,mph:1,knot:1},Area:{"m²":1,"km²":1,"cm²":1,hectare:1,acre:1},Time:{second:1,minute:1,hour:1,day:1},Data:{B:1,KB:1,MB:1,GB:1,TB:1}} as Record<string,Record<string,number>>)[convertCategory] || {})).map(unit => <option key={unit}>{unit}</option>)}</select></label><label className="lh-field">To<select value={convertTo} onChange={e => setConvertTo(e.target.value)}>{(convertCategory === "Temperature" ? ["°C","°F","K"] : Object.keys(({Length:{m:1,km:1,cm:1,mm:1,mi:1,ft:1,in:1,yd:1},Mass:{kg:1,g:1,mg:1,tonne:1,lb:1,oz:1},Volume:{L:1,mL:1,m3:1,"US gal":1,"UK gal":1},Speed:{"m/s":1,"km/h":1,mph:1,knot:1},Area:{"m²":1,"km²":1,"cm²":1,hectare:1,acre:1},Time:{second:1,minute:1,hour:1,day:1},Data:{B:1,KB:1,MB:1,GB:1,TB:1}} as Record<string,Record<string,number>>)[convertCategory] || {})).map(unit => <option key={unit}>{unit}</option>)}</select></label><ActionButton onClick={doUniversalConversion}>Convert</ActionButton></div>{convertResult && <div className="lh-output"><strong>{convertResult}</strong></div>}</Panel>}
 
-    {active === "World" && <div className="lh-two-col"><Panel title="Weather around the world" description="Current conditions and a short forecast from Open-Meteo."><div className="lh-input-row"><input value={weatherPlace} onChange={e => setWeatherPlace(e.target.value)} onKeyDown={e => e.key === "Enter" && void loadWorldWeather()} placeholder="City or town"/><ActionButton onClick={() => void loadWorldWeather()}>Get weather</ActionButton></div>{weatherData && <div className="lh-output"><h4>{weatherData.place.name}, {weatherData.place.country}</h4><strong>{weatherData.forecast.current.temperature_2m}°C</strong><p>Feels like {weatherData.forecast.current.apparent_temperature}°C · Humidity {weatherData.forecast.current.relative_humidity_2m}% · Wind {weatherData.forecast.current.wind_speed_10m} km/h</p><div className="lh-weather-days">{weatherData.forecast.daily.time.slice(0, 5).map((day: string, index: number) => <span key={day}>{day}<b>{weatherData.forecast.daily.temperature_2m_max[index]}° / {weatherData.forecast.daily.temperature_2m_min[index]}°</b></span>)}</div></div>}</Panel><Panel title="Currency converter" description="Reference exchange rates from Frankfurter. Rates are not a guaranteed transaction quote."><div className="lh-input-row"><input type="number" min="0" value={currencyAmount} onChange={e => setCurrencyAmount(e.target.value)}/><select value={currencyFrom} onChange={e => setCurrencyFrom(e.target.value)}>{["USD","GHS","EUR","GBP","NGN","ZAR","CAD","JPY","INR","KES"].map(x => <option key={x}>{x}</option>)}</select><span>to</span><select value={currencyTo} onChange={e => setCurrencyTo(e.target.value)}>{["GHS","USD","EUR","GBP","NGN","ZAR","CAD","JPY","INR","KES"].map(x => <option key={x}>{x}</option>)}</select><ActionButton onClick={() => void convertCurrency()}>Convert</ActionButton></div>{currencyData && <div className="lh-output"><strong>{currencyAmount} {currencyFrom} = {Number(currencyData.converted).toFixed(2)} {currencyTo}</strong><small>Rate date: {currencyData.date}</small></div>}<label className="lh-field">World clock<select value={worldTime} onChange={e => setWorldTime(e.target.value)}>{["Africa/Accra","Europe/London","Europe/Paris","America/New_York","America/Los_Angeles","Asia/Tokyo","Asia/Dubai","Asia/Kolkata","Australia/Sydney","Pacific/Auckland"].map(x => <option key={x}>{x}</option>)}</select></label><div className="lh-output"><b>{new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "medium", timeZone: worldTime }).format(new Date())}</b><small>{worldTime}</small></div><h4>Country information</h4><div className="lh-input-row"><input value={countryQuery} onChange={e => setCountryQuery(e.target.value)} placeholder="Country name"/><ActionButton onClick={() => void lookupCountry()}>Find country</ActionButton></div>{countryData && <div className="lh-output"><b>{countryData.name.common}</b><p>Capital: {(countryData.capital || []).join(", ") || "Not listed"} · Region: {countryData.region} · Population: {Number(countryData.population).toLocaleString()}</p><p>Languages: {Object.values(countryData.languages || {}).join(", ")}</p><a href={countryData.maps?.googleMaps} target="_blank" rel="noreferrer">Open country map ↗</a></div>}<h4>Public holidays</h4><div className="lh-input-row"><input value={holidayCountry} onChange={e => setHolidayCountry(e.target.value)} placeholder="ISO country code"/><input type="number" value={holidayYear} onChange={e => setHolidayYear(e.target.value)}/><ActionButton onClick={() => void lookupHolidays()}>Find holidays</ActionButton></div>{holidayData.length > 0 && <div className="lh-task-list">{holidayData.slice(0, 12).map((item: any) => <article key={item.date + item.name}><span>{item.date} · {item.localName}</span><small>{item.name}</small></article>)}</div>}</Panel></div>}
+    {active === "World" && <div className="lh-two-col"><Panel title="Weather around the world" description="Current conditions and a short forecast from Open-Meteo."><div className="lh-input-row"><input value={weatherPlace} onChange={e => setWeatherPlace(e.target.value)} onKeyDown={e => e.key === "Enter" && void loadWorldWeather()} placeholder="City or town"/><ActionButton onClick={() => void loadWorldWeather()}>Get weather</ActionButton></div>{weatherData && <div className="lh-output"><h4>{weatherData.place.name}, {weatherData.place.country}</h4><strong>{weatherData.forecast.current.temperature_2m}°C</strong><p>Feels like {weatherData.forecast.current.apparent_temperature}°C · Humidity {weatherData.forecast.current.relative_humidity_2m}% · Wind {weatherData.forecast.current.wind_speed_10m} km/h</p><div className="lh-weather-days">{weatherData.forecast.daily.time.slice(0, 5).map((day: string, index: number) => <span key={day}>{day}<b>{weatherData.forecast.daily.temperature_2m_max[index]}° / {weatherData.forecast.daily.temperature_2m_min[index]}°</b></span>)}</div></div>}</Panel><Panel title="Currency converter" description="Reference exchange rates from Frankfurter. Rates are not a guaranteed transaction quote."><div className="lh-input-row"><input type="number" min="0" value={currencyAmount} onChange={e => setCurrencyAmount(e.target.value)}/><select value={currencyFrom} onChange={e => setCurrencyFrom(e.target.value)}>{["USD","GHS","EUR","GBP","NGN","ZAR","CAD","JPY","INR","KES"].map(x => <option key={x}>{x}</option>)}</select><span>to</span><select value={currencyTo} onChange={e => setCurrencyTo(e.target.value)}>{["GHS","USD","EUR","GBP","NGN","ZAR","CAD","JPY","INR","KES"].map(x => <option key={x}>{x}</option>)}</select><ActionButton onClick={() => void convertCurrency()} disabled={currencyBusy}>{currencyBusy ? "Converting…" : "Convert"}</ActionButton></div>{currencyError && <div className="lh-error" role="alert">{currencyError}</div>}{currencyData && <div className="lh-output"><strong>{Number(currencyAmount).toLocaleString()} {currencyFrom} = {Number(currencyData.converted).toLocaleString(undefined,{maximumFractionDigits:4})} {currencyTo}</strong><small>Rate: 1 {currencyFrom} = {Number(currencyData.rate).toLocaleString(undefined,{maximumFractionDigits:6})} {currencyTo} · Updated: {currencyData.date}</small></div>}<label className="lh-field">World clock<select value={worldTime} onChange={e => setWorldTime(e.target.value)}>{["Africa/Accra","Europe/London","Europe/Paris","America/New_York","America/Los_Angeles","Asia/Tokyo","Asia/Dubai","Asia/Kolkata","Australia/Sydney","Pacific/Auckland"].map(x => <option key={x}>{x}</option>)}</select></label><div className="lh-output"><b>{new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "medium", timeZone: worldTime }).format(new Date())}</b><small>{worldTime}</small></div><h4>Country information</h4><div className="lh-input-row"><input value={countryQuery} onChange={e => setCountryQuery(e.target.value)} placeholder="Country name"/><ActionButton onClick={() => void lookupCountry()} disabled={countryBusy}>{countryBusy ? "Searching…" : "Find country"}</ActionButton></div>{countryError && <div className="lh-error" role="alert">{countryError}</div>}{countryData && <div className="lh-output"><b>{countryData.flag} {countryData.name.common}</b><p>Capital: {(countryData.capital || []).join(", ") || "Not listed"} · Region: {countryData.region || "Not listed"} · Subregion: {countryData.subregion || "Not listed"}</p><p>Population: {Number(countryData.population || 0).toLocaleString()} · Area: {Number(countryData.area || 0).toLocaleString()} km²</p><p>Languages: {Object.values(countryData.languages || {}).join(", ") || "Not listed"}</p><p>Currency: {Object.values(countryData.currencies || {}).map((item: any) => item.name + " (" + item.symbol + ")").join(", ") || "Not listed"}</p>{countryData.maps?.googleMaps && <a href={countryData.maps.googleMaps} target="_blank" rel="noreferrer">Open country map ↗</a>}</div>}<h4>Public holidays</h4><div className="lh-input-row"><input value={holidayCountry} onChange={e => setHolidayCountry(e.target.value)} placeholder="ISO country code"/><input type="number" value={holidayYear} onChange={e => setHolidayYear(e.target.value)}/><ActionButton onClick={() => void lookupHolidays()}>Find holidays</ActionButton></div>{holidayData.length > 0 && <div className="lh-task-list">{holidayData.slice(0, 12).map((item: any) => <article key={item.date + item.name}><span>{item.date} · {item.localName}</span><small>{item.name}</small></article>)}</div>}</Panel></div>}
 
     {active === "Pulse" && <Panel title="Global news search" description="Search current indexed news reports. Open publishers for full reporting and context."><div className="lh-input-row"><input value={pulseQuery} onChange={e => setPulseQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && void loadPulse()} placeholder="Search a topic, country or event"/><ActionButton onClick={() => void loadPulse()} disabled={pulseBusy}>{pulseBusy ? "Searching…" : "Search news"}</ActionButton></div><div className="lh-results">{pulseResults.map((item, index) => <article key={item.url + index}><span>{item.source} · {item.date}</span><a href={item.url} target="_blank" rel="noreferrer">{item.title}</a></article>)}</div></Panel>}
 
@@ -601,8 +653,9 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
 
     {active === "Sheets" && <LumenSheets userId={userId}/>}
 
-    {active === "Alerts" && <Panel title="Personal reminders" description="Create reminders. Browser notifications are optional and require your permission."><div className="lh-input-row"><input value={reminderTitle} onChange={e => setReminderTitle(e.target.value)} placeholder="Reminder title"/><input type="datetime-local" value={reminderWhen} onChange={e => setReminderWhen(e.target.value)}/><ActionButton onClick={() => void addReminder()}><Plus size={14}/> Add reminder</ActionButton></div><div className="lh-task-list">{reminders.map(item => <article key={item.id}><CalendarDays size={14}/><span>{item.title}<small>{new Date(item.when).toLocaleString()}</small></span><small>{item.notified ? "Notified" : "Scheduled"}</small><button onClick={() => setReminders(current => current.filter(reminder => reminder.id !== item.id))}><Trash2 size={14}/></button></article>)}</div></Panel>}
+    {active === "Alerts" && <Panel title="Personal reminders" description="Create reminders. Browser notifications are optional and require your permission."><div className="lh-input-row"><input value={reminderTitle} onChange={e => setReminderTitle(e.target.value)} placeholder="Reminder title"/><input type="datetime-local" value={reminderWhen} onChange={e => setReminderWhen(e.target.value)}/><ActionButton onClick={() => void addReminder()}><Plus size={14}/> Add reminder</ActionButton></div><div className="lh-task-list">{reminders.map(item => <article key={item.id}><CalendarDays size={14}/><span>{item.title}<small>{new Date(item.when).toLocaleString()}</small></span><small>{item.read ? "Read" : item.notified ? "Due" : "Scheduled"}</small><button onClick={() => setReminders(current => current.filter(reminder => reminder.id !== item.id))} aria-label="Delete reminder"><Trash2 size={14}/></button></article>)}</div></Panel>}
 
+    {dueReminders.length > 0 && <div className="lh-reminder-backdrop" role="presentation"><section className="lh-reminder-dialog" role="dialog" aria-modal="true" aria-labelledby="lh-reminder-title"><div className="lh-reminder-dialog-head"><CalendarDays size={22}/><span><b id="lh-reminder-title">Reminder alert</b><small>{dueReminders.length} reminder{dueReminders.length === 1 ? "" : "s"} due</small></span></div><p>You have reminders that are due. Mark each one as read to clear it from this alert.</p><div className="lh-reminder-due-list">{dueReminders.map(item => <article key={item.id}><div><b>{item.title}</b><small>{new Date(item.when).toLocaleString()}</small></div><button onClick={() => setReminders(current => current.map(reminder => reminder.id === item.id ? { ...reminder, read: true } : reminder))}><CheckCircle2 size={15}/> Mark as read</button></article>)}</div><button className="lh-reminder-mark-all" onClick={() => setReminders(current => current.map(item => item.notified && !item.read ? { ...item, read: true } : item))}>Mark all as read</button></section></div>}
     {!moduleOpened && <div className="lh-footer"><span><ShieldCheck size={14}/> Your personal data is stored locally in this browser unless a feature explicitly uses an external public service.</span><span><Activity size={14}/> Lumen Core · {coreActivity}</span></div>}
   </div>;
 }
