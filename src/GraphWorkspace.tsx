@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Activity, Download, Plus, RotateCcw, Table2, TrendingUp } from "lucide-react";
 
 type Point = { x: number; y: number };
 type Mode = "function" | "data";
+type ChartType = "line" | "area" | "bar" | "scatter" | "pie" | "doughnut";
 type Preset = { name: string; equation: string; xLabel: string; yLabel: string; description: string };
 
 const presets: Preset[] = [
@@ -127,6 +128,8 @@ function regression(points: Point[]) {
 
 export default function GraphWorkspace() {
   const [mode, setMode] = useState<Mode>("function");
+  const [chartType, setChartType] = useState<ChartType>("line");
+  const dragRef = useRef<{x:number;y:number;bounds:{xMin:number;xMax:number;yMin:number;yMax:number}} | null>(null);
   const [equation, setEquation] = useState("x^2 - 4");
   const [dataText, setDataText] = useState("0, 0\n1, 2\n2, 4\n3, 6\n4, 8");
   const [xMin, setXMin] = useState("-5");
@@ -185,7 +188,15 @@ export default function GraphWorkspace() {
   const bottom = 62;
   const sx = (x: number) => left + ((x - (bounds?.xMin ?? -5)) / ((bounds?.xMax ?? 5) - (bounds?.xMin ?? -5))) * (width - left - right);
   const sy = (y: number) => top + (1 - ((y - (bounds?.yMin ?? -5)) / ((bounds?.yMax ?? 10) - (bounds?.yMin ?? -5)))) * (height - top - bottom);
-  const tickValues = (min: number, max: number) => Array.from({ length: 9 }, (_, i) => min + (max - min) * i / 8);
+  const tickValues = (min: number, max: number) => Array.from({ length: 11 }, (_, i) => min + (max - min) * i / 10);
+  const formatTick = (value: number) => Number(value.toPrecision(5)).toLocaleString(undefined, { maximumFractionDigits: 5 });
+  const barWidth = bounds ? Math.max(8, (width - left - right) / Math.max(points.length, 1) * 0.58) : 18;
+  const pieTotal = points.reduce((sum, point) => sum + Math.max(0, point.y), 0);
+  const pieSegments = points.filter(point => point.y > 0 && pieTotal > 0).reduce<{value:number;offset:number;label:string}[]>((items, point) => {
+    const previous = items.length ? items[items.length - 1].offset + items[items.length - 1].value : 0;
+    items.push({ value: point.y / pieTotal * 100, offset: previous, label: String(point.x) });
+    return items;
+  }, []);
   const path = curve.reduce((acc, point, index) => {
     if (!Number.isFinite(point.y) || !bounds || point.y < bounds.yMin - (bounds.yMax - bounds.yMin) * 4 || point.y > bounds.yMax + (bounds.yMax - bounds.yMin) * 4) return acc + " ";
     return acc + (index === 0 || !Number.isFinite(curve[index - 1]?.y) ? "M" : "L") + sx(point.x).toFixed(2) + "," + sy(point.y).toFixed(2) + " ";
@@ -271,6 +282,7 @@ export default function GraphWorkspace() {
     <div className="gl-graph-head"><div><span className="eyebrow">LUMEN GRAPH STUDIO</span><h3>Mathematics & science graph solver</h3><p>Plot equations, analyse experimental data, calculate gradients and compare relationships.</p></div><button className="quiet-button" onClick={exportCsv}><Download size={15}/> Export CSV</button></div>
     <div className="gl-graph-tabs"><button className={mode === "function" ? "active" : ""} onClick={() => { setMode("function"); setError(""); }}><Activity size={15}/> Function plot</button><button className={mode === "data" ? "active" : ""} onClick={() => { setMode("data"); setError(""); }}><Table2 size={15}/> Experimental data</button></div>
     <div className="gl-graph-presets"><span>SCIENCE STARTERS</span>{presets.map(p => <button key={p.name} className={selectedPreset === p.name ? "selected" : ""} onClick={() => applyPreset(p.name)}>{p.name}</button>)}</div>
+    <div className="gl-graph-typebar"><span>VISUALISATION</span>{(["line","area","bar","scatter","pie","doughnut"] as ChartType[]).map(type => <button key={type} className={chartType === type ? "active" : ""} onClick={() => { setChartType(type); if (type === "bar" || type === "pie" || type === "doughnut" || type === "scatter") setMode("data"); }}>{type === "line" ? "Line" : type === "area" ? "Area" : type === "bar" ? "Bar" : type === "scatter" ? "Scatter" : type === "pie" ? "Pie" : "Doughnut"}</button>)}</div>
     <div className="gl-graph-layout">
       <div className="gl-graph-controls">
         {mode === "function" ? <label>Function <span>Use x as the independent variable</span><input value={equation} onChange={e => setEquation(e.target.value)} placeholder="e.g. 2*x^2 - 3*x + 1"/></label> : <label>Coordinate data <span>Enter x,y pairs separated by commas or new lines</span><textarea value={dataText} onChange={e => setDataText(e.target.value)} rows={8}/></label>}
@@ -284,23 +296,23 @@ export default function GraphWorkspace() {
         <button className="quiet-button" onClick={() => { setEquation("x^2 - 4"); setDataText("0, 0\n1, 2\n2, 4\n3, 6\n4, 8"); setXMin("-5"); setXMax("5"); setYMin("-5"); setYMax("10"); setXLabel("x"); setYLabel("y"); setSelectedPreset(""); setSampleResult(null); setFunctionAnalysis(null); setError(""); }}><RotateCcw size={14}/> Reset graph</button>
       </div>
       <div className="gl-graph-visual">
-        <div className="gl-graph-visual-head"><b>{mode === "function" ? "FUNCTION GRAPH" : "DATA PLOT"}</b><span>{mode === "function" ? "y = " + equation : points.length + " data points"}</span></div>
+        <div className="gl-graph-visual-head"><div><b>{chartType.toUpperCase()} {mode === "function" ? "FUNCTION GRAPH" : "DATA VISUALISATION"}</b><small>{mode === "function" ? "y = " + equation : points.length + " data points"}</small></div><span>Drag to pan · Use range fields to calibrate</span></div>
         {mode === "function" && !curve.length && <div className="gl-graph-notice">Enter a valid function to display its curve.</div>}
         {mode === "data" && !points.length && <div className="gl-graph-notice">Enter coordinate pairs to plot your experiment.</div>}
-        <svg className="gl-graph-svg" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label="Cartesian graph">
+        <svg className="gl-graph-svg" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={chartType + " graph"} onPointerDown={event => { if (bounds && chartType !== "pie" && chartType !== "doughnut") { event.currentTarget.setPointerCapture(event.pointerId); dragRef.current = { x:event.clientX, y:event.clientY, bounds:{...bounds} }; } }} onPointerMove={event => { const drag = dragRef.current; if (!drag) return; const rect = event.currentTarget.getBoundingClientRect(); const dx = (event.clientX - drag.x) / rect.width * (drag.bounds.xMax - drag.bounds.xMin); const dy = (event.clientY - drag.y) / rect.height * (drag.bounds.yMax - drag.bounds.yMin); setXMin(String(Number((drag.bounds.xMin - dx).toPrecision(7)))); setXMax(String(Number((drag.bounds.xMax - dx).toPrecision(7)))); setYMin(String(Number((drag.bounds.yMin + dy).toPrecision(7)))); setYMax(String(Number((drag.bounds.yMax + dy).toPrecision(7)))); }} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }}>
           {bounds && <>
-            {tickValues(bounds.xMin, bounds.xMax).map((v, i) => <g key={"x" + i}><line x1={sx(v)} x2={sx(v)} y1={top} y2={height - bottom} className="gl-grid-line"/><text x={sx(v)} y={height - bottom + 22} className="gl-axis-tick" textAnchor="middle">{Number(v.toPrecision(4))}</text></g>)}
+            {tickValues(bounds.xMin, bounds.xMax).map((v, i) => <g key={"x" + i}><line x1={sx(v)} x2={sx(v)} y1={top} y2={height - bottom} className="gl-grid-line"/><text x={sx(v)} y={height - bottom + 22} className="gl-axis-tick" textAnchor="middle">{formatTick(v)}</text></g>)}
             {tickValues(bounds.yMin, bounds.yMax).map((v, i) => <g key={"y" + i}><line x1={left} x2={width - right} y1={sy(v)} y2={sy(v)} className="gl-grid-line"/><text x={left - 12} y={sy(v) + 4} className="gl-axis-tick" textAnchor="end">{Number(v.toPrecision(4))}</text></g>)}
             {bounds.xMin <= 0 && bounds.xMax >= 0 && <line x1={sx(0)} x2={sx(0)} y1={top} y2={height - bottom} className="gl-axis-line"/>}
             {bounds.yMin <= 0 && bounds.yMax >= 0 && <line x1={left} x2={width - right} y1={sy(0)} y2={sy(0)} className="gl-axis-line"/>}
-            {mode === "function" && <path d={path} className="gl-function-line"/>}
+            {mode === "function" && chartType === "line" && <path d={path} className="gl-function-line"/>}\n            {mode === "function" && chartType === "area" && <path d={path + " L" + sx(bounds.xMax) + "," + sy(0) + " L" + sx(bounds.xMin) + "," + sy(0) + " Z"} className="gl-area-fill"/>}
             {mode === "data" && showFit && <path d={fitPath} className="gl-fit-line"/>}
             {pointPath.map((p, i) => <g key={i}><circle cx={p.cx} cy={p.cy} r="6" className="gl-data-point"/><text x={p.cx + 9} y={p.cy - 9} className="gl-point-label">({p.x}, {p.y})</text></g>)}
             <text x={(left + width - right) / 2} y={height - 12} className="gl-axis-label" textAnchor="middle">{xLabel}</text>
             <text x="18" y={(top + height - bottom) / 2} className="gl-axis-label" textAnchor="middle" transform={`rotate(-90 18 ${(top + height - bottom) / 2})`}>{yLabel}</text>
           </>}
         </svg>
-        {mode === "data" && fit && <div className="gl-graph-analysis"><span><TrendingUp size={14}/> Gradient / rate of change: <b>{Number(fit.slope.toPrecision(6))}</b></span><span>Y-intercept: <b>{Number(fit.intercept.toPrecision(6))}</b></span><span>Coefficient of determination: <b>{Number(fit.r2.toPrecision(5))}</b></span></div>}
+        {(chartType === "pie" || chartType === "doughnut") && <div className="gl-chart-legend">{pieSegments.map((segment,i)=><span key={i}><i style={{background:`hsl(${i*67+195} 72% 55%)`}}/>{segment.label}: {Number(segment.value.toFixed(1))}%</span>)}</div>}\n        {mode === "data" && fit && <div className="gl-graph-analysis"><span><TrendingUp size={14}/> Gradient / rate of change: <b>{Number(fit.slope.toPrecision(6))}</b></span><span>Y-intercept: <b>{Number(fit.intercept.toPrecision(6))}</b></span><span>Coefficient of determination: <b>{Number(fit.r2.toPrecision(5))}</b></span></div>}
         {mode === "function" && <p className="gl-graph-footnote">Supported: polynomial expressions, fractions, powers, roots, trigonometric and inverse trigonometric functions, logarithms, exponentials and absolute values. Trigonometric units follow the selected angle mode.</p>}
       </div>
     </div>
