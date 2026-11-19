@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import LumenSheets from "./LumenSheets";
+import { connectionAwareMessage } from "./api";
 import { Activity, ArrowLeft, BookOpen, CalendarDays, CheckCircle2, Copy, Download, FileText, Globe2, Languages, Plus, Search, ShieldCheck, Trash2, Upload, Wifi, WifiOff } from "lucide-react";
 
 type ModuleName = "Knowledge Graph" | "Verify" | "Document Intelligence" | "Convert" | "World" | "Pulse" | "Scan" | "Workspace" | "Finance" | "Vault" | "Academy" | "Code" | "Lab" | "Create" | "Translate" | "Accessibility" | "Offline" | "Connect" | "Alerts" | "Sheets";
@@ -253,7 +254,7 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
       const data = await response.json();
       setGraphResults((data.pages || []).map((item: any) => ({ title: item.title, description: item.description || item.excerpt?.replace(/<[^>]*>/g, "") || "Related encyclopedia topic", url: "https://en.wikipedia.org/wiki/" + encodeURIComponent(item.key) })));
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Could not load knowledge results.");
+      setNotice(connectionAwareMessage(error, "Knowledge results could not be loaded."));
     } finally {
       setGraphBusy(false);
     }
@@ -366,7 +367,7 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
       };
       setCountryData(normalized);
     } catch (error) {
-      setCountryError(error instanceof Error ? error.message : "Country lookup failed. Check your connection and try again.");
+      setCountryError(connectionAwareMessage(error, "Country information could not be loaded."));
     } finally {
       setCountryBusy(false);
     }
@@ -378,7 +379,7 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
       if (!response.ok) throw new Error("Holiday calendar is unavailable for that country and year.");
       setHolidayData(await response.json());
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Holiday lookup failed.");
+      setNotice(connectionAwareMessage(error, "Holiday information could not be loaded."));
     }
   };
 
@@ -402,7 +403,7 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
       if (!response.ok) throw new Error("Weather forecast unavailable.");
       setWeatherData({ place, forecast: await response.json() });
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Weather is unavailable.");
+      setNotice(connectionAwareMessage(error, "Weather information could not be loaded."));
     }
   };
 
@@ -433,7 +434,7 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
       if (!Number.isFinite(rate)) throw new Error("This currency pair is not currently supported.");
       setCurrencyData({ converted: amount * rate, rate, date: rateDate, base: currencyFrom, target: currencyTo });
     } catch (error) {
-      setCurrencyError(error instanceof Error ? error.message : "Currency conversion failed. Check your connection and try again.");
+      setCurrencyError(connectionAwareMessage(error, "Currency conversion could not be completed."));
     } finally {
       setCurrencyBusy(false);
     }
@@ -448,7 +449,7 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
       const data = await response.json();
       setPulseResults((data.articles || []).map((item: any) => ({ title: item.title || "Untitled report", url: item.url, source: item.domain || item.sourcecountry || "Publisher", date: item.seendate || "" })).filter((item: any) => item.url));
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "News search failed.");
+      setNotice(connectionAwareMessage(error, "News could not be loaded."));
     } finally {
       setPulseBusy(false);
     }
@@ -469,7 +470,7 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
       if (data.responseStatus !== 200) throw new Error(data.responseDetails || "Translation unavailable.");
       setTranslated(data.responseData.translatedText);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Translation failed.");
+      setNotice(connectionAwareMessage(error, "Translation could not be completed."));
     } finally {
       setTranslateBusy(false);
     }
