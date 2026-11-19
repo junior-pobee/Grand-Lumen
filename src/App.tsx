@@ -1821,7 +1821,6 @@ function App() {
       setClearDataPassword("");
       setClearDataOpen(false);
       setSection("Settings");
-      recordActivity("Cleared workspace data after password verification", "Settings");
     } catch (reason) {
       setClearDataError(reason instanceof Error ? reason.message : "Workspace data could not be cleared. Please try again.");
     } finally {
