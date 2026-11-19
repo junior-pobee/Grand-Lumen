@@ -8,6 +8,7 @@ import ExpansionHub from "./ExpansionHub";
 import TeamWorkspace from "./TeamWorkspace";
 import LumenSheets from "./LumenSheets";
 import ActivityDigest, { type ActivityEntry } from "./ActivityDigest";
+import WelcomeTour from "./WelcomeTour";
 import { supabase, supabaseConfigured } from "./auth";
 import { getCurrency, getDictionary, getHoliday, getPokemon, getWeather, researchTopic, searchArchiveVideos, searchCommonsImages, searchHackerNews, searchWikipedia, searchGlobalNews, type SearchItem, type NewsItem, connectionAwareMessage } from "./api";
 
@@ -25,6 +26,34 @@ function highlightCode(value: string): string {
     if (/^\d/.test(token)) return '<span class="syntax-number">' + token + '</span>';
     return '<span class="syntax-keyword">' + token + '</span>';
   });
+}
+
+function accountProfileImage(email: string): string {
+  try {
+    const images = JSON.parse(localStorage.getItem("grandLumenProfileImages") || "{}") as Record<string, string>;
+    return images[email.trim().toLowerCase()] || "";
+  } catch {
+    return "";
+  }
+}
+
+function saveAccountProfileImage(email: string, image: string): void {
+  try {
+    const images = JSON.parse(localStorage.getItem("grandLumenProfileImages") || "{}") as Record<string, string>;
+    const key = email.trim().toLowerCase();
+    if (image) images[key] = image;
+    else delete images[key];
+    localStorage.setItem("grandLumenProfileImages", JSON.stringify(images));
+  } catch {
+    localStorage.setItem("grandLumenProfileImages", JSON.stringify({ [email.trim().toLowerCase()]: image }));
+  }
+}
+
+function initialDisplayScale(key: string): number {
+  const smallScreen = typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches;
+  const stored = localStorage.getItem(smallScreen ? key + "Mobile" : key);
+  const value = Number(stored ?? "1");
+  return Number.isFinite(value) ? value : 1;
 }
 
 function readWorkspaceData<T>(key: string, fallback: T): T {
@@ -634,7 +663,7 @@ const appLanguages: { code: string; name: string }[] = [
 
 type PortalMode = "about" | "signin" | "signup";
 
-function PublicPortal({ onGuest }: { onGuest: (profile?: { fullName: string; email: string }) => void }) {
+function PublicPortal({ onGuest }: { onGuest: (profile?: { fullName: string; email: string; profileImage?: string; onboardingPending?: boolean }) => void }) {
   const [mode, setMode] = useState<PortalMode>("about");
   return <div className="public-portal">
     <div className="portal-ambient portal-ambient-one" />
@@ -658,7 +687,7 @@ function PublicPortal({ onGuest }: { onGuest: (profile?: { fullName: string; ema
   </div>;
 }
 
-function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup"; onModeChange: (mode: PortalMode) => void; onGuest: (profile?: { fullName: string; email: string }) => void }) {
+function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup"; onModeChange: (mode: PortalMode) => void; onGuest: (profile?: { fullName: string; email: string; profileImage?: string; onboardingPending?: boolean }) => void }) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -686,7 +715,7 @@ function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup";
             email: email.trim(),
             password,
             options: {
-              data: { full_name: fullName.trim() },
+              data: { full_name: fullName.trim(), grand_lumen_onboarding_pending: true },
               emailRedirectTo: window.location.origin + window.location.pathname
             }
           });
@@ -698,23 +727,24 @@ function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup";
           if (error) throw error;
         }
       } else {
-        const accounts = JSON.parse(localStorage.getItem("grandLumenLocalAccounts") || "[]") as { fullName: string; email: string; salt: string; passwordHash: string }[];
+        const accounts = JSON.parse(localStorage.getItem("grandLumenLocalAccounts") || "[]") as { fullName: string; email: string; salt: string; passwordHash: string; onboardingPending?: boolean }[];
         const normalizedEmail = email.trim().toLowerCase();
         if (isSignup) {
           if (accounts.some(account => account.email === normalizedEmail)) throw new Error("An account with this email already exists. Sign in instead.");
           const salt = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(value => value.toString(16).padStart(2, "0")).join("");
           const passwordHash = await hashLocalPassword(password, salt);
-          accounts.push({ fullName: fullName.trim(), email: normalizedEmail, salt, passwordHash });
+          accounts.push({ fullName: fullName.trim(), email: normalizedEmail, salt, passwordHash, onboardingPending: true });
           localStorage.setItem("grandLumenLocalAccounts", JSON.stringify(accounts));
-          localStorage.setItem("grandLumenLocalSession", JSON.stringify({ fullName: fullName.trim(), email: normalizedEmail }));
+          localStorage.setItem("grandLumenLocalSession", JSON.stringify({ fullName: fullName.trim(), email: normalizedEmail, onboardingPending: true }));
           setNotice("Your local account is ready. Opening Grand-Lumen…", "success");
-          window.setTimeout(() => onGuest({ fullName: fullName.trim(), email: normalizedEmail }), 250);
+          window.setTimeout(() => onGuest({ fullName: fullName.trim(), email: normalizedEmail, onboardingPending: true }), 250);
         } else {
           const account = accounts.find(item => item.email === normalizedEmail);
           if (!account || await hashLocalPassword(password, account.salt) !== account.passwordHash) throw new Error("Email or password is incorrect.");
-          localStorage.setItem("grandLumenLocalSession", JSON.stringify({ fullName: account.fullName, email: account.email }));
+          const profile = { fullName: account.fullName, email: account.email, profileImage: accountProfileImage(account.email), onboardingPending: account.onboardingPending === true };
+          localStorage.setItem("grandLumenLocalSession", JSON.stringify(profile));
           setNotice("Signed in. Opening Grand-Lumen…", "success");
-          window.setTimeout(() => onGuest({ fullName: account.fullName, email: account.email }), 250);
+          window.setTimeout(() => onGuest(profile), 250);
         }
       }
     } catch (reason) {
@@ -1796,7 +1826,8 @@ function App() {
   const [verificationMessage, setVerificationMessage] = useState("");
   const [authReady, setAuthReady] = useState(false);
   const [guestMode, setGuestMode] = useState(false);
-  const [localProfile, setLocalProfile] = useState<{ fullName: string; email: string; profileImage?: string } | null>(null);
+  const [localProfile, setLocalProfile] = useState<{ fullName: string; email: string; profileImage?: string; onboardingPending?: boolean } | null>(null);
+  const [welcomeTourOpen, setWelcomeTourOpen] = useState(false);
   const [activityEntries, setActivityEntries] = useState<ActivityEntry[]>([]);
   const [clearDataOpen, setClearDataOpen] = useState(false);
   const [clearDataPassword, setClearDataPassword] = useState("");
@@ -1814,8 +1845,8 @@ function App() {
   const [error, setError] = useState("");
   const [saved, setSaved] = useState<SearchItem[]>(() => readWorkspaceData("grandLumenSaved", []));
   const [theme, setTheme] = useState<"dark" | "light">("light");
-  const [fontScale, setFontScale] = useState(() => Number(localStorage.getItem("grandLumenFontScale") || "1"));
-  const [interfaceScale, setInterfaceScale] = useState(() => Number(localStorage.getItem("grandLumenInterfaceScale") || "1"));
+  const [fontScale, setFontScale] = useState(() => initialDisplayScale("grandLumenFontScale"));
+  const [interfaceScale, setInterfaceScale] = useState(() => initialDisplayScale("grandLumenInterfaceScale"));
   const [fontFamily, setFontFamily] = useState(() => localStorage.getItem("grandLumenFontFamily") || "Manrope, sans-serif");
   const [fontWeight, setFontWeight] = useState(() => localStorage.getItem("grandLumenFontWeight") || "normal");
   const [appLanguage, setAppLanguage] = useState(() => {
@@ -1829,8 +1860,9 @@ function App() {
   const [languageSearch, setLanguageSearch] = useState(() => appLanguages.find(language => language.code === (localStorage.getItem("grandLumenLanguageChosen") === "true" ? localStorage.getItem("grandLumenLanguage") || "en" : "en"))?.name || "English");
 
   useEffect(() => {
-    localStorage.setItem("grandLumenFontScale", String(fontScale));
-    localStorage.setItem("grandLumenInterfaceScale", String(interfaceScale));
+    const smallScreen = window.matchMedia("(max-width: 760px)").matches;
+    localStorage.setItem(smallScreen ? "grandLumenFontScaleMobile" : "grandLumenFontScale", String(fontScale));
+    localStorage.setItem(smallScreen ? "grandLumenInterfaceScaleMobile" : "grandLumenInterfaceScale", String(interfaceScale));
     localStorage.setItem("grandLumenFontFamily", fontFamily);
     localStorage.setItem("grandLumenFontWeight", fontWeight);
     document.documentElement.style.setProperty("--gl-font-scale", String(fontScale));
@@ -2084,8 +2116,9 @@ function App() {
       try {
         const localSession = localStorage.getItem("grandLumenLocalSession");
         if (localSession) {
-          const profile = JSON.parse(localSession) as { fullName: string; email: string; profileImage?: string };
+          const profile = JSON.parse(localSession) as { fullName: string; email: string; profileImage?: string; onboardingPending?: boolean };
           setLocalProfile(profile);
+          setWelcomeTourOpen(profile.onboardingPending === true);
           setGuestMode(true);
         }
       } catch {
@@ -2098,11 +2131,13 @@ function App() {
     supabase.auth.getSession().then(({ data }) => {
       if (active) {
         setSession(data.session);
+        setWelcomeTourOpen(Boolean(data.session?.user.user_metadata?.grand_lumen_onboarding_pending && localStorage.getItem("grandLumenTourCompleted:" + data.session.user.id) !== "true"));
         setAuthReady(true);
       }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       setSession(nextSession);
+      setWelcomeTourOpen(Boolean(nextSession?.user.user_metadata?.grand_lumen_onboarding_pending && localStorage.getItem("grandLumenTourCompleted:" + nextSession.user.id) !== "true"));
       setAuthReady(true);
     });
     return () => {
@@ -2131,8 +2166,9 @@ function App() {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
   useEffect(() => {
-    localStorage.setItem("grandLumenFontScale", String(fontScale));
-    localStorage.setItem("grandLumenInterfaceScale", String(interfaceScale));
+    const smallScreen = window.matchMedia("(max-width: 760px)").matches;
+    localStorage.setItem(smallScreen ? "grandLumenFontScaleMobile" : "grandLumenFontScale", String(fontScale));
+    localStorage.setItem(smallScreen ? "grandLumenInterfaceScaleMobile" : "grandLumenInterfaceScale", String(interfaceScale));
     localStorage.setItem("grandLumenFontFamily", fontFamily);
     localStorage.setItem("grandLumenFontWeight", fontWeight);
     document.documentElement.style.setProperty("--gl-font-scale", String(fontScale));
@@ -2140,6 +2176,32 @@ function App() {
     document.documentElement.style.setProperty("--gl-font-family", fontFamily);
     document.documentElement.style.setProperty("--gl-font-weight", fontWeight);
   }, [fontScale, interfaceScale, fontFamily, fontWeight]);
+
+  useEffect(() => {
+    const email = localProfile?.email || session?.user.email;
+    if (!email) return;
+    const legacyImage = localStorage.getItem("grandLumenProfileImage") || "";
+    const image = accountProfileImage(email) || localProfile?.profileImage || legacyImage;
+    if (image) saveAccountProfileImage(email, image);
+    if (legacyImage) localStorage.removeItem("grandLumenProfileImage");
+    setProfilePicture(image);
+    if (localProfile && image !== localProfile.profileImage) setLocalProfile(current => current ? { ...current, profileImage: image } : current);
+  }, [localProfile?.email, session?.user.email]);
+
+  const completeWelcomeTour = () => {
+    setWelcomeTourOpen(false);
+    if (localProfile?.email) {
+      const accounts = JSON.parse(localStorage.getItem("grandLumenLocalAccounts") || "[]") as { email: string; onboardingPending?: boolean; [key: string]: unknown }[];
+      localStorage.setItem("grandLumenLocalAccounts", JSON.stringify(accounts.map(account => account.email === localProfile.email ? { ...account, onboardingPending: false } : account)));
+      const savedSession = JSON.parse(localStorage.getItem("grandLumenLocalSession") || "{}") as Record<string, unknown>;
+      localStorage.setItem("grandLumenLocalSession", JSON.stringify({ ...savedSession, onboardingPending: false }));
+      setLocalProfile(current => current ? { ...current, onboardingPending: false } : current);
+    }
+    if (session && supabase) {
+      localStorage.setItem("grandLumenTourCompleted:" + session.user.id, "true");
+      void supabase.auth.updateUser({ data: { grand_lumen_onboarding_pending: false, grand_lumen_onboarding_completed: true } });
+    }
+  };
 
   const requestEmailVerification = async () => {
     const email = session?.user.email;
@@ -2190,6 +2252,8 @@ function App() {
       setLocalProfile(null);
       setGuestMode(false);
     }
+    setWelcomeTourOpen(false);
+    setProfilePicture("");
     setSession(null);
     setSection("Home");
   };
@@ -2333,7 +2397,7 @@ function App() {
   };
 
   if (!authReady) return <div className="auth-boot"><div className="portal-brand-mark"><img src={`${import.meta.env.BASE_URL}icons/grand-lumen-icon.svg`} alt="Grand-Lumen" /></div><span>SECURING YOUR WORKSPACE</span></div>;
-  if (!session && !guestMode) return <PublicPortal onGuest={(profile) => { if (profile) setLocalProfile(profile); setGuestMode(true); }} />;
+  if (!session && !guestMode) return <PublicPortal onGuest={(profile) => { if (profile) { setLocalProfile(profile); setWelcomeTourOpen(profile.onboardingPending === true); } setGuestMode(true); }} />;
 
   return (
     <>
@@ -2396,11 +2460,12 @@ function App() {
             {section === "Saved" && <section><PageTitle eyebrow="PERSONAL KNOWLEDGE VAULT" title={heading.Saved} description="Keep useful discoveries close. Saved items remain in this browser." /><div className="saved-list"><Results items={saved} saved={saved} onSave={toggleSave} onShare={item => openShare(item.title + "\n\n" + item.description + "\n\n" + item.url)} busy={false} error="" /></div>{!saved.length && <EmptyState title="Your vault is ready." detail="Save search results to build your personal knowledge collection." />}</section>}
             {section === "Activity Digest" && <section><PageTitle eyebrow="WORKSPACE ACTIVITY" title={heading["Activity Digest"]} description="Review your recorded Grand Lumen activity and create summaries to copy, share or save."/><ActivityDigest entries={activityEntries} storageKey={activityStorageKey} onEntriesChange={next => { setActivityEntries(next); try { localStorage.setItem(activityStorageKey, JSON.stringify(next)); } catch { setError("Activity records could not be saved on this device."); } }} verifyPassword={verifyActivityPassword}/></section>}
             {section === "Creative Studio" && <section><PageTitle eyebrow="LUMEN CREATIVE" title="Creative Studio" description="Edit photographs and video clips with detailed controls, then export your finished work."/><CreativeStudio/></section>}{section === "Projects" && <section><PageTitle eyebrow="PROJECT MANAGEMENT" title={heading.Projects} description="Keep track of ideas and projects you are developing." /><div className="project-create"><input value={projectName} onChange={e => setProjectName(e.target.value)} onKeyDown={e => e.key === "Enter" && projectName.trim() && (setProjects([projectName.trim(), ...projects]), setProjectName(""))} placeholder="Name a project or idea..." /><button className="solid-button" onClick={() => { if (projectName.trim()) { setProjects([projectName.trim(), ...projects]); setProjectName(""); } }}><Plus size={15} /> Add project</button></div><div className="project-grid">{projects.map((name,index) => <div className="glass-card project-card" key={name + index}><span className="feature-icon"><Layers3 size={19} /></span><h3>{name}</h3><span className="muted">PERSONAL PROJECT</span><button onClick={() => setProjects(projects.filter((_,i) => i !== index))}>Remove <X size={13} /></button></div>)}</div>{!projects.length && <EmptyState title="A space for your next big idea." detail="Create your first project to start organising your work." />}</section>}
-            {section === "Settings" && <section><PageTitle eyebrow="PREFERENCES" title={heading.Settings} description="Manage your profile, appearance and local workspace preferences." /><div className="settings-card profile-settings-card"><div className="profile-settings-preview">{(localProfile?.profileImage || profilePicture) ? <img src={localProfile?.profileImage || profilePicture} alt="Your profile"/> : <span>{(localProfile?.fullName || session?.user.email || "GL").slice(0,2).toUpperCase()}</span>}</div><div className="profile-settings-copy"><b>Profile photograph</b><p>Choose a picture to represent your Grand-Lumen account on this device.</p><label className="quiet-button profile-upload-button"><Upload size={14}/> Upload profile picture<input type="file" accept="image/*" onChange={event => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 3 * 1024 * 1024) { alert("Choose an image smaller than 3 MB."); return; } const reader = new FileReader(); reader.onload = () => { const image = String(reader.result || ""); if (localProfile) { const updated = { ...localProfile, profileImage: image }; setLocalProfile(updated); localStorage.setItem("grandLumenLocalSession", JSON.stringify(updated)); } else if (session) { localStorage.setItem("grandLumenProfileImage", image); setProfilePicture(image); } }; reader.readAsDataURL(file); event.currentTarget.value = ""; }}/></label>{(localProfile?.profileImage || profilePicture) && <button className="quiet-button" onClick={() => { if (localProfile) { const updated = { ...localProfile, profileImage: undefined }; setLocalProfile(updated); localStorage.setItem("grandLumenLocalSession", JSON.stringify(updated)); } setProfilePicture(""); localStorage.removeItem("grandLumenProfileImage"); }}>Remove picture</button>}</div></div>{session && supabase && <div className="settings-card email-verification-card"><div><b>Email verification</b><p>{session.user.email_confirmed_at ? "Your account email is verified." : "Your account is active. You can verify your email whenever you need to."}</p><span className={session.user.email_confirmed_at ? "email-verification-status verified" : "email-verification-status pending"}>{session.user.email_confirmed_at ? "Verified" : "Not verified"}</span>{verificationMessage && <small className="email-verification-message">{verificationMessage}</small>}</div><div className="email-verification-actions">{!session.user.email_confirmed_at && <button className="quiet-button" onClick={() => void requestEmailVerification()} disabled={verificationBusy}><Mail size={14}/>{verificationBusy ? "Please wait…" : "Send verification email"}</button>}<button className="quiet-button" onClick={() => void refreshEmailVerification()} disabled={verificationBusy}>Refresh status</button></div></div>}<div className="settings-card install-settings-card"><div className="install-settings-icon"><Smartphone size={22}/></div><div className="install-settings-copy"><b>Install Grand-Lumen</b><p>Install the workspace directly on this device. Installation is optional and never forced.</p>{installHelp && <small>{installHelp}</small>}</div><button className="solid-button" onClick={() => void installGrandLumen()} disabled={isInstalled}><Download size={15}/>{isInstalled ? "Installed" : "Install app"}</button></div><div className="settings-preferences"><div className="settings-preferences-heading"><div><b>Display & typography</b><p>Control the size and style of text and the app interface on this device.</p></div><button className="quiet-button" onClick={() => { setFontScale(1); setInterfaceScale(1); setFontFamily("Manrope, sans-serif"); setFontWeight("normal"); }}>Reset</button></div><div className="preference-control"><div className="preference-label"><label htmlFor="gl-font-scale">Text size</label><strong>{Math.round(fontScale * 100)}%</strong></div><input id="gl-font-scale" type="range" min="0.85" max="1.3" step="0.05" value={fontScale} onChange={event => setFontScale(Number(event.target.value))}/><div className="preference-range-labels"><span>Smaller</span><span>Default</span><span>Larger</span></div></div><div className="preference-control"><div className="preference-label"><label htmlFor="gl-interface-scale">App screen scale</label><strong>{Math.round(interfaceScale * 100)}%</strong></div><input id="gl-interface-scale" type="range" min="0.85" max="1.15" step="0.05" value={interfaceScale} onChange={event => setInterfaceScale(Number(event.target.value))}/><div className="preference-range-labels"><span>Compact</span><span>Default</span><span>Spacious</span></div></div><div className="preference-control"><label htmlFor="gl-font-family">Font style</label><select id="gl-font-family" value={fontFamily} onChange={event => setFontFamily(event.target.value)}><option value="Manrope, sans-serif">Manrope · Modern</option><option value="Arial, sans-serif">Arial · Classic</option><option value="Georgia, serif">Georgia · Serif</option><option value="'DM Mono', monospace">DM Mono · Monospace</option><option value="system-ui, sans-serif">System default</option></select></div><div className="preference-control"><label htmlFor="gl-font-weight">Text weight</label><select id="gl-font-weight" value={fontWeight} onChange={event => setFontWeight(event.target.value)}><option value="normal">Regular</option><option value="500">Medium</option><option value="600">Semi-bold</option><option value="700">Bold</option></select></div><div className="preference-preview"><span>PREVIEW</span><strong>Explore beyond. Build what comes next.</strong><p>Your display preferences are saved automatically on this device.</p></div></div><div className="settings-card language-settings-card"><div><b>App language</b><p>Choose from more than 100 languages. Grand-Lumen uses English by default and remembers your selection on this device.</p></div><div className="language-setting-control"><input list="gl-app-language-options" value={languageSearch} onChange={event => { setLanguageSearch(event.target.value); const selected = appLanguages.find(language => language.name.toLowerCase() === event.target.value.trim().toLowerCase()); if (selected) { localStorage.setItem("grandLumenLanguageChosen", "true"); setAppLanguage(selected.code); } }} placeholder="Search languages..." aria-label="Search app languages"/><datalist id="gl-app-language-options">{appLanguages.map(language => <option key={language.code} value={language.name}/>)}</datalist><span>{appLanguages.find(language => language.code === appLanguage)?.name || "English"} selected · Translation by Google</span><button className="quiet-button" onClick={resetToEnglish}>Use English</button></div></div><div className="settings-card"><div><b>Appearance</b><p>Choose the interface theme.</p></div><div className="theme-switch"><button className={theme === "dark" ? "selected" : ""} onClick={() => setTheme("dark")}><Moon size={15} /> Dark</button><button className={theme === "light" ? "selected" : ""} onClick={() => setTheme("light")}><Sun size={15} /> Light</button></div></div><div className="settings-card"><div><b>Clear workspace data</b><p>Remove saved items, projects, research notes, Code Lab files and activity records from this browser. Your account, password and sign-in session will remain intact.</p></div><button className="quiet-button" onClick={() => { setClearDataPassword(""); setClearDataError(""); setClearDataOpen(true); }}><LockKeyhole size={14}/> Clear workspace data</button></div><div className="settings-card"><div><b>Export workspace</b><p>Download your saved items, projects and available Grand-Lumen workspace data as a JSON backup. Account passwords are never included.</p></div><button className="quiet-button" onClick={exportWorkspace}><Download size={15}/> Export workspace</button></div><div className="settings-card settings-danger-card"><div><b>Sign out</b><p>End your current Grand-Lumen session on this device.</p></div><button className="quiet-button" onClick={() => void handleLogout()}><LogOut size={15}/> Log out</button></div><div className="settings-card about-grand-lumen"><div><b>About Grand-Lumen</b><p>Grand-Lumen is a connected digital space for discovery, learning, research and creation.</p><strong>Built by Emmanuel Pobee Okpoti - Inventor and student Leader.</strong><a href="https://wa.me/233203446793" target="_blank" rel="noreferrer" className="about-whatsapp-link">Connect via 0203446793 <ExternalLink size={14}/></a></div><span className="version">v1.0.0</span></div>{clearDataOpen && <div className="clear-data-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !clearDataBusy) setClearDataOpen(false); }}><section className="clear-data-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-data-title"><div className="clear-data-icon"><LockKeyhole size={21}/></div><button className="clear-data-close" type="button" onClick={() => { if (!clearDataBusy) setClearDataOpen(false); }} aria-label="Close"><X size={18}/></button><span className="eyebrow">OWNER VERIFICATION</span><h2 id="clear-data-title">Clear workspace data?</h2><p>This permanently removes saved items, projects, research notes, Code Lab files and activity records from this browser. Your Grand-Lumen account and current sign-in will not be deleted.</p><label htmlFor="clear-data-password">Confirm your account password</label><input id="clear-data-password" type="password" autoComplete="current-password" value={clearDataPassword} onChange={event => { setClearDataPassword(event.target.value); setClearDataError(""); }} onKeyDown={event => { if (event.key === "Enter" && clearDataPassword && !clearDataBusy) void clearWorkspaceData(); }} placeholder="Enter your password" disabled={clearDataBusy}/>{clearDataError && <div className="clear-data-error" role="alert">{clearDataError}</div>}<div className="clear-data-actions"><button className="quiet-button" type="button" onClick={() => { setClearDataOpen(false); setClearDataPassword(""); setClearDataError(""); }} disabled={clearDataBusy}>Cancel</button><button className="clear-data-confirm" type="button" onClick={() => void clearWorkspaceData()} disabled={!clearDataPassword || clearDataBusy}>{clearDataBusy ? "Verifying…" : "Verify & clear data"}</button></div><small>Password is checked against the account currently signed in. No password is stored by this confirmation form.</small></section></div>}</section>}
+            {section === "Settings" && <section><PageTitle eyebrow="PREFERENCES" title={heading.Settings} description="Manage your profile, appearance and local workspace preferences." /><div className="settings-card profile-settings-card"><div className="profile-settings-preview">{(localProfile?.profileImage || profilePicture) ? <img src={localProfile?.profileImage || profilePicture} alt="Your profile"/> : <span>{(localProfile?.fullName || session?.user.email || "GL").slice(0,2).toUpperCase()}</span>}</div><div className="profile-settings-copy"><b>Profile photograph</b><p>Choose a picture to represent your Grand-Lumen account on this device.</p><label className="quiet-button profile-upload-button"><Upload size={14}/> Upload profile picture<input type="file" accept="image/*" onChange={event => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 3 * 1024 * 1024) { alert("Choose an image smaller than 3 MB."); return; } const reader = new FileReader(); reader.onload = () => { const image = String(reader.result || ""); if (localProfile) { const updated = { ...localProfile, profileImage: image }; setLocalProfile(updated); localStorage.setItem("grandLumenLocalSession", JSON.stringify(updated)); saveAccountProfileImage(localProfile.email, image); setProfilePicture(image); } else if (session?.user.email) { saveAccountProfileImage(session.user.email, image); setProfilePicture(image); } }; reader.readAsDataURL(file); event.currentTarget.value = ""; }}/></label>{(localProfile?.profileImage || profilePicture) && <button className="quiet-button" onClick={() => { if (localProfile) { const updated = { ...localProfile, profileImage: undefined }; setLocalProfile(updated); localStorage.setItem("grandLumenLocalSession", JSON.stringify(updated)); saveAccountProfileImage(localProfile.email, ""); } else if (session?.user.email) { saveAccountProfileImage(session.user.email, ""); } setProfilePicture(""); }}>Remove picture</button>}</div></div>{session && supabase && <div className="settings-card email-verification-card"><div><b>Email verification</b><p>{session.user.email_confirmed_at ? "Your account email is verified." : "Your account is active. You can verify your email whenever you need to."}</p><span className={session.user.email_confirmed_at ? "email-verification-status verified" : "email-verification-status pending"}>{session.user.email_confirmed_at ? "Verified" : "Not verified"}</span>{verificationMessage && <small className="email-verification-message">{verificationMessage}</small>}</div><div className="email-verification-actions">{!session.user.email_confirmed_at && <button className="quiet-button" onClick={() => void requestEmailVerification()} disabled={verificationBusy}><Mail size={14}/>{verificationBusy ? "Please wait…" : "Send verification email"}</button>}<button className="quiet-button" onClick={() => void refreshEmailVerification()} disabled={verificationBusy}>Refresh status</button></div></div>}<div className="settings-card install-settings-card"><div className="install-settings-icon"><Smartphone size={22}/></div><div className="install-settings-copy"><b>Install Grand-Lumen</b><p>Install the workspace directly on this device. Installation is optional and never forced.</p>{installHelp && <small>{installHelp}</small>}</div><button className="solid-button" onClick={() => void installGrandLumen()} disabled={isInstalled}><Download size={15}/>{isInstalled ? "Installed" : "Install app"}</button></div><div className="settings-preferences"><div className="settings-preferences-heading"><div><b>Display & typography</b><p>Control the size and style of text and the app interface on this device.</p></div><button className="quiet-button" onClick={() => { setFontScale(1); setInterfaceScale(1); setFontFamily("Manrope, sans-serif"); setFontWeight("normal"); }}>Reset</button></div><div className="preference-control"><div className="preference-label"><label htmlFor="gl-font-scale">Text size</label><strong>{Math.round(fontScale * 100)}%</strong></div><input id="gl-font-scale" type="range" min="0.85" max="1.3" step="0.05" value={fontScale} onChange={event => setFontScale(Number(event.target.value))}/><div className="preference-range-labels"><span>Smaller</span><span>Default</span><span>Larger</span></div></div><div className="preference-control"><div className="preference-label"><label htmlFor="gl-interface-scale">App screen scale</label><strong>{Math.round(interfaceScale * 100)}%</strong></div><input id="gl-interface-scale" type="range" min="0.85" max="1.15" step="0.05" value={interfaceScale} onChange={event => setInterfaceScale(Number(event.target.value))}/><div className="preference-range-labels"><span>Compact</span><span>Default</span><span>Spacious</span></div></div><div className="preference-control"><label htmlFor="gl-font-family">Font style</label><select id="gl-font-family" value={fontFamily} onChange={event => setFontFamily(event.target.value)}><option value="Manrope, sans-serif">Manrope · Modern</option><option value="Arial, sans-serif">Arial · Classic</option><option value="Georgia, serif">Georgia · Serif</option><option value="'DM Mono', monospace">DM Mono · Monospace</option><option value="system-ui, sans-serif">System default</option></select></div><div className="preference-control"><label htmlFor="gl-font-weight">Text weight</label><select id="gl-font-weight" value={fontWeight} onChange={event => setFontWeight(event.target.value)}><option value="normal">Regular</option><option value="500">Medium</option><option value="600">Semi-bold</option><option value="700">Bold</option></select></div><div className="preference-preview"><span>PREVIEW</span><strong>Explore beyond. Build what comes next.</strong><p>Your display preferences are saved automatically on this device.</p></div></div><div className="settings-card language-settings-card"><div><b>App language</b><p>Choose from more than 100 languages. Grand-Lumen uses English by default and remembers your selection on this device.</p></div><div className="language-setting-control"><input list="gl-app-language-options" value={languageSearch} onChange={event => { setLanguageSearch(event.target.value); const selected = appLanguages.find(language => language.name.toLowerCase() === event.target.value.trim().toLowerCase()); if (selected) { localStorage.setItem("grandLumenLanguageChosen", "true"); setAppLanguage(selected.code); } }} placeholder="Search languages..." aria-label="Search app languages"/><datalist id="gl-app-language-options">{appLanguages.map(language => <option key={language.code} value={language.name}/>)}</datalist><span>{appLanguages.find(language => language.code === appLanguage)?.name || "English"} selected · Translation by Google</span><button className="quiet-button" onClick={resetToEnglish}>Use English</button></div></div><div className="settings-card"><div><b>Appearance</b><p>Choose the interface theme.</p></div><div className="theme-switch"><button className={theme === "dark" ? "selected" : ""} onClick={() => setTheme("dark")}><Moon size={15} /> Dark</button><button className={theme === "light" ? "selected" : ""} onClick={() => setTheme("light")}><Sun size={15} /> Light</button></div></div><div className="settings-card"><div><b>Clear workspace data</b><p>Remove saved items, projects, research notes, Code Lab files and activity records from this browser. Your account, password and sign-in session will remain intact.</p></div><button className="quiet-button" onClick={() => { setClearDataPassword(""); setClearDataError(""); setClearDataOpen(true); }}><LockKeyhole size={14}/> Clear workspace data</button></div><div className="settings-card"><div><b>Export workspace</b><p>Download your saved items, projects and available Grand-Lumen workspace data as a JSON backup. Account passwords are never included.</p></div><button className="quiet-button" onClick={exportWorkspace}><Download size={15}/> Export workspace</button></div><div className="settings-card settings-danger-card"><div><b>Sign out</b><p>End your current Grand-Lumen session on this device.</p></div><button className="quiet-button" onClick={() => void handleLogout()}><LogOut size={15}/> Log out</button></div><div className="settings-card about-grand-lumen"><div><b>About Grand-Lumen</b><p>Grand-Lumen is a connected digital space for discovery, learning, research and creation.</p><strong>Built by Emmanuel Pobee Okpoti - Inventor and student Leader.</strong><a href="https://wa.me/233203446793" target="_blank" rel="noreferrer" className="about-whatsapp-link">Connect via 0203446793 <ExternalLink size={14}/></a></div><span className="version">v1.0.0</span></div>{clearDataOpen && <div className="clear-data-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !clearDataBusy) setClearDataOpen(false); }}><section className="clear-data-dialog" role="dialog" aria-modal="true" aria-labelledby="clear-data-title"><div className="clear-data-icon"><LockKeyhole size={21}/></div><button className="clear-data-close" type="button" onClick={() => { if (!clearDataBusy) setClearDataOpen(false); }} aria-label="Close"><X size={18}/></button><span className="eyebrow">OWNER VERIFICATION</span><h2 id="clear-data-title">Clear workspace data?</h2><p>This permanently removes saved items, projects, research notes, Code Lab files and activity records from this browser. Your Grand-Lumen account and current sign-in will not be deleted.</p><label htmlFor="clear-data-password">Confirm your account password</label><input id="clear-data-password" type="password" autoComplete="current-password" value={clearDataPassword} onChange={event => { setClearDataPassword(event.target.value); setClearDataError(""); }} onKeyDown={event => { if (event.key === "Enter" && clearDataPassword && !clearDataBusy) void clearWorkspaceData(); }} placeholder="Enter your password" disabled={clearDataBusy}/>{clearDataError && <div className="clear-data-error" role="alert">{clearDataError}</div>}<div className="clear-data-actions"><button className="quiet-button" type="button" onClick={() => { setClearDataOpen(false); setClearDataPassword(""); setClearDataError(""); }} disabled={clearDataBusy}>Cancel</button><button className="clear-data-confirm" type="button" onClick={() => void clearWorkspaceData()} disabled={!clearDataPassword || clearDataBusy}>{clearDataBusy ? "Verifying…" : "Verify & clear data"}</button></div><small>Password is checked against the account currently signed in. No password is stored by this confirmation form.</small></section></div>}</section>}
           </div>
           <footer className="app-footer"><span>GRAND-LUMEN</span><span>EXPLORE BEYOND · BUILD WHAT COMES NEXT</span><span>FOUNDATION 1.0</span></footer>
         </main>
       </div>
+      {welcomeTourOpen && <WelcomeTour name={session?.user.user_metadata?.full_name || localProfile?.fullName || session?.user.email || "explorer"} onComplete={completeWelcomeTour} />}
     </>
   );
 }
