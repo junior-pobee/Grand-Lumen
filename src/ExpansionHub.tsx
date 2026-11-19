@@ -140,7 +140,10 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
   const [active, setActive] = useState<ModuleName>("Knowledge Graph");
   const [moduleOpened, setModuleOpened] = useState(false);
   const [browseQuery, setBrowseQuery] = useState("");
-  const [browseSite, setBrowseSite] = useState<(typeof shoppingSites)[number] | null>(null);\n  const [browseResults, setBrowseResults] = useState<{ title: string; description: string; url: string; source: string; kind: string }[]>([]);\n  const [browseBusy, setBrowseBusy] = useState(false);\n  const [browseError, setBrowseError] = useState("");
+  const [browseSite, setBrowseSite] = useState<(typeof shoppingSites)[number] | null>(null);
+  const [browseResults, setBrowseResults] = useState<{ title: string; description: string; url: string; source: string; kind: string }[]>([]);
+  const [browseBusy, setBrowseBusy] = useState(false);
+  const [browseError, setBrowseError] = useState("");
   const [tasks, setTasks] = useState<Task[]>(() => readLocal("lumenTasks", initialTasks));
   const [entries, setEntries] = useState<Entry[]>(() => readLocal("lumenFinanceEntries", initialEntries));
   const [files, setFiles] = useState<SavedFile[]>(() => readLocal("lumenVaultFiles", initialFiles));
