@@ -9,7 +9,7 @@ import TeamWorkspace from "./TeamWorkspace";
 import LumenSheets from "./LumenSheets";
 import ActivityDigest, { type ActivityEntry } from "./ActivityDigest";
 import { supabase, supabaseConfigured } from "./auth";
-import { getCurrency, getDictionary, getHoliday, getPokemon, getWeather, researchTopic, searchArchiveVideos, searchCommonsImages, searchHackerNews, searchWikipedia, searchGlobalNews, type SearchItem, type NewsItem } from "./api";
+import { getCurrency, getDictionary, getHoliday, getPokemon, getWeather, researchTopic, searchArchiveVideos, searchCommonsImages, searchHackerNews, searchWikipedia, searchGlobalNews, type SearchItem, type NewsItem, connectionAwareMessage } from "./api";
 
 function escapeCode(value: string): string {
   return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
@@ -1608,7 +1608,7 @@ function NewsWorkspace() {
       if (!result.length) setError("No matching reports were found. Try a different topic, date, country or publisher.");
     } catch (reason) {
       setItems([]);
-      setError(reason instanceof Error ? reason.message : "News could not be loaded.");
+      setError(connectionAwareMessage(reason, "News could not be loaded."));
     } finally {
       setBusy(false);
     }
@@ -2111,7 +2111,7 @@ function App() {
       setResults(groups.flat());
       if (!groups.flat().length) setError("No results found. Try a different search phrase.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Search failed. Please try again.");
+      setError(connectionAwareMessage(e, "Search could not be completed."));
     } finally {
       setBusy(false);
     }
@@ -2127,7 +2127,7 @@ function App() {
       setResearchResults(items);
       if (!items.length) setError("No readable explanations were found. Try another topic.");
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Research could not be completed.");
+      setError(connectionAwareMessage(reason, "Research could not be completed."));
     } finally {
       setResearchBusy(false);
     }
@@ -2146,7 +2146,7 @@ function App() {
       setMediaResults(items);
       if (!items.length) setError("No media results found. Try another search.");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Media search failed. Please try again.");
+      setError(connectionAwareMessage(e, "Media search could not be completed."));
     } finally {
       setMediaBusy(false);
     }
@@ -2183,7 +2183,7 @@ function App() {
       }
       if (tool === "Public Holidays") setToolOutput(await getHoliday(toolInput.trim() || "GH", new Date().getFullYear()));
     } catch (e) {
-      setError(e instanceof Error ? e.message : "The tool could not complete this request.");
+      setError(connectionAwareMessage(e, "The tool could not complete this request."));
     } finally {
       setBusy(false);
     }
