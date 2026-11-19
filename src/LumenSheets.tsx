@@ -6,8 +6,7 @@ type Sheet = { id: string; workbook_id: string; name: string; position: number }
 type Cell = { id?: string; sheet_id: string; cell_ref: string; value: string; formula: string | null; format: Record<string, unknown>; updated_by: string };
 type StoredBook = { workbook: Workbook; sheets: Sheet[]; cells: Record<string, Record<string, Cell>> };
 
-const columns = Array.from({ length: 12 }, (_, index) => String.fromCharCode(65 + index));
-const rows = Array.from({ length: 30 }, (_, index) => index + 1);
+function columnName(index: number) { let value = index + 1; let name = ""; while (value > 0) { value -= 1; name = String.fromCharCode(65 + value % 26) + name; value = Math.floor(value / 26); } return name; }
 const storageKey = (userId: string) => "grandLumenLocalSheets:" + userId;
 
 function columnIndex(ref: string) {
@@ -37,7 +36,7 @@ function evaluateFormula(source: string, cells: Record<string, Cell>, stack = ne
     const endRow = Number(range[3].match(/[0-9]+/)?.[0]);
     const values: number[] = [];
     for (let row = Math.min(startRow, endRow); row <= Math.max(startRow, endRow); row += 1) {
-      for (let col = Math.min(startCol, endCol); col <= Math.max(startCol, endCol); col += 1) values.push(resolve(columns[col] + row));
+      for (let col = Math.min(startCol, endCol); col <= Math.max(startCol, endCol); col += 1) values.push(resolve(columnName(col) + row));
     }
     const numeric = values.filter(value => Number.isFinite(value));
     const kind = range[1].toUpperCase();
@@ -74,6 +73,13 @@ export default function LumenSheets({ userId }: { userId: string }) {
   const [input, setInput] = useState("");
   const [newName, setNewName] = useState("");
   const [notice, setNotice] = useState("");
+  const [rowCount, setRowCount] = useState(30);
+  const [columnCount, setColumnCount] = useState(12);
+  const [rowDraft, setRowDraft] = useState("30");
+  const [columnDraft, setColumnDraft] = useState("12");
+  const [expanded, setExpanded] = useState(false);
+  const columns = useMemo(() => Array.from({ length: columnCount }, (_, index) => columnName(index)), [columnCount]);
+  const rows = useMemo(() => Array.from({ length: rowCount }, (_, index) => index + 1), [rowCount]);
   const [members] = useState<{ id: string; display_name: string | null; email: string | null }[]>([]);
 
   const readStore = (): StoredBook[] => {
@@ -194,10 +200,10 @@ export default function LumenSheets({ userId }: { userId: string }) {
       }
       const records: Record<string, Cell> = {};
       source.eachRow((row, rowNumber) => {
-        if (rowNumber > 30) return;
+        if (rowNumber > rowCount) return;
         row.eachCell((sourceCell, columnNumber) => {
-          if (columnNumber > 12) return;
-          const ref = columns[columnNumber - 1] + rowNumber;
+          if (columnNumber > columnCount) return;
+          const ref = columnName(columnNumber - 1) + rowNumber;
           const value = sourceCell.value;
           const formula = value && typeof value === "object" && "formula" in value ? "=" + String(value.formula) : null;
           records[ref] = { sheet_id: target!.id, cell_ref: ref, value: formula ? "" : sourceCell.text || String(value ?? ""), formula, format: {}, updated_by: userId };
@@ -228,9 +234,9 @@ export default function LumenSheets({ userId }: { userId: string }) {
     const next = { ...cells };
     lines.forEach((line, rowIndex) => {
       const values = line.match(/(?:^|,)(?:"(?:[^"]|"")*"|[^,]*)/g) || [];
-      values.slice(0, 12).forEach((raw, colIndex) => {
+      values.slice(0, columnCount).forEach((raw, colIndex) => {
         const value = raw.replace(/^,/, "").replace(/^"|"$/g, "").replace(/""/g, '"');
-        const ref = columns[colIndex] + (rowIndex + 1);
+        const ref = columnName(colIndex) + (rowIndex + 1);
         next[ref] = { sheet_id: sheet.id, cell_ref: ref, value: value.startsWith("=") ? "" : value, formula: value.startsWith("=") ? value : null, format: {}, updated_by: userId };
       });
     });
@@ -250,13 +256,15 @@ export default function LumenSheets({ userId }: { userId: string }) {
 
   useEffect(() => { setInput(cells[selected]?.formula || cells[selected]?.value || ""); }, [selected, cells]);
 
+  const applyDimensions = () => { const nextRows = Math.max(1, Math.min(10000, Math.floor(Number(rowDraft) || 1))); const nextColumns = Math.max(1, Math.min(500, Math.floor(Number(columnDraft) || 1))); setRowCount(nextRows); setColumnCount(nextColumns); setRowDraft(String(nextRows)); setColumnDraft(String(nextColumns)); setNotice("Grid resized to " + nextRows.toLocaleString() + " rows × " + nextColumns.toLocaleString() + " columns."); };
+
   const shareWorkbook = () => setNotice("This workbook is stored locally on this device. Cloud sharing is unavailable in offline mode. Export the Excel file to share a copy.");
 
-  return <div className="sheets-workspace">
+  return <div className={"sheets-workspace" + (expanded ? " sheets-workspace-expanded" : "")}>
     <div className="sheets-header"><div><span className="eyebrow">BUSINESS & RECORDS WORKSPACE</span><h2>Lumen Sheets</h2><p>Organise business records, budgets, account registers and calculations. Saved locally on this device.</p></div><div className="sheets-toolbar"><button className="team-secondary" onClick={() => void exportXlsx()} disabled={!workbook}>Export Excel</button><label className="team-secondary sheets-import">Import Excel<input type="file" accept=".xlsx,.xls" onChange={event => { const file = event.target.files?.[0]; if (file) void importXlsx(file); event.currentTarget.value = ""; }}/></label><button className="team-secondary" onClick={exportCsv} disabled={!sheet}>Export CSV</button></div></div>
     {notice && <div className="team-notice">{notice}</div>}
     <div className="sheets-create"><input value={newName} onChange={event => setNewName(event.target.value)} placeholder="New workbook name e.g. Business Accounts"/><button className="team-primary" onClick={createWorkbook} disabled={!newName.trim()}>Create workbook</button></div>
     <div className="sheets-layout"><aside className="sheets-library"><h3>Your workbooks</h3>{workbooks.map(item => <button key={item.id} className={workbook?.id === item.id ? "active" : ""} onClick={() => loadWorkbook(item)}><b>{item.name}</b><small>{new Date(item.updated_at).toLocaleDateString()}</small></button>)}{!workbooks.length && <p className="team-muted">No workbooks yet.</p>}</aside>
-      <section className="sheets-editor">{workbook ? <><div className="sheets-book-title"><div><h3>{workbook.name}</h3><small>Private · Stored on this device</small></div><button className="team-secondary" onClick={shareWorkbook}>Share workbook</button><button className="team-secondary" onClick={addSheet}>+ Add sheet</button></div><div className="sheets-tabs">{sheets.map(item => <button key={item.id} className={sheet?.id === item.id ? "active" : ""} onClick={() => loadSheet(item)}>{item.name}</button>)}</div>{sheet && <><div className="sheets-cell-editor"><b>{selected}</b><input value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === "Enter") saveCell(); }} placeholder="Enter a value or formula, e.g. =SUM(A1:A5)"/><button className="team-primary" onClick={saveCell}>Save cell</button></div><div className="sheets-grid-wrap"><table className="sheets-grid"><thead><tr><th></th>{columns.map(column => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map(row => <tr key={row}><th>{row}</th>{columns.map(column => { const ref = column + row; return <td key={ref}><button className={selected === ref ? "selected" : ""} onClick={() => setSelected(ref)} title={cells[ref]?.formula || cells[ref]?.value || ref}>{calculated[ref] || ""}</button></td>; })}</tr>)}</tbody></table></div></>}</> : <div className="sheets-empty"><h3>Select or create a workbook</h3><p>Your spreadsheet records are saved securely in this browser on this device.</p></div>}</section></div>
+      <section className="sheets-editor">{workbook ? <><div className="sheets-book-title"><div><h3>{workbook.name}</h3><small>Private · Stored on this device</small></div><div className="sheets-book-actions"><button className="team-secondary" onClick={() => setExpanded(value => !value)}>{expanded ? "Exit full screen" : "Expand workspace"}</button><button className="team-secondary" onClick={shareWorkbook}>Share workbook</button><button className="team-secondary" onClick={addSheet}>+ Add sheet</button></div></div><div className="sheets-tabs">{sheets.map(item => <button key={item.id} className={sheet?.id === item.id ? "active" : ""} onClick={() => loadSheet(item)}>{item.name}</button>)}</div>{sheet && <><div className="sheets-dimensions"><label>Rows<input type="number" min="1" max="10000" value={rowDraft} onChange={event => setRowDraft(event.target.value)}/></label><label>Columns<input type="number" min="1" max="500" value={columnDraft} onChange={event => setColumnDraft(event.target.value)}/></label><button className="team-primary" onClick={applyDimensions}>Apply grid size</button><small>Up to 10,000 rows and 500 columns per visible grid. Increase these values whenever needed.</small></div><div className="sheets-cell-editor"><b>{selected}</b><input value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (event.key === "Enter") saveCell(); }} placeholder="Enter a value or formula, e.g. =SUM(A1:A5)"/><button className="team-primary" onClick={saveCell}>Save cell</button></div><div className="sheets-grid-wrap"><table className="sheets-grid"><thead><tr><th></th>{columns.map(column => <th key={column}>{column}</th>)}</tr></thead><tbody>{rows.map(row => <tr key={row}><th>{row}</th>{columns.map(column => { const ref = column + row; return <td key={ref}><button className={selected === ref ? "selected" : ""} onClick={() => setSelected(ref)} title={cells[ref]?.formula || cells[ref]?.value || ref}>{calculated[ref] || ""}</button></td>; })}</tr>)}</tbody></table></div></>}</> : <div className="sheets-empty"><h3>Select or create a workbook</h3><p>Your spreadsheet records are saved securely in this browser on this device.</p></div>}</section></div>
   </div>;
 }
