@@ -599,6 +599,20 @@ body{top:0!important}
 @media(max-width:850px){.gl-graph-layout{grid-template-columns:minmax(0,1fr)}.gl-graph-controls{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.gl-graph-controls>label:first-child,.gl-graph-controls>.gl-graph-field-grid,.gl-graph-controls>.gl-graph-result,.gl-graph-controls>.error-text,.gl-graph-controls>.solid-button,.gl-graph-controls>.quiet-button{grid-column:1/-1}}
 @media(min-width:1400px){.gl-graph-svg{height:clamp(700px,82vh,1100px);min-height:700px}.gl-graph-visual{padding:22px}.gl-graph-controls{grid-template-columns:repeat(4,minmax(0,1fr))}}\n@media(max-width:560px){.gl-graph-svg{height:clamp(430px,66vh,620px);min-height:430px}.gl-graph-head{flex-direction:column}.gl-graph-head>.quiet-button{width:100%;justify-content:center}.gl-graph-controls{grid-template-columns:minmax(0,1fr)}.gl-graph-controls>*{grid-column:1!important}.gl-graph-svg{height:clamp(360px,62vh,560px);min-height:360px}.gl-graph-visual{padding:9px}.gl-axis-tick{font-size:15px}.gl-point-label{font-size:12px}.gl-graph-analysis{display:grid;gap:7px}}
 
+.gl-graph-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.gl-graph-expanded{position:fixed!important;inset:0!important;z-index:99999!important;display:flex!important;flex-direction:column;gap:0!important;padding:clamp(12px,2vw,28px)!important;overflow:auto!important;background:var(--bg,#f4f7fb)!important;box-sizing:border-box}
+.gl-graph-expanded .gl-graph-head,.gl-graph-expanded .gl-graph-tabs,.gl-graph-expanded .gl-graph-presets,.gl-graph-expanded .gl-graph-typebar,.gl-graph-expanded .gl-graph-controls{opacity:0;visibility:hidden;pointer-events:none;max-height:0;overflow:hidden;margin:0;padding:0;border:0;transition:opacity .25s ease,max-height .25s ease}
+.gl-graph-expanded .gl-graph-layout{flex:1;min-height:0;display:flex;gap:0}
+.gl-graph-expanded .gl-graph-visual{flex:1;min-height:0;display:flex;flex-direction:column;padding:clamp(8px,1.5vw,20px);border:0;border-radius:0;background:transparent}
+.gl-graph-expanded .gl-graph-svg{flex:1;width:100%;height:100%;min-height:0;max-height:none;border-radius:12px}
+.gl-graph-exit{position:fixed;top:12px;right:16px;z-index:100001;display:inline-flex;align-items:center;gap:8px;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text);font:inherit;font-size:12px;box-shadow:0 8px 30px #0002;cursor:pointer}
+.gl-graph-expanded .gl-graph-visual-head{padding-right:150px}
+.gl-graph-expanded .gl-graph-visual-head span{opacity:0}
+.gl-graph-expanded .gl-graph-footnote,.gl-graph-expanded .gl-graph-analysis,.gl-graph-expanded .gl-chart-legend{opacity:0;max-height:0;overflow:hidden}
+.gl-graph-expanded .gl-graph-visual-head{transition:opacity .2s ease}
+.gl-graph-expanded .gl-graph-svg{touch-action:none}
+.gl-graph-expanded .gl-graph-svg text{paint-order:stroke;stroke:var(--glass);stroke-width:2px;stroke-linejoin:round}
+@media(max-width:600px){.gl-graph-expanded{padding:8px!important}.gl-graph-expanded .gl-graph-visual-head{padding-right:130px}.gl-graph-exit{top:8px;right:8px;padding:8px 10px;font-size:10px}}
 
 .lumen-hub{display:grid;gap:18px;min-width:0;color:var(--text)}
 .lh-intro{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:20px;border:1px solid var(--line);border-radius:15px;background:linear-gradient(135deg,color-mix(in srgb,var(--accent) 13%,var(--surface)),var(--surface))}
