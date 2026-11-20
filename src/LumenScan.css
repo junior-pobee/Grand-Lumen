@@ -107,6 +107,6 @@ html[data-theme="light"] .gl-scan-submenu button{color:#315d96}
 html[data-theme="light"] .gl-scan-submenu{border-left-color:rgba(76,119,179,.3)}
 @media(prefers-reduced-motion:reduce){.gl-scan-panel,.gl-scan-preview-list{scroll-behavior:auto!important}}
 
-.gl-scan-orb{border-radius:50%;background:#050505;color:#fff;border:5px solid #fff}
+.gl-scan-orb{border-radius:50%;background:#050505;color:#fff;border:1px solid #fff}
 html[data-theme="light"] .gl-scan-orb{background:#fff;color:#050505;border-color:#111;box-shadow:0 10px 30px rgba(38,65,104,.16),inset 0 1px 0 rgba(255,255,255,.95)}
 .gl-scan-orb:focus-visible{outline:2px solid currentColor;outline-offset:3px}
