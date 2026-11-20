@@ -161,6 +161,11 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
     }
     wake();
     setDimmed(false);
+    setPosition(current => {
+      const next = { x: current.x < 0 ? 12 : current.x > window.innerWidth - 68 ? window.innerWidth - 80 : current.x, y: current.y > window.innerHeight - 68 ? window.innerHeight - 80 : current.y };
+      localStorage.setItem("grandLumenScanPosition", JSON.stringify(next));
+      return next;
+    });
     setMenuOpen(value => !value);
     setScreenshotOpen(false);
   };
@@ -170,7 +175,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
       <button ref={buttonRef} className="gl-scan-orb" aria-label="Open Lumen Scan" onPointerDown={beginDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onClick={activate}>
         <QrCode size={35} strokeWidth={2.5}/>
       </button>
-      {menuOpen && <div className="gl-scan-menu">
+      {menuOpen && <div className={"gl-scan-menu" + (position.x < window.innerWidth / 2 ? " side-left" : "") + (position.y < window.innerHeight / 2 ? " below" : "")}>
         <button onClick={() => { setScreenshotOpen(value => !value); wake(); }}><Camera size={16}/> Screenshot <ChevronDown size={13}/></button>
         {screenshotOpen && <div className="gl-scan-submenu">
           <button onClick={onScreenshot}>Capture screen</button>
