@@ -2067,11 +2067,11 @@ function App() {
     setActivityLoaded(true);
   }, [activityStorageKey]);
   useEffect(() => {
-    const meaningfulAction = /^(share|shared|upload|uploaded|download|downloaded|export|exported|save|saved|create|created|add|added|remove|removed|delete|deleted|send|sent|capture|captured|scan|scanned|run|generate|generated|copy|copied|compile|compiled|edit|edited|update|updated|submit|submitted|invite|invited|accept|accepted|reject|rejected|clear|cleared|import|imported|search|searched|explain|explore|explored)\\b/i;
+    const meaningfulAction = /^(share|shared|upload|uploaded|download|downloaded|export|exported|save|saved|create|created|add|added|remove|removed|delete|deleted|send|sent|capture|captured|scan|scanned|run|generate|generated|copy|copied|compile|compiled|edit|edited|update|updated|submit|submitted|invite|invited|accept|accepted|reject|rejected|clear|cleared|import|imported|search|searched|explain|explore|explored)\b/i;
     const captureActivity = (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target.closest<HTMLElement>("button, a, [role=button]") : null;
       if (!target || target.closest(".nav-item, .feature-card, .frequent-card, .activity-digest, .previous-summary-card")) return;
-      const action = (target.innerText || target.getAttribute("aria-label") || target.getAttribute("title") || "").replace(/\\s+/g, " ").trim();
+      const action = (target.innerText || target.getAttribute("aria-label") || target.getAttribute("title") || "").replace(/\s+/g, " ").trim();
       if (!action || action.length < 2 || !meaningfulAction.test(action)) return;
       recordActivity(action.slice(0, 100));
     };
