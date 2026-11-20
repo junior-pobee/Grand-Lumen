@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent } from "react";
-import { Aperture, Camera, Check, ChevronDown, Clapperboard, Copy, Download, FileImage, FileText, ImagePlus, Move, QrCode, ScanLine, Share2, Sparkles, Trash2, Upload, Video, X } from "lucide-react";
+import { Aperture, Camera, Check, ChevronDown, Clapperboard, Copy, Download, FileImage, FileText, FlipHorizontal, ImagePlus, Maximize2, Mic, MicOff, Minimize2, Move, NotebookPen, QrCode, RotateCw, ScanLine, Share2, Sparkles, Sun, Trash2, Upload, Video, X } from "lucide-react";
 import { createWorker } from "tesseract.js";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
 import * as tf from "@tensorflow/tfjs";
@@ -230,7 +230,21 @@ export default function LumenScan() {
   const [studioMediaUrl, setStudioMediaUrl] = useState("");
   const [studioMediaKind, setStudioMediaKind] = useState<"photo" | "video" | "">("");
   const [recording, setRecording] = useState(false);
+  const [cameraFacing, setCameraFacing] = useState<"environment" | "user">("environment");
+  const [cameraExpanded, setCameraExpanded] = useState(false);
+  const [photoRotation, setPhotoRotation] = useState(0);
+  const [photoBrightness, setPhotoBrightness] = useState(100);
+  const [photoContrast, setPhotoContrast] = useState(100);
+  const [voiceRecording, setVoiceRecording] = useState(false);
+  const [voiceUrl, setVoiceUrl] = useState("");
+  const [qrResult, setQrResult] = useState("");
+  const [qrBusy, setQrBusy] = useState(false);
+  const [quickNotes, setQuickNotes] = useState(() => { try { return localStorage.getItem("grandLumenQuickNotes") || ""; } catch { return ""; } });
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceStreamRef = useRef<MediaStream | null>(null);
+  const voiceChunksRef = useRef<Blob[]>([]);
+  const qrFileRef = useRef<HTMLInputElement>(null);
   const mediaChunksRef = useRef<Blob[]>([]);
   const [mode, setMode] = useState<"document" | "object">("document");
   const [records, setRecords] = useState<ScanRecord[]>([]);
@@ -253,6 +267,16 @@ export default function LumenScan() {
   useEffect(() => { void refreshRecords(); }, [refreshRecords]);
 
   useEffect(() => {
+    try { localStorage.setItem("grandLumenQuickNotes", quickNotes); } catch { setError("Quick Notes could not be saved in this browser."); }
+  }, [quickNotes]);
+
+  useEffect(() => () => {
+    voiceStreamRef.current?.getTracks().forEach(track => track.stop());
+    if (voiceUrl) URL.revokeObjectURL(voiceUrl);
+    if (studioMediaUrl) URL.revokeObjectURL(studioMediaUrl);
+  }, [voiceUrl, studioMediaUrl]);
+
+  useEffect(() => {
     if (selected?.kind === "object") {
       requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
     }
@@ -261,7 +285,7 @@ export default function LumenScan() {
   useEffect(() => {
     if (!cameraOn || !videoRef.current) return;
     let active = true;
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: cameraKind === "video" }).then(stream => {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: cameraFacing }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: cameraKind === "video" }).then(stream => {
       if (!active) {
         stream.getTracks().forEach(track => track.stop());
         return;
@@ -281,7 +305,7 @@ export default function LumenScan() {
       streamRef.current = null;
       if (videoRef.current) videoRef.current.srcObject = null;
     };
-  }, [cameraOn, cameraKind]);
+  }, [cameraOn, cameraKind, cameraFacing]);
 
   const addFiles = (incoming: FileList | File[]) => {
     const images = Array.from(incoming).filter(file => file.type.startsWith("image/"));
@@ -536,6 +560,101 @@ export default function LumenScan() {
     setOpen(true);
   };
 
+  const switchCamera = () => {
+    if (recording) stopVideoRecording();
+    setCameraFacing(current => current === "environment" ? "user" : "environment");
+    setError("");
+    setStatus("Switching camera…");
+  };
+
+  const startVoiceRecording = async () => {
+    try {
+      if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") throw new Error("Voice recording is not supported by this browser.");
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      voiceStreamRef.current = stream;
+      voiceChunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      recorder.ondataavailable = event => { if (event.data.size) voiceChunksRef.current.push(event.data); };
+      recorder.onstop = () => {
+        const blob = new Blob(voiceChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        if (voiceUrl) URL.revokeObjectURL(voiceUrl);
+        setVoiceUrl(URL.createObjectURL(blob));
+        setVoiceRecording(false);
+        voiceStreamRef.current?.getTracks().forEach(track => track.stop());
+        voiceStreamRef.current = null;
+        setStatus("Voice recording ready. Play it back or save it.");
+      };
+      voiceRecorderRef.current = recorder;
+      recorder.start();
+      setVoiceRecording(true);
+      setError("");
+      setStatus("Voice recording in progress.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Microphone access was not granted.");
+    }
+  };
+
+  const stopVoiceRecording = () => {
+    if (voiceRecorderRef.current?.state === "recording") voiceRecorderRef.current.stop();
+  };
+
+  const saveVoiceRecording = () => {
+    if (!voiceUrl) return;
+    const anchor = document.createElement("a");
+    anchor.href = voiceUrl;
+    anchor.download = "Grand-Lumen-Voice-" + Date.now() + ".webm";
+    anchor.click();
+  };
+
+  const scanQrImage = async (file: File) => {
+    setQrBusy(true);
+    setQrResult("");
+    setError("");
+    try {
+      const Detector = (globalThis as unknown as { BarcodeDetector?: new (options?: { formats?: string[] }) => { detect: (source: ImageBitmap) => Promise<Array<{ rawValue: string; format: string }>> } }).BarcodeDetector;
+      if (!Detector) throw new Error("QR decoding is not supported by this browser yet. Open this feature in a recent Chrome-based browser.");
+      const bitmap = await createImageBitmap(file);
+      const detector = new Detector({ formats: ["qr_code"] });
+      const results = await detector.detect(bitmap);
+      bitmap.close();
+      if (!results.length) throw new Error("No QR code was found. Try a sharper, well-lit image with the full code visible.");
+      setQrResult(results.map(item => item.rawValue).join("\n\n"));
+      setStatus("QR code decoded inside Grand-Lumen.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "The QR code could not be decoded.");
+    } finally {
+      setQrBusy(false);
+    }
+  };
+
+  const saveEditedPhoto = async () => {
+    if (!studioMediaUrl || studioMediaKind !== "photo") return;
+    try {
+      const image = new Image();
+      image.src = studioMediaUrl;
+      await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error("The photo could not be opened for editing.")); });
+      const sideways = Math.abs(photoRotation % 180) === 90;
+      const canvas = document.createElement("canvas");
+      canvas.width = sideways ? image.naturalHeight : image.naturalWidth;
+      canvas.height = sideways ? image.naturalWidth : image.naturalHeight;
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("Photo editing is unavailable in this browser.");
+      context.translate(canvas.width / 2, canvas.height / 2);
+      context.rotate(photoRotation * Math.PI / 180);
+      context.filter = "brightness(" + photoBrightness + "%) contrast(" + photoContrast + "%)";
+      context.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2);
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/jpeg", .94));
+      if (!blob) throw new Error("The edited photo could not be exported.");
+      const anchor = document.createElement("a");
+      anchor.href = URL.createObjectURL(blob);
+      anchor.download = "Grand-Lumen-Edited-" + Date.now() + ".jpg";
+      anchor.click();
+      setStatus("Edited photo saved to your device.");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Photo editing failed.");
+    }
+  };
+
   const startVideoRecording = () => {
     const stream = streamRef.current;
     if (!stream || typeof MediaRecorder === "undefined") {
@@ -584,9 +703,18 @@ export default function LumenScan() {
           {!cameraOn && !studioMediaUrl && <div className="gl-studio-launch-grid">
             <button onClick={() => startCamera("photo")}><Aperture size={27}/><b>Take a picture</b><span>Capture a photo with your device camera.</span></button>
             <button onClick={() => startCamera("video")}><Video size={27}/><b>Record a video</b><span>Record a video with microphone audio when permission is granted.</span></button>
+            <button onClick={() => void startVoiceRecording()} disabled={voiceRecording}><Mic size={27}/><b>Voice recorder</b><span>Record clear audio using your microphone.</span></button>
+            <button onClick={() => qrFileRef.current?.click()}><QrCode size={27}/><b>QR scanner</b><span>Decode a QR image and show its content here.</span></button>
+            <button onClick={() => setStatus("Quick Notes are ready below.")}><NotebookPen size={27}/><b>Quick Notes</b><span>Write and automatically save notes on this device.</span></button>
           </div>}
-          {cameraOn && <div className="gl-scan-camera-area"><video ref={videoRef} muted playsInline autoPlay/><div className="gl-scan-camera-actions">{cameraKind === "video" ? recording ? <button className="gl-scan-primary" onClick={stopVideoRecording}>Stop recording</button> : <button className="gl-scan-primary" onClick={startVideoRecording}><Video size={16}/> Start recording</button> : <button className="gl-scan-primary" onClick={() => void captureCamera()}><Camera size={16}/> Take picture</button>}<button className="gl-scan-secondary" onClick={() => { if (recording) stopVideoRecording(); else setCameraOn(false); }}>Cancel</button></div></div>}
-          {studioMediaUrl && <div className="gl-studio-preview">{studioMediaKind === "video" ? <video src={studioMediaUrl} controls playsInline/> : <img src={studioMediaUrl} alt="Captured creative studio photo"/>}<div><button className="gl-scan-primary" onClick={saveStudioMedia}><Download size={15}/> Save to device</button><button className="gl-scan-secondary" onClick={() => { URL.revokeObjectURL(studioMediaUrl); setStudioMediaUrl(""); setStudioMediaKind(""); setStatus("Ready for another capture."); }}>New capture</button></div></div>}
+          <input ref={qrFileRef} type="file" accept="image/*" hidden onChange={event => { const file = event.target.files?.[0]; if (file) void scanQrImage(file); event.currentTarget.value = ""; }}/>
+          {voiceRecording && <div className="gl-studio-audio-card"><span><MicOff size={17}/> Recording audio…</span><button className="gl-scan-primary" onClick={stopVoiceRecording}>Stop recording</button></div>}
+          {voiceUrl && <div className="gl-studio-audio-card"><audio src={voiceUrl} controls/><button className="gl-scan-primary" onClick={saveVoiceRecording}><Download size={15}/> Save audio</button><button className="gl-scan-secondary" onClick={() => { URL.revokeObjectURL(voiceUrl); setVoiceUrl(""); }}>Discard</button></div>}
+          {qrBusy && <div className="gl-scan-message">Decoding QR image…</div>}
+          {qrResult && <div className="gl-studio-qr-result"><b>QR result</b><textarea readOnly value={qrResult}/><button className="gl-scan-secondary" onClick={() => void navigator.clipboard?.writeText(qrResult)}><Copy size={14}/> Copy result</button></div>}
+          <div className="gl-studio-notes"><label htmlFor="gl-quick-notes">Quick Notes · saved automatically on this device</label><textarea id="gl-quick-notes" value={quickNotes} onChange={event => setQuickNotes(event.target.value)} placeholder="Write an idea, reminder or quick note…"/></div>
+          {cameraOn && <div className={"gl-scan-camera-area" + (cameraExpanded ? " is-expanded" : "")}><video ref={videoRef} muted playsInline autoPlay/><div className="gl-scan-camera-actions"><button className="gl-scan-secondary" onClick={switchCamera}><FlipHorizontal size={15}/> Switch to {cameraFacing === "environment" ? "front" : "back"}</button><button className="gl-scan-secondary" onClick={() => setCameraExpanded(value => !value)}>{cameraExpanded ? <Minimize2 size={15}/> : <Maximize2 size={15}/>} {cameraExpanded ? "Fit preview" : "Expand preview"}</button>{cameraKind === "video" ? recording ? <button className="gl-scan-primary" onClick={stopVideoRecording}>Stop recording</button> : <button className="gl-scan-primary" onClick={startVideoRecording}><Video size={16}/> Start recording</button> : <button className="gl-scan-primary" onClick={() => void captureCamera()}><Camera size={16}/> Take picture</button>}<button className="gl-scan-secondary" onClick={() => { if (recording) stopVideoRecording(); else setCameraOn(false); }}>Cancel</button></div></div>}
+          {studioMediaUrl && <div className="gl-studio-preview">{studioMediaKind === "video" ? <video src={studioMediaUrl} controls playsInline/> : <><img src={studioMediaUrl} alt="Captured creative studio photo" style={{ transform: "rotate(" + photoRotation + "deg)", filter: "brightness(" + photoBrightness + "%) contrast(" + photoContrast + "%)" }}/><div className="gl-studio-edit-tools"><button className="gl-scan-secondary" onClick={() => setPhotoRotation(value => (value + 90) % 360)}><RotateCw size={14}/> Rotate</button><label><Sun size={14}/> Brightness <input type="range" min="50" max="160" value={photoBrightness} onChange={event => setPhotoBrightness(Number(event.target.value))}/></label><label>Contrast <input type="range" min="50" max="160" value={photoContrast} onChange={event => setPhotoContrast(Number(event.target.value))}/></label><button className="gl-scan-secondary" onClick={() => { setPhotoRotation(0); setPhotoBrightness(100); setPhotoContrast(100); }}>Reset edits</button></div></>}<div><button className="gl-scan-primary" onClick={studioMediaKind === "photo" ? () => void saveEditedPhoto() : saveStudioMedia}><Download size={15}/> Save {studioMediaKind === "photo" ? "edited photo" : "video"}</button><button className="gl-scan-secondary" onClick={() => { URL.revokeObjectURL(studioMediaUrl); setStudioMediaUrl(""); setStudioMediaKind(""); setPhotoRotation(0); setPhotoBrightness(100); setPhotoContrast(100); setStatus("Ready for another capture."); }}>New capture</button></div></div>}
           <p className="gl-scan-capability">Camera and microphone activate only after you choose a capture option. Recording is visible in the studio and stops when you finish or cancel.</p>
         </div> : <><div className="gl-scan-tabs">
           <button className={mode === "document" ? "active" : ""} onClick={() => { setMode("document"); setCameraOn(false); }}><FileText size={15}/> Document scan</button>
