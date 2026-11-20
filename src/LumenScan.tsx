@@ -210,7 +210,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
   return <>
     <div className={"gl-scan-float" + (dimmed ? " is-dimmed" : "")} style={{ left: position.x, top: position.y }}>
       <button ref={buttonRef} className="gl-scan-orb" aria-label="Open Lumen Scan" onPointerDown={beginDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onClick={activate}>
-        <ScanLine size={23} strokeWidth={2.1}/>
+        <QrCode size={24} strokeWidth={2.1}/>
       </button>
       {menuOpen && <div className={"gl-scan-menu" + (position.x < window.innerWidth / 2 ? " side-left" : "") + (position.y < window.innerHeight / 2 ? " below" : "")}>
         <button onClick={() => { setScreenshotOpen(value => !value); wake(); }}><Camera size={16}/> Screenshot <ChevronDown size={13}/></button>
@@ -404,69 +404,45 @@ export default function LumenScan() {
 
   const captureScreen = async () => {
     setError("");
-    setStatus("Capturing the visible Grand-Lumen workspace…");
+    setStatus("Choose the Grand-Lumen tab or screen to capture…");
     try {
-      const width = window.innerWidth;
-      const height = window.innerHeight;
-      const source = document.body;
-      const clone = source.cloneNode(true) as HTMLElement;
-      const copyStyles = (original: Element, copied: Element) => {
-        const computed = window.getComputedStyle(original);
-        const style = Array.from(computed).map(property => property + ":" + computed.getPropertyValue(property) + ";").join("");
-        (copied as HTMLElement).setAttribute("style", style + "box-sizing:border-box;");
-        const originalChildren = Array.from(original.children);
-        const copiedChildren = Array.from(copied.children);
-        originalChildren.forEach((child, index) => {
-          if (copiedChildren[index]) copyStyles(child, copiedChildren[index]);
-        });
-        if (original instanceof HTMLInputElement && copied instanceof HTMLInputElement) copied.setAttribute("value", original.value);
-        if (original instanceof HTMLTextAreaElement && copied instanceof HTMLTextAreaElement) copied.textContent = original.value;
-        if (original instanceof HTMLSelectElement && copied instanceof HTMLSelectElement) copied.value = original.value;
-        if (original instanceof HTMLCanvasElement && copied instanceof HTMLCanvasElement) {
-          try { copied.getContext("2d")?.drawImage(original, 0, 0); } catch {}
-        }
-      };
-      copyStyles(source, clone);
-      clone.style.position = "absolute";
-      clone.style.left = -window.scrollX + "px";
-      clone.style.top = -window.scrollY + "px";
-      clone.style.width = Math.max(source.scrollWidth, width) + "px";
-      clone.style.height = Math.max(source.scrollHeight, height) + "px";
-      clone.style.margin = "0";
-      clone.style.transform = "none";
-      const wrapper = document.createElement("div");
-      wrapper.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
-      wrapper.style.width = width + "px";
-      wrapper.style.height = height + "px";
-      wrapper.style.overflow = "hidden";
-      wrapper.appendChild(clone);
-      const markup = new XMLSerializer().serializeToString(wrapper);
-      const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '"><foreignObject width="100%" height="100%">' + markup + "</foreignObject></svg>";
-      const image = new Image();
-      const imageUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+      if (!navigator.mediaDevices?.getDisplayMedia) {
+        throw new Error("This browser does not support in-app screen capture. Use your device screenshot controls, then upload the image in Scan.");
+      }
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 1 }, audio: false });
       try {
+        const track = stream.getVideoTracks()[0];
+        if (!track) throw new Error("No screen was selected for capture.");
+        const video = document.createElement("video");
+        video.muted = true;
+        video.playsInline = true;
+        video.srcObject = stream;
         await new Promise<void>((resolve, reject) => {
-          image.onload = () => resolve();
-          image.onerror = () => reject(new Error("This browser could not render the workspace screenshot."));
-          image.src = imageUrl;
+          video.onloadedmetadata = () => resolve();
+          video.onerror = () => reject(new Error("The selected screen could not be opened."));
         });
+        await video.play();
+        await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+        const width = video.videoWidth;
+        const height = video.videoHeight;
+        if (!width || !height) throw new Error("The selected screen has no capturable image.");
         const canvas = document.createElement("canvas");
-        canvas.width = width * Math.min(2, window.devicePixelRatio || 1);
-        canvas.height = height * Math.min(2, window.devicePixelRatio || 1);
+        const scale = Math.min(2, window.devicePixelRatio || 1);
+        canvas.width = Math.round(width * scale);
+        canvas.height = Math.round(height * scale);
         const context = canvas.getContext("2d");
         if (!context) throw new Error("Screenshot capture is unavailable in this browser.");
-        context.scale(canvas.width / width, canvas.height / height);
-        context.drawImage(image, 0, 0, width, height);
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
         const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png"));
         if (!blob) throw new Error("The workspace screenshot could not be created.");
         await saveScreenshot(new File([blob], "Grand-Lumen-Screenshot-" + Date.now() + ".png", { type: "image/png" }));
+        setMode("document");
+        setOpen(true);
       } finally {
-        URL.revokeObjectURL(imageUrl);
+        stream.getTracks().forEach(track => track.stop());
       }
-      setMode("document");
-      setOpen(true);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "The workspace screenshot could not be captured. Use your phone's screenshot controls if this browser blocks page capture.");
+      setError(reason instanceof Error ? reason.message : "The workspace screenshot could not be captured.");
       setOpen(true);
     }
   };
