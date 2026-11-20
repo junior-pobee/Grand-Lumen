@@ -110,3 +110,26 @@ html[data-theme="light"] .gl-scan-submenu{border-left-color:rgba(76,119,179,.3)}
 .gl-scan-orb{border-radius:50%;background:#050505;color:#fff;border:5px solid #fff}
 html[data-theme="light"] .gl-scan-orb{background:#fff;color:#050505;border-color:#111;box-shadow:0 10px 30px rgba(38,65,104,.16),inset 0 1px 0 rgba(255,255,255,.95)}
 .gl-scan-orb:focus-visible{outline:2px solid currentColor;outline-offset:3px}
+
+.gl-scan-orb{position:relative;isolation:isolate;transform-style:preserve-3d;perspective:700px;background:radial-gradient(circle at 28% 20%,#fff 0 5%,#9ee5ff 8%,#3977c8 24%,#101d3d 62%,#050914 100%);border:1px solid #d8f3ff;box-shadow:0 15px 24px #07152f66,0 5px 0 #07152f,inset 0 2px 5px #ffffffb8,inset 0 -7px 12px #0009;transition:transform .22s ease,box-shadow .22s ease,filter .22s ease;animation:gl-orb-float 4s ease-in-out infinite}
+.gl-scan-orb:before{content:"";position:absolute;inset:5px;border:1px solid #d5f4ff99;border-radius:50%;box-shadow:inset 0 0 12px #a4e8ff66,0 0 13px #7dd7ff77;pointer-events:none;transform:translateZ(5px)}
+.gl-scan-orb:after{content:"";position:absolute;inset:-5px;border-radius:50%;background:conic-gradient(from 20deg,#5ee7ff88,#7b9cff22,#ffffffaa,#54d6ff66);filter:blur(9px);opacity:.5;z-index:-1;pointer-events:none}
+.gl-scan-orb:hover{transform:translateY(-4px) rotateX(9deg) rotateY(-9deg) scale(1.04);box-shadow:0 21px 30px #07152f77,0 7px 0 #07152f,inset 0 2px 5px #ffffffc9,inset 0 -7px 12px #0009}
+.gl-scan-orb:active{transform:translateY(2px) scale(.96);box-shadow:0 8px 14px #07152f66,0 2px 0 #07152f,inset 0 2px 8px #0008}
+.gl-scan-menu-feature{background:linear-gradient(115deg,#244f8b66,#7c58c766)!important;border:1px solid #9edcff55!important}
+.gl-scan-menu-feature span{margin-left:auto;color:#9fdcff;font-size:8px;letter-spacing:.08em}
+.gl-studio-workspace{display:grid;gap:14px}
+.gl-studio-launch-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.gl-studio-launch-grid button{min-height:155px;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:10px;padding:18px;border:1px solid #91caff44;border-radius:16px;background:linear-gradient(145deg,#264d8233,#8a70c51c);color:#a9d7ff;text-align:left;box-shadow:inset 0 1px #ffffff20,0 10px 25px #07152f22;transition:transform .2s ease,border-color .2s ease}
+.gl-studio-launch-grid button:hover{transform:translateY(-3px);border-color:#9edcff99}
+.gl-studio-launch-grid b{color:inherit;font-size:14px}
+.gl-studio-launch-grid span{color:#91a0b7;font-size:10px;line-height:1.6}
+.gl-studio-preview{display:grid;gap:12px;padding:12px;border:1px solid #ffffff20;border-radius:14px;background:#ffffff08}
+.gl-studio-preview img,.gl-studio-preview video{display:block;width:100%;max-height:55dvh;object-fit:contain;border-radius:10px;background:#030914}
+.gl-studio-preview>div{display:flex;gap:8px;flex-wrap:wrap}
+html[data-theme="light"] .gl-studio-launch-grid button{background:linear-gradient(145deg,#e8f3ff,#f3efff);border-color:#c6d9ef;color:#285b96}
+html[data-theme="light"] .gl-studio-launch-grid span{color:#64748b}
+html[data-theme="light"] .gl-studio-preview{background:#f8fafd;border-color:#d8e1ed}
+@keyframes gl-orb-float{0%,100%{translate:0 0}50%{translate:0 -3px}}
+@media(max-width:560px){.gl-studio-launch-grid{grid-template-columns:1fr}.gl-studio-launch-grid button{min-height:120px}}
+@media(prefers-reduced-motion:reduce){.gl-scan-orb{animation:none}}
