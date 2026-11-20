@@ -1092,3 +1092,9 @@ html[data-theme="light"] .gl-welcome-tour-actions>button{border-color:rgba(74,11
 .app-shell,.app-shell *:not(svg):not(path){font-family:var(--gl-font-family,Manrope,sans-serif)!important;font-weight:var(--gl-font-weight,400)!important}
 .app-shell .preference-preview *{font-family:var(--gl-font-family,Manrope,sans-serif)!important;font-weight:var(--gl-font-weight,400)!important}
 .app-shell .lh-code-editor,.app-shell pre,.app-shell code{font-family:ui-monospace,monospace!important}
+
+
+html{scroll-behavior:smooth;scroll-padding-top:76px}
+body,.app-shell,.main-area,.content-wrap,.side-nav,.tool-workspace,.results-list,.media-grid,.api-grid,.project-grid,.learning-grid,.research-grid,.gl-scan-panel,.gl-scan-preview-list{overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
+.side-nav,.tool-workspace,.content-wrap,.main-area,.results-list,.media-grid,.api-grid,.project-grid,.learning-grid,.research-grid{scroll-behavior:smooth}
+@media(prefers-reduced-motion:reduce){html,.side-nav,.tool-workspace,.content-wrap,.main-area,.results-list,.media-grid,.api-grid,.project-grid,.learning-grid,.research-grid{scroll-behavior:auto!important}}
