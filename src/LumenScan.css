@@ -133,3 +133,21 @@ html[data-theme="light"] .gl-studio-preview{background:#f8fafd;border-color:#d8e
 @keyframes gl-orb-float{0%,100%{translate:0 0}50%{translate:0 -3px}}
 @media(max-width:560px){.gl-studio-launch-grid{grid-template-columns:1fr}.gl-studio-launch-grid button{min-height:120px}}
 @media(prefers-reduced-motion:reduce){.gl-scan-orb{animation:none}}
+
+.gl-scan-camera-area.is-expanded{position:fixed;z-index:12003;inset:10px;display:flex;flex-direction:column;justify-content:center;padding:14px;border:1px solid #ffffff30;border-radius:18px;background:#030817f5;box-shadow:0 20px 80px #000b}
+.gl-scan-camera-area.is-expanded video{width:100%;height:min(72dvh,900px);max-height:none;min-height:0;object-fit:contain}
+.gl-scan-camera-area.is-expanded .gl-scan-camera-actions{justify-content:center}
+.gl-studio-audio-card,.gl-studio-qr-result,.gl-studio-notes{display:grid;gap:10px;padding:13px;border:1px solid #ffffff1c;border-radius:12px;background:#ffffff08}
+.gl-studio-audio-card>span{display:flex;align-items:center;gap:8px;color:#b9d9ff;font-size:11px}
+.gl-studio-audio-card audio{width:100%}
+.gl-studio-qr-result>b,.gl-studio-notes>label{color:#a9d1ff;font-size:11px;font-weight:750}
+.gl-studio-qr-result textarea,.gl-studio-notes textarea{width:100%;min-height:100px;padding:11px;border:1px solid #ffffff20;border-radius:9px;background:#070d19;color:#e8efff;font:11px/1.6 inherit;resize:vertical}
+.gl-studio-notes textarea{min-height:145px}
+.gl-studio-edit-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.gl-studio-edit-tools label{display:flex;align-items:center;gap:7px;flex-wrap:wrap;color:#aebbd0;font-size:10px}
+.gl-studio-edit-tools input[type=range]{width:100%;accent-color:#9acbff}
+html[data-theme="light"] .gl-studio-audio-card,html[data-theme="light"] .gl-studio-qr-result,html[data-theme="light"] .gl-studio-notes{border-color:#d8e1ed;background:#f8fafd}
+html[data-theme="light"] .gl-studio-audio-card>span,html[data-theme="light"] .gl-studio-qr-result>b,html[data-theme="light"] .gl-studio-notes>label{color:#285b96}
+html[data-theme="light"] .gl-studio-qr-result textarea,html[data-theme="light"] .gl-studio-notes textarea{border-color:#cbd5e1;background:#fff;color:#17243a}
+html[data-theme="light"] .gl-studio-edit-tools label{color:#64748b}
+@media(max-width:560px){.gl-studio-edit-tools{grid-template-columns:1fr}.gl-scan-camera-area.is-expanded{inset:5px;padding:9px}.gl-scan-camera-area.is-expanded video{height:68dvh}}
