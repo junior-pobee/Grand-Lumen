@@ -728,7 +728,7 @@ export default function LumenScan() {
           <button className="gl-scan-close" onClick={() => { if (!busy) { if (recording) stopVideoRecording(); setOpen(false); setCameraOn(false); } }} aria-label="Close Lumen Scan"><X size={19}/></button>
         </header>
         {workspaceMode === "studio" ? <div className="gl-studio-workspace">
-          {!cameraOn && !studioMediaUrl && !activeStudioTool && <div className="gl-studio-launch-grid">
+          {!cameraOn && !studioMediaUrl && <div className={"gl-studio-launch-grid" + (activeStudioTool ? " is-faded" : "")} aria-hidden={Boolean(activeStudioTool)}>
             <button onClick={() => { setActiveStudioTool("photo"); startCamera("photo"); }}><Aperture size={27}/><b>Take a picture</b><span>Capture a photo with your device camera.</span></button>
             <button onClick={() => setCameraFacing(current => current === "environment" ? "user" : "environment")}><FlipHorizontal size={27}/><b>Camera: {cameraFacing === "environment" ? "Back" : "Front"}</b><span>Choose which camera opens for your next capture.</span></button>
             <button onClick={() => { setActiveStudioTool("video"); startCamera("video"); }}><Video size={27}/><b>Record a video</b><span>Record a video with microphone audio when permission is granted.</span></button>
