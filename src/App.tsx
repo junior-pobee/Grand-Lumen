@@ -677,14 +677,14 @@ function PublicPortal({ onGuest }: { onGuest: (profile?: { fullName: string; ema
     </header>
     {mode === "about" ? <main className="portal-about">
       <section className="portal-hero">
-        <div className="portal-copy"><span className="portal-kicker"><span /> A UNIVERSE FOR THE CURIOUS</span><h1>Think wider.<br /><span>Build beyond.</span></h1><p>Grand-Lumen is a connected digital environment for discovering knowledge, researching ideas, learning skills and creating things that matter.</p><div className="portal-actions"><button className="portal-primary" onClick={() => setMode("signup")}>Create your account <ArrowUpRight size={17} /></button><button className="portal-secondary" onClick={() => setMode("signin")}>Sign in <ArrowRight size={16} /></button></div><div className="portal-trust"><ShieldCheck size={16} /><span>A simple account to unlock your workspace on this device.</span></div></div>
+        <div className="portal-copy"><span className="portal-kicker"><span /> A UNIVERSE FOR THE CURIOUS</span><h1>Think wider.<br /><span>Build beyond.</span></h1><p>Grand-Lumen brings discovery, research, recipes, learning, maps, media, creative tools, spreadsheets and collaboration into one connected workspace.</p><div className="portal-actions"><button className="portal-primary" onClick={() => setMode("signup")}>Create your account <ArrowUpRight size={17} /></button><button className="portal-secondary" onClick={() => setMode("signin")}>Sign in <ArrowRight size={16} /></button></div><div className="portal-trust"><ShieldCheck size={16} /><span>A simple account to unlock your workspace on this device.</span></div></div>
         <div className="portal-visual"><div className="portal-orbit orbit-one" /><div className="portal-orbit orbit-two" /><div className="portal-orbit orbit-three" /><div className="portal-core"><img src={`${import.meta.env.BASE_URL}icons/grand-lumen-icon.svg`} alt="Grand-Lumen star and rings emblem" /><small>GRAND<br />LUMEN</small></div><div className="portal-float portal-float-search"><Search size={16} /><span>Discovery</span></div><div className="portal-float portal-float-code"><Code2 size={16} /><span>Creation</span></div><div className="portal-float portal-float-learn"><BookOpen size={16} /><span>Learning</span></div></div>
       </section>
-      <section className="portal-manifesto"><div><span className="portal-kicker">THE GRAND-LUMEN IDEA</span><h2>More than a search page.<br /><span>A place to make progress.</span></h2></div><p>Grand-Lumen brings useful digital capabilities into one organised workspace. Move from a question to a source, from a concept to a lesson, and from an idea to a working project without losing your direction.</p></section>
+      <section className="portal-manifesto"><div><span className="portal-kicker">THE GRAND-LUMEN IDEA</span><h2>More than a search page.<br /><span>A place to make progress.</span></h2></div><p>Search and investigate ideas, explore recipes and global media, create with camera and code tools, organise data in Lumen Sheets, and share work across devices. Grand-Lumen brings these everyday workflows together in one evolving workspace.</p></section>
       <section className="portal-feature-section"><div className="portal-section-heading"><span className="portal-kicker">INSIDE THE UNIVERSE</span><h2>One environment.<br /><span>Many ways to explore.</span></h2></div><div className="portal-feature-grid">
-        {[{icon:Search,title:"Discovery engine",detail:"Explore knowledge and technology sources in one search experience."},{icon:FlaskConical,title:"Research studio",detail:"Investigate topics, collect source material and organise your thinking."},{icon:Code2,title:"Multi-language Code Lab",detail:"Experiment with programming languages and preview web projects."},{icon:GraduationCap,title:"Learning hub",detail:"Build practical knowledge through guided learning paths."},{icon:Image,title:"Visual universe",detail:"Discover images and public video collections."},{icon:MapPin,title:"Maps and location",detail:"Explore places, use device GPS and plan directions."},{icon:Calculator,title:"Smart utilities",detail:"Use a scientific calculator, dictionary, weather and conversion tools."},{icon:Database,title:"API library",detail:"Discover services and open data for future integrations."}].map((item,index)=>{const Icon=item.icon;return <article className="portal-feature" key={item.title}><span className="portal-feature-index">0{index+1}</span><span className="portal-feature-icon"><Icon size={20}/></span><h3>{item.title}</h3><p>{item.detail}</p></article>;})}
+        {[{icon:Search,title:"Search and discovery",detail:"Search knowledge and technology sources, with results presented inside Grand-Lumen."},{icon:FlaskConical,title:"Research workspace",detail:"Investigate topics, review source material and keep research notes organised."},{icon:Utensils,title:"Recipe discovery",detail:"Find recipes, preview meal details, compare indicative prices and follow ordering links."},{icon:Newspaper,title:"News and media",detail:"Explore global news, discover images and preview public video collections."},{icon:MapPin,title:"Maps and location",detail:"Explore places, use device location when available and open directions."},{icon:Code2,title:"Code Lab and learning",detail:"Work with multi-language code starters, preview web projects and follow learning paths."},{icon:Video,title:"Creative Studio",detail:"Use camera capture, video recording, voice recording and photo editing tools."},{icon:ScanLine,title:"Scanner",detail:"Scan QR codes with a supported camera or an uploaded image."},{icon:Layers3,title:"Lumen Sheets",detail:"Edit spreadsheet cells, use formulas, import and export workbooks, and expand the workspace."},{icon:Calculator,title:"Workspace tools",detail:"Use the calculator, graphing, dictionary, weather, currency and reminder tools."},{icon:Share2,title:"Lumen Share",detail:"Connect devices to exchange text and files while both devices remain connected."},{icon:Bookmark,title:"Personal workspace",detail:"Keep saved discoveries, projects and activity together, with theme and interface settings."},{icon:Database,title:"API Library",detail:"Browse a catalogue of public and developer APIs with source documentation."},{icon:UserRound,title:"Messages and Team",detail:"Access the communication and team workspaces from the Grand-Lumen sidebar."}].map((item,index)=>{const Icon=item.icon;return <article className="portal-feature" key={item.title}><span className="portal-feature-index">0{index+1}</span><span className="portal-feature-icon"><Icon size={20}/></span><h3>{item.title}</h3><p>{item.detail}</p></article>;})}
       </div></section>
-      <section className="portal-account-band"><div><span className="portal-kicker">YOUR WORKSPACE, YOUR ACCOUNT</span><h2>Pick up where you left off.</h2><p>Create a temporary local account to unlock Grand-Lumen in this browser. Cloud sign-in and cross-device access will be added when Supabase is connected.</p></div><button className="portal-primary" onClick={() => setMode("signup")}>Get started <ArrowUpRight size={17}/></button></section>
+      <section className="portal-account-band"><div><span className="portal-kicker">YOUR WORKSPACE, YOUR ACCOUNT</span><h2>Pick up where you left off.</h2><p>{supabaseConfigured ? "Sign in with your account to reopen your workspace." : "Create a local account to unlock Grand-Lumen in this browser. Local account data stays on this device."}</p></div><button className="portal-primary" onClick={() => setMode("signup")}>Get started <ArrowUpRight size={17}/></button></section>
       <footer className="portal-footer"><span>GRAND-LUMEN</span><span>EXPLORE BEYOND · BUILD WHAT COMES NEXT</span><button onClick={() => setMode("signin")}>Account access <ArrowRight size={14}/></button></footer>
     </main> : <AuthPanel mode={mode} onModeChange={setMode} onGuest={onGuest} />}
   </div>;
@@ -1837,10 +1837,7 @@ function App() {
   const [clearDataError, setClearDataError] = useState("");
   const [clearDataBusy, setClearDataBusy] = useState(false);
   const [profilePicture, setProfilePicture] = useState<string>(() => localStorage.getItem("grandLumenProfileImage") || "");
-  const [loading, setLoading] = useState(true);
-  const [progress, setProgress] = useState(0);
-  const [status, setStatus] = useState("INITIALIZING GRAND-LUMEN");
-  const [query, setQuery] = useState("");
+    const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchItem[]>([]);
   const [mediaResults, setMediaResults] = useState<SearchItem[]>([]);
   const [mediaBusy, setMediaBusy] = useState(false);
@@ -2172,13 +2169,6 @@ function App() {
   }, []);
 
   useEffect(() => {
-    setProgress(100);
-    setStatus("WORKSPACE READY");
-    const timeout = window.setTimeout(() => setLoading(false), 520);
-    return () => window.clearTimeout(timeout);
-  }, []);
-
-  useEffect(() => {
     localStorage.setItem("grandLumenSaved", JSON.stringify(saved));
   }, [saved]);
   useEffect(() => {
@@ -2426,20 +2416,13 @@ function App() {
     Settings: "Shape your workspace."
   };
 
-  if (!authReady) return <div className="auth-boot"><div className="portal-brand-mark"><img src={`${import.meta.env.BASE_URL}icons/grand-lumen-icon.svg`} alt="Grand-Lumen" /></div><span>SECURING YOUR WORKSPACE</span></div>;
+  if (!authReady) return <div className="auth-boot"><div className="portal-brand-mark"><img src={`${import.meta.env.BASE_URL}icons/grand-lumen-icon.svg`} alt="Grand-Lumen" /></div><span>SECURING YOUR WORKSPACE DATA</span></div>;
   if (!session && !guestMode) return <PublicPortal onGuest={(profile) => { if (profile) { setLocalProfile(profile); setWelcomeTourOpen(profile.onboardingPending === true); } setGuestMode(true); }} />;
 
   return (
     <>
-      {loading && <div id="lumen-loading-screen">
-        <div className="ls-logo">LUMEN<span>.</span></div>
-        <div className="ls-spinner-container"><div className="ls-spinner-ring" /><div className="ls-spinner-core" /></div>
-        <div className="ls-progress-bar-bg"><div className="ls-progress-bar-fill" style={{ width: progress + "%" }} /></div>
-        <div className="ls-status-text">{status}</div>
-        <div className="ls-credit">A NEW WORLD OF POSSIBILITIES</div>
-      </div>}
       <GlobalReminderMonitor />
-      {!loading && <LumenScan />}
+      <LumenScan />
       <div className={theme === "light" ? "app-shell theme-light" : "app-shell theme-dark"} style={{ "--gl-font-scale": fontScale, "--gl-interface-scale": interfaceScale, "--gl-font-family": fontFamily, "--gl-font-weight": fontWeight } as React.CSSProperties}>
         {appLanguage !== "en" && <button className="language-default-fab" onClick={resetToEnglish} aria-label="Switch back to English"><Globe2 size={15} /><span>English</span><ArrowRight size={13} /></button>}
         <aside className={mobileMenu ? "sidebar open" : "sidebar"}>
