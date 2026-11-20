@@ -123,7 +123,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
       const saved = localStorage.getItem("grandLumenScanPosition");
       if (saved) return JSON.parse(saved) as Position;
     } catch {}
-    return { x: Math.max(12, window.innerWidth - 76), y: Math.max(90, Math.round(window.innerHeight * 0.56)) };
+    return { x: Math.max(12, window.innerWidth - 88), y: Math.max(90, Math.round(window.innerHeight * 0.56)) };
   });
   const [menuOpen, setMenuOpen] = useState(false);
   const [screenshotOpen, setScreenshotOpen] = useState(false);
@@ -141,11 +141,11 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
       setMenuOpen(false);
       setScreenshotOpen(false);
       setPosition(current => {
-        const centerX = current.x + 26;
-        const centerY = current.y + 26;
+        const centerX = current.x + 32;
+        const centerY = current.y + 32;
         const distances = { left: centerX, right: window.innerWidth - centerX, top: centerY, bottom: window.innerHeight - centerY };
         const nearest = Object.entries(distances).sort((a, b) => a[1] - b[1])[0][0];
-        const next = nearest === "left" ? { x: -26, y: Math.max(12, Math.min(window.innerHeight - 52, current.y)) } : nearest === "right" ? { x: window.innerWidth - 26, y: Math.max(12, Math.min(window.innerHeight - 52, current.y)) } : nearest === "top" ? { x: Math.max(12, Math.min(window.innerWidth - 52, current.x)), y: -24 } : { x: Math.max(12, Math.min(window.innerWidth - 52, current.x)), y: window.innerHeight - 26 };
+        const next = nearest === "left" ? { x: -32, y: Math.max(12, Math.min(window.innerHeight - 64, current.y)) } : nearest === "right" ? { x: window.innerWidth - 32, y: Math.max(12, Math.min(window.innerHeight - 64, current.y)) } : nearest === "top" ? { x: Math.max(12, Math.min(window.innerWidth - 64, current.x)), y: -24 } : { x: Math.max(12, Math.min(window.innerWidth - 64, current.x)), y: window.innerHeight - 32 };
         localStorage.setItem("grandLumenScanPosition", JSON.stringify(next));
         return next;
       });
@@ -154,7 +154,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
 
   useEffect(() => {
     wake();
-    const resize = () => setPosition(current => ({ x: Math.max(-24, Math.min(window.innerWidth - 24, current.x)), y: Math.max(-24, Math.min(window.innerHeight - 26, current.y)) }));
+    const resize = () => setPosition(current => ({ x: Math.max(-24, Math.min(window.innerWidth - 24, current.x)), y: Math.max(-24, Math.min(window.innerHeight - 32, current.y)) }));
     window.addEventListener("resize", resize);
     return () => {
       window.clearTimeout(idleTimer.current);
@@ -174,7 +174,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
     const dy = event.clientY - drag.current.y;
     if (Math.abs(dx) + Math.abs(dy) > 5) drag.current.moved = true;
     if (drag.current.moved) {
-      const next = { x: Math.max(8, Math.min(window.innerWidth - 60, drag.current.left + dx)), y: Math.max(12, Math.min(window.innerHeight - 60, drag.current.top + dy)) };
+      const next = { x: Math.max(8, Math.min(window.innerWidth - 72, drag.current.left + dx)), y: Math.max(12, Math.min(window.innerHeight - 72, drag.current.top + dy)) };
       setPosition(next);
       localStorage.setItem("grandLumenScanPosition", JSON.stringify(next));
     }
@@ -199,7 +199,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
     wake();
     setDimmed(false);
     setPosition(current => {
-      const next = { x: current.x < 0 ? 12 : current.x > window.innerWidth - 52 ? window.innerWidth - 60 : current.x, y: current.y > window.innerHeight - 52 ? window.innerHeight - 60 : current.y };
+      const next = { x: current.x < 0 ? 12 : current.x > window.innerWidth - 64 ? window.innerWidth - 72 : current.x, y: current.y > window.innerHeight - 64 ? window.innerHeight - 72 : current.y };
       localStorage.setItem("grandLumenScanPosition", JSON.stringify(next));
       return next;
     });
@@ -210,7 +210,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
   return <>
     <div className={"gl-scan-float" + (dimmed ? " is-dimmed" : "")} style={{ left: position.x, top: position.y }}>
       <button ref={buttonRef} className="gl-scan-orb" aria-label="Open Lumen Scan" onPointerDown={beginDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onClick={activate}>
-        <QrCode size={24} strokeWidth={2.1}/>
+        <QrCode size={30} strokeWidth={2.1}/>
       </button>
       {menuOpen && <div className={"gl-scan-menu" + (position.x < window.innerWidth / 2 ? " side-left" : "") + (position.y < window.innerHeight / 2 ? " below" : "")}>
         <button onClick={() => { setScreenshotOpen(value => !value); wake(); }}><Camera size={16}/> Screenshot <ChevronDown size={13}/></button>
