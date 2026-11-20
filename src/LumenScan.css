@@ -141,7 +141,7 @@ html[data-theme="light"] .gl-studio-preview{background:#f8fafd;border-color:#d8e
 .gl-studio-audio-card>span{display:flex;align-items:center;gap:8px;color:#b9d9ff;font-size:11px}
 .gl-studio-audio-card audio{width:100%}
 .gl-studio-qr-result>b,.gl-studio-notes>label{color:#a9d1ff;font-size:11px;font-weight:750}
-.gl-studio-qr-result textarea,.gl-studio-notes textarea{width:100%;min-height:100px;padding:11px;border:1px solid #ffffff20;border-radius:9px;background:#070d19;color:#e8efff;font:11px/1.6 inherit;resize:vertical}
+.gl-studio-qr-result textarea,.gl-studio-notes textarea{width:100%;min-height:100px;padding:11px;border:1px solid #ffffff20;border-radius:9px;background:#070d19;color:#e8efff;font:11px/1.6 sans-serif;resize:vertical}
 .gl-studio-notes textarea{min-height:145px}
 .gl-studio-edit-tools{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
 .gl-studio-edit-tools label{display:flex;align-items:center;gap:7px;flex-wrap:wrap;color:#aebbd0;font-size:10px}
