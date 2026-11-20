@@ -2444,7 +2444,7 @@ function App() {
           <nav className="side-nav">
             {sections.map(item => {
               const Icon = item.icon;
-              return <button key={item.name} className={section === item.name ? "nav-item active" : "nav-item"} onClick={() => selectSection(item.name)}><span className="nav-icon-wrap" aria-hidden="true"><Icon size={18} strokeWidth={2.8} /><Icon size={18} strokeWidth={2.8} /></span><span>{item.name}</span>{item.name === "Saved" && saved.length > 0 && <i>{saved.length}</i>}</button>;
+              return <button key={item.name} className={section === item.name ? "nav-item active" : "nav-item"} onClick={() => selectSection(item.name)}><span className="nav-icon-wrap" aria-hidden="true"><Icon className="nav-icon-base" size={18} strokeWidth={2.8} /><Icon className="nav-icon-edge" size={18} strokeWidth={2.8} /></span><span>{item.name}</span>{item.name === "Saved" && saved.length > 0 && <i>{saved.length}</i>}</button>;
             })}
             <div className="sidebar-clock" aria-live="off">
               <div className="sidebar-clock-heading"><Clock size={12}/><span>LOCAL DATE &amp; TIME</span></div>
