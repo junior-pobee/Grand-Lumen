@@ -1795,3 +1795,50 @@ html,body,#root { width:100%; max-width:100%; overflow-x:clip; }
     font-size: 9px;
   }
 }
+
+.nav-item {
+  gap: 12px;
+}
+.nav-icon-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 24px;
+  color: currentColor;
+}
+.nav-icon-wrap svg {
+  width: 19px;
+  height: 19px;
+  stroke-width: 2.8px;
+  filter: drop-shadow(0 0 .35px currentColor);
+}
+.nav-icon-wrap::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  right: 0;
+  width: 4px;
+  border-right: 1.35px solid currentColor;
+  border-radius: 0 80% 80% 0;
+  transform: translateX(-1px) scaleY(.92);
+  opacity: .9;
+  pointer-events: none;
+}
+.theme-light .nav-icon-wrap {
+  color: #385675;
+}
+.theme-light .nav-item.active .nav-icon-wrap,
+.theme-light .nav-item:hover .nav-icon-wrap {
+  color: #174f8c;
+}
+.theme-dark .nav-icon-wrap {
+  color: #c0cee2;
+}
+.theme-dark .nav-item.active .nav-icon-wrap,
+.theme-dark .nav-item:hover .nav-icon-wrap {
+  color: var(--accent);
+}
