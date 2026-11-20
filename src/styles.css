@@ -1916,3 +1916,41 @@ html,body,#root { width:100%; max-width:100%; overflow-x:clip; }
 @keyframes previous-summary-fade{from{opacity:0}to{opacity:1}}
 @keyframes previous-summary-rise{from{opacity:0;transform:translateY(18px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(max-width:560px){.previous-summary-backdrop{padding:9px;align-items:center}.previous-summary-card{max-height:92dvh;padding:17px;border-radius:19px}.previous-summary-heading{gap:11px}.previous-summary-mark{flex-basis:43px;width:43px;height:43px}.previous-summary-list{max-height:30dvh}.previous-summary-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.previous-summary-actions button{width:100%}}
+
+
+.recipe-modal {
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+}
+
+.recipe-modal-content {
+  min-height: 0;
+  max-height: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: #7896bd66 transparent;
+}
+
+.recipe-modal-content::-webkit-scrollbar {
+  width: 7px;
+}
+
+.recipe-modal-content::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #7896bd66;
+}
+
+@media (min-width: 621px) {
+  .recipe-modal {
+    height: min(88vh, 900px);
+    height: min(88dvh, 900px);
+  }
+
+  .recipe-modal-image {
+    min-height: 0;
+    height: 100%;
+  }
+}
