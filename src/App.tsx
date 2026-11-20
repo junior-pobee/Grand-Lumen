@@ -1823,6 +1823,7 @@ function ReminderToolsWorkspace() {
 }
 
 function App() {
+  const contentRef = useRef<HTMLDivElement>(null);
   const [section, setSection] = useState<Section>("Home");
   const [session, setSession] = useState<Session | null>(null);
   const [verificationBusy, setVerificationBusy] = useState(false);
@@ -2382,6 +2383,11 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
+    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  }, [section, session?.user.id, localProfile?.email, guestMode, authReady]);
+
   function selectSection(value: Section) {
     if (value !== section) recordActivity("Opened " + value, value);
     setSection(value);
@@ -2448,7 +2454,7 @@ function App() {
             <div className="breadcrumb"><span>GRAND-LUMEN</span><ArrowRight size={13} /><b>{section.toUpperCase()}</b></div>
             <div className="top-actions"><span className="system-status"><i /> SYSTEM READY</span><div className="desktop-alert-center"><AlertCenter /></div><span className="signed-in-email">{session?.user.email || localProfile?.email || "LOCAL WORKSPACE"}</span><button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => void handleLogout()} aria-label="Sign out"><LogOut size={16} /></button></div>
           </header>
-          <div className="content-wrap">
+          <div className="content-wrap" ref={contentRef}>
             {section === "Lumen Hub" && <section><PageTitle eyebrow="GLOBAL DIGITAL UTILITY PLATFORM" title={heading["Lumen Hub"]} description="Connected knowledge, everyday utilities, productivity, learning and accessibility tools. AI is intentionally excluded from this release."/><ExpansionHub language={appLanguage} userId={session?.user.id || ""} onOpenScanner={() => selectSection("Scanner")}/></section>}
             {section === "Home" && <section>
               <div className="hero-block"><div className="eyebrow"><Sparkles size={13} /> YOUR EXPANDED DIGITAL UNIVERSE</div><h1>Explore beyond<br /><span>what you know.</span></h1><p>One workspace for discovery, research, learning, development and creation. Your next idea starts here.</p><div className="hero-search"><Search size={19} /><input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && runSearch()} placeholder="Search knowledge, ideas, technology..." /><button onClick={() => { selectSection("Search"); runSearch(); }}>Explore <ArrowRight size={15} /></button></div><div className="quick-tags"><button onClick={() => { setQuery("artificial intelligence"); selectSection("Search"); }}>Artificial intelligence</button><button onClick={() => { setQuery("space exploration"); selectSection("Search"); }}>Space exploration</button><button onClick={() => { setQuery("web development"); selectSection("Search"); }}>Web development</button></div></div>
