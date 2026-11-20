@@ -15,7 +15,11 @@
     "@supabase/supabase-js": "^2.57.4",
     "peerjs": "^1.5.5",
     "qrcode.react": "^4.2.0",
-    "exceljs": "^4.4.0"
+    "exceljs": "^4.4.0",
+    "tesseract.js": "^6.0.1",
+    "@tensorflow-models/coco-ssd": "^2.2.3",
+    "@tensorflow/tfjs": "^4.22.0",
+    "jspdf": "^3.0.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.18",
