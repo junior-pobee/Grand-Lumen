@@ -94,3 +94,15 @@ html[data-theme="light"] .gl-scan-preview-list figcaption{color:#64748b}
 
 .gl-scan-panel,.gl-scan-preview-list{touch-action:pan-y;}
 .gl-scan-panel:focus-within{scroll-behavior:smooth;}
+
+
+.gl-scan-orb,.gl-scan-menu{backdrop-filter:blur(24px) saturate(165%);-webkit-backdrop-filter:blur(24px) saturate(165%);box-shadow:0 12px 34px rgba(3,12,28,.2),inset 0 1px 0 rgba(255,255,255,.2)}
+.gl-scan-orb{background:rgba(15,29,53,.68);border-color:rgba(169,209,255,.45)}
+.gl-scan-menu{background:rgba(12,22,40,.76);border-color:rgba(190,213,246,.22)}
+.gl-scan-menu>button:hover,.gl-scan-submenu button:hover{background:rgba(255,255,255,.12)}
+html[data-theme="light"] .gl-scan-orb{background:rgba(255,255,255,.72);border-color:rgba(92,125,171,.3);color:#24518a;box-shadow:0 10px 30px rgba(38,65,104,.16),inset 0 1px 0 rgba(255,255,255,.95)}
+html[data-theme="light"] .gl-scan-menu{background:rgba(255,255,255,.76);border-color:rgba(105,130,165,.26);color:#1b2c45;box-shadow:0 18px 48px rgba(34,56,88,.18),inset 0 1px 0 rgba(255,255,255,.96)}
+html[data-theme="light"] .gl-scan-menu>button:hover,html[data-theme="light"] .gl-scan-submenu button:hover{background:rgba(74,119,183,.1)}
+html[data-theme="light"] .gl-scan-submenu button{color:#315d96}
+html[data-theme="light"] .gl-scan-submenu{border-left-color:rgba(76,119,179,.3)}
+@media(prefers-reduced-motion:reduce){.gl-scan-panel,.gl-scan-preview-list{scroll-behavior:auto!important}}
