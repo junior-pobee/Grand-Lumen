@@ -2075,8 +2075,22 @@ function App() {
       if (!action || action.length < 2 || !meaningfulAction.test(action)) return;
       recordActivity(action.slice(0, 100));
     };
+    const captureFileActivity = (event: Event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLInputElement) || target.type !== "file" || !target.files?.length) return;
+      const files = Array.from(target.files);
+      const imageFiles = files.filter(file => file.type.startsWith("image/"));
+      const label = target.closest("label")?.innerText?.replace(/\s+/g, " ").trim();
+      const names = files.slice(0, 3).map(file => file.name).join(", ");
+      const action = imageFiles.length === files.length ? "Added image" : "Added file";
+      recordActivity(action + (label ? " through " + label : "") + ": " + names);
+    };
     document.addEventListener("click", captureActivity, true);
-    return () => document.removeEventListener("click", captureActivity, true);
+    document.addEventListener("change", captureFileActivity, true);
+    return () => {
+      document.removeEventListener("click", captureActivity, true);
+      document.removeEventListener("change", captureFileActivity, true);
+    };
   }, [activityStorageKey, section]);
   useEffect(() => {
     const captureInstall = (event: Event) => {
