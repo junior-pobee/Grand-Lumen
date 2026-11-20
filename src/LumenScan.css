@@ -77,3 +77,6 @@ html[data-theme="light"] .gl-scan-message{color:#176442;background:#e8f8ef}
 html[data-theme="light"] .gl-scan-message.is-error{color:#a51f2d;background:#fff0f0}
 @media(max-width:560px){.gl-scan-backdrop{padding:8px;align-items:end}.gl-scan-panel{max-height:94dvh;padding:16px;border-radius:18px}.gl-scan-header h2{font-size:24px}.gl-scan-capture-grid{grid-template-columns:1fr}.gl-scan-capture-grid button{min-height:82px}.gl-scan-tabs button{font-size:10px}.gl-scan-result-actions button{flex:1;justify-content:center}.gl-scan-menu{right:-5px;width:210px}}
 @media(prefers-reduced-motion:reduce){.gl-scan-float,.gl-scan-orb{transition:none!important}}
+
+.gl-scan-clear-all{display:inline-flex;align-items:center;gap:5px;margin-left:auto;padding:5px 8px;border:1px solid #ff9b9b44;border-radius:7px;background:#ff777710;color:#ffaaaa;font-size:9px}
+html[data-theme="light"] .gl-scan-clear-all{border-color:#e8b9bd;background:#fff0f0;color:#a51f2d}
