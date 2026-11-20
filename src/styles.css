@@ -1435,3 +1435,32 @@ body {
     min-height:44px;
   }
 }
+
+
+html[data-theme="light"] .gl-scan-panel,
+html[data-theme="light"] .gl-scan-panel :is(h1,h2,h3,h4,p,span,label,b,strong,small,button) {
+  color:#17243a;
+}
+html[data-theme="light"] .gl-scan-panel :is(.gl-scan-header p,.gl-scan-focus-heading>span,.gl-scan-camera-status,.gl-scan-capture-grid span,.gl-scan-preview-list figcaption,.gl-studio-edit-tools label) {
+  color:#52627a;
+}
+html[data-theme="light"] .gl-scan-panel :is(button,.gl-scan-tabs button,.gl-scan-camera-actions button,.gl-studio-focus-heading button) {
+  color:#24476f;
+}
+html[data-theme="light"] .gl-scan-panel :is(input,textarea,select) {
+  background:#fff;
+  border-color:#cbd6e4;
+  color:#17243a;
+}
+html[data-theme="light"] .gl-scan-panel :is(input,textarea)::placeholder {
+  color:#66768d;
+  opacity:1;
+}
+html[data-theme="light"] .gl-studio-launch-grid b,
+html[data-theme="light"] .gl-studio-focus-heading>span {
+  color:#234d7e;
+}
+html[data-theme="light"] .gl-studio-launch-grid span,
+html[data-theme="light"] .gl-studio-edit-tools label {
+  color:#52627a;
+}
