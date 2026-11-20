@@ -151,3 +151,7 @@ html[data-theme="light"] .gl-studio-audio-card>span,html[data-theme="light"] .gl
 html[data-theme="light"] .gl-studio-qr-result textarea,html[data-theme="light"] .gl-studio-notes textarea{border-color:#cbd5e1;background:#fff;color:#17243a}
 html[data-theme="light"] .gl-studio-edit-tools label{color:#64748b}
 @media(max-width:560px){.gl-studio-edit-tools{grid-template-columns:1fr}.gl-scan-camera-area.is-expanded{inset:5px;padding:9px}.gl-scan-camera-area.is-expanded video{height:68dvh}}
+
+.gl-studio-annotation{grid-column:1/-1;display:grid!important;grid-template-columns:1fr;align-items:start!important}
+.gl-studio-annotation input{width:100%;min-height:36px;padding:8px 10px;border:1px solid #ffffff24;border-radius:8px;background:#070d19;color:#e8efff;font:11px sans-serif}
+html[data-theme="light"] .gl-studio-annotation input{border-color:#cbd5e1;background:#fff;color:#17243a}
