@@ -1837,7 +1837,7 @@ function App() {
   const [clearDataError, setClearDataError] = useState("");
   const [clearDataBusy, setClearDataBusy] = useState(false);
   const [profilePicture, setProfilePicture] = useState<string>(() => localStorage.getItem("grandLumenProfileImage") || "");
-    const [query, setQuery] = useState("");
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchItem[]>([]);
   const [mediaResults, setMediaResults] = useState<SearchItem[]>([]);
   const [mediaBusy, setMediaBusy] = useState(false);
