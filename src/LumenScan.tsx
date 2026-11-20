@@ -149,7 +149,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
         localStorage.setItem("grandLumenScanPosition", JSON.stringify(next));
         return next;
       });
-    }, 13 * 60 * 1000);
+    }, 13 * 1000);
   }, []);
 
   useEffect(() => {
