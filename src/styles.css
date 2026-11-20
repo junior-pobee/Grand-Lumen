@@ -1098,3 +1098,115 @@ html{scroll-behavior:smooth;scroll-padding-top:76px}
 body,.app-shell,.main-area,.content-wrap,.side-nav,.tool-workspace,.results-list,.media-grid,.api-grid,.project-grid,.learning-grid,.research-grid,.gl-scan-panel,.gl-scan-preview-list{overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch}
 .side-nav,.tool-workspace,.content-wrap,.main-area,.results-list,.media-grid,.api-grid,.project-grid,.learning-grid,.research-grid{scroll-behavior:smooth}
 @media(prefers-reduced-motion:reduce){html,.side-nav,.tool-workspace,.content-wrap,.main-area,.results-list,.media-grid,.api-grid,.project-grid,.learning-grid,.research-grid{scroll-behavior:auto!important}}
+
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 76px;
+  -webkit-text-size-adjust: 100%;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  overflow-x: clip;
+  overflow-y: auto;
+  overscroll-behavior-x: none;
+  overscroll-behavior-y: auto;
+  touch-action: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.app-shell,
+.main-area,
+.content-wrap {
+  min-width: 0;
+}
+
+.side-nav {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
+}
+
+.tool-workspace,
+.gl-scan-panel,
+.gl-scan-preview-list,
+.lh-vault-preview-body,
+.lh-document-workspace-content,
+.team-message-list,
+.sheets-tabs,
+.sheets-grid-wrap,
+.sheets-library,
+.activity-digest-preview,
+.activity-digest-timeline,
+.lh-reminder-dialog,
+.alert-center-panel,
+.tools-section-focused,
+.gl-graph-expanded,
+.sheets-workspace-expanded,
+.scanner-raw-data pre,
+.studio-code-layer {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  scrollbar-gutter: stable;
+}
+
+.tool-workspace,
+.lh-vault-preview-body,
+.lh-document-workspace-content,
+.team-message-list,
+.sheets-library,
+.activity-digest-preview,
+.activity-digest-timeline,
+.lh-reminder-dialog,
+.alert-center-panel,
+.tools-section-focused,
+.gl-graph-expanded,
+.sheets-workspace-expanded,
+.scanner-raw-data pre,
+.studio-code-layer {
+  overscroll-behavior-y: contain;
+}
+
+.gl-scan-panel,
+.gl-scan-preview-list {
+  touch-action: pan-y pinch-zoom;
+}
+
+.sheets-tabs,
+.sheets-grid-wrap {
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  .side-nav,
+  .tool-workspace,
+  .gl-scan-panel,
+  .gl-scan-preview-list,
+  .lh-vault-preview-body,
+  .lh-document-workspace-content,
+  .team-message-list,
+  .sheets-tabs,
+  .sheets-grid-wrap,
+  .sheets-library,
+  .activity-digest-preview,
+  .activity-digest-timeline,
+  .lh-reminder-dialog,
+  .alert-center-panel,
+  .tools-section-focused,
+  .gl-graph-expanded,
+  .sheets-workspace-expanded {
+    scroll-behavior: auto !important;
+  }
+}
