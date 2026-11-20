@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent } from "react";
-import { Camera, Check, ChevronDown, Copy, Download, FileImage, FileText, ImagePlus, Move, Scan, ScanLine, Share2, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { Camera, Check, ChevronDown, Copy, Download, FileImage, FileText, ImagePlus, Move, QrCode, ScanLine, Share2, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { createWorker } from "tesseract.js";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
 import { jsPDF } from "jspdf";
@@ -168,7 +168,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
   return <>
     <div className={"gl-scan-float" + (dimmed ? " is-dimmed" : "")} style={{ left: position.x, top: position.y }}>
       <button ref={buttonRef} className="gl-scan-orb" aria-label="Open Lumen Scan" onPointerDown={beginDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onClick={activate}>
-        <Scan size={34} strokeWidth={2.8}/>
+        <QrCode size={35} strokeWidth={2.5}/>
       </button>
       {menuOpen && <div className="gl-scan-menu">
         <button onClick={() => { setScreenshotOpen(value => !value); wake(); }}><Camera size={16}/> Screenshot <ChevronDown size={13}/></button>
@@ -344,6 +344,8 @@ export default function LumenScan() {
       const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
       const video = document.createElement("video");
       video.srcObject = stream;
+      video.muted = true;
+      video.playsInline = true;
       await video.play();
       const canvas = document.createElement("canvas");
       canvas.width = video.videoWidth;
