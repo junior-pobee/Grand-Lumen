@@ -1800,12 +1800,12 @@ html,body,#root { width:100%; max-width:100%; overflow-x:clip; }
   gap: 12px;
 }
 .nav-icon-wrap {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 4px;
-  flex: 0 0 42px;
-  width: 42px;
+  flex: 0 0 24px;
+  width: 24px;
   height: 24px;
   color: currentColor;
 }
@@ -1815,6 +1815,18 @@ html,body,#root { width:100%; max-width:100%; overflow-x:clip; }
   height: 19px;
   stroke-width: 2.8px;
   filter: drop-shadow(0 0 .35px currentColor);
+}
+.nav-icon-wrap .nav-icon-base {
+  position: relative;
+  z-index: 1;
+}
+.nav-icon-wrap .nav-icon-edge {
+  position: absolute;
+  z-index: 2;
+  left: 3px;
+  top: 3px;
+  clip-path: inset(0 0 0 50%);
+  pointer-events: none;
 }
 .theme-light .nav-icon-wrap {
   color: #385675;
