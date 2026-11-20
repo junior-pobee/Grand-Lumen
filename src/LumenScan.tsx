@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { PointerEvent } from "react";
 import { Camera, Check, ChevronDown, Copy, Download, FileImage, FileText, ImagePlus, Move, Scan, ScanLine, Share2, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { createWorker } from "tesseract.js";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
@@ -91,6 +92,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
   const [screenshotOpen, setScreenshotOpen] = useState(false);
   const [dimmed, setDimmed] = useState(false);
   const drag = useRef<{ x: number; y: number; left: number; top: number; moved: boolean } | null>(null);
+  const suppressClick = useRef(false);
   const idleTimer = useRef<number | undefined>(undefined);
   const buttonRef = useRef<HTMLButtonElement>(null);
 
@@ -123,13 +125,13 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
     };
   }, [wake]);
 
-  const beginDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+  const beginDrag = (event: PointerEvent<HTMLButtonElement>) => {
     wake();
     drag.current = { x: event.clientX, y: event.clientY, left: position.x, top: position.y, moved: false };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
-  const moveDrag = (event: React.PointerEvent<HTMLButtonElement>) => {
+  const moveDrag = (event: PointerEvent<HTMLButtonElement>) => {
     if (!drag.current) return;
     const dx = event.clientX - drag.current.x;
     const dy = event.clientY - drag.current.y;
@@ -143,6 +145,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
 
   const endDrag = () => {
     const moved = drag.current?.moved;
+    suppressClick.current = Boolean(moved);
     drag.current = null;
     if (moved) {
       setMenuOpen(false);
@@ -152,7 +155,10 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
   };
 
   const activate = () => {
-    if (drag.current?.moved) return;
+    if (suppressClick.current) {
+      suppressClick.current = false;
+      return;
+    }
     wake();
     setDimmed(false);
     setMenuOpen(value => !value);
@@ -324,7 +330,7 @@ export default function LumenScan() {
   const captureScreen = async () => {
     setError("");
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: "browser" } as MediaTrackConstraints, audio: false });
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
       const video = document.createElement("video");
       video.srcObject = stream;
       await video.play();
