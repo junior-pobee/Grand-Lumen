@@ -210,7 +210,7 @@ function FloatingScanIcon({ onScreenshot, onScan, onStudio }: { onScreenshot: ()
   return <>
     <div className={"gl-scan-float" + (dimmed ? " is-dimmed" : "")} style={{ left: position.x, top: position.y }}>
       <button ref={buttonRef} className="gl-scan-orb" aria-label="Open Lumen Scan" onPointerDown={beginDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onClick={activate}>
-        <QrCode size={30} strokeWidth={2.1}/>
+        <QrCode size={42} strokeWidth={2.3}/>
       </button>
       {menuOpen && <div className={"gl-scan-menu" + (position.x < window.innerWidth / 2 ? " side-left" : "") + (position.y < window.innerHeight / 2 ? " below" : "")}>
         <button className="gl-scan-menu-feature" onClick={() => { onStudio(); setMenuOpen(false); }}><Clapperboard size={17}/> Creative Studio <span>PHOTO · VIDEO</span></button>
