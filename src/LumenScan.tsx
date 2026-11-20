@@ -3,6 +3,9 @@ import type { PointerEvent } from "react";
 import { Camera, Check, ChevronDown, Copy, Download, FileImage, FileText, ImagePlus, Move, QrCode, ScanLine, Share2, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { createWorker } from "tesseract.js";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
+import * as tf from "@tensorflow/tfjs";
+import "@tensorflow/tfjs-backend-webgl";
+import "@tensorflow/tfjs-backend-cpu";
 import { jsPDF } from "jspdf";
 import "./LumenScan.css";
 
@@ -14,6 +17,7 @@ type ScanRecord = {
   pageCount: number;
   kind: "document" | "object";
   image?: string;
+  images?: string[];
 };
 
 type Position = { x: number; y: number };
@@ -86,7 +90,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
       const saved = localStorage.getItem("grandLumenScanPosition");
       if (saved) return JSON.parse(saved) as Position;
     } catch {}
-    return { x: Math.max(12, window.innerWidth - 92), y: Math.max(90, Math.round(window.innerHeight * 0.56)) };
+    return { x: Math.max(12, window.innerWidth - 72), y: Math.max(90, Math.round(window.innerHeight * 0.56)) };
   });
   const [menuOpen, setMenuOpen] = useState(false);
   const [screenshotOpen, setScreenshotOpen] = useState(false);
@@ -104,11 +108,11 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
       setMenuOpen(false);
       setScreenshotOpen(false);
       setPosition(current => {
-        const right = window.innerWidth - current.x - 68;
-        const bottom = window.innerHeight - current.y - 68;
-        const x = right < current.x ? window.innerWidth - 34 : -34;
-        const y = bottom < current.y ? window.innerHeight - 34 : 12;
-        const next = { x: Math.max(-34, Math.min(window.innerWidth - 34, x)), y: Math.max(12, Math.min(window.innerHeight - 34, y)) };
+        const right = window.innerWidth - current.x - 48;
+        const bottom = window.innerHeight - current.y - 48;
+        const x = right < current.x ? window.innerWidth - 24 : -24;
+        const y = bottom < current.y ? window.innerHeight - 24 : 12;
+        const next = { x: Math.max(-34, Math.min(window.innerWidth - 24, x)), y: Math.max(12, Math.min(window.innerHeight - 24, y)) };
         localStorage.setItem("grandLumenScanPosition", JSON.stringify(next));
         return next;
       });
@@ -117,7 +121,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
 
   useEffect(() => {
     wake();
-    const resize = () => setPosition(current => ({ x: Math.max(-34, Math.min(window.innerWidth - 68, current.x)), y: Math.max(12, Math.min(window.innerHeight - 68, current.y)) }));
+    const resize = () => setPosition(current => ({ x: Math.max(-34, Math.min(window.innerWidth - 48, current.x)), y: Math.max(12, Math.min(window.innerHeight - 48, current.y)) }));
     window.addEventListener("resize", resize);
     return () => {
       window.clearTimeout(idleTimer.current);
@@ -137,7 +141,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
     const dy = event.clientY - drag.current.y;
     if (Math.abs(dx) + Math.abs(dy) > 5) drag.current.moved = true;
     if (drag.current.moved) {
-      const next = { x: Math.max(8, Math.min(window.innerWidth - 76, drag.current.left + dx)), y: Math.max(12, Math.min(window.innerHeight - 76, drag.current.top + dy)) };
+      const next = { x: Math.max(8, Math.min(window.innerWidth - 56, drag.current.left + dx)), y: Math.max(12, Math.min(window.innerHeight - 56, drag.current.top + dy)) };
       setPosition(next);
       localStorage.setItem("grandLumenScanPosition", JSON.stringify(next));
     }
@@ -162,7 +166,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
     wake();
     setDimmed(false);
     setPosition(current => {
-      const next = { x: current.x < 0 ? 12 : current.x > window.innerWidth - 68 ? window.innerWidth - 80 : current.x, y: current.y > window.innerHeight - 68 ? window.innerHeight - 80 : current.y };
+      const next = { x: current.x < 0 ? 12 : current.x > window.innerWidth - 48 ? window.innerWidth - 56 : current.x, y: current.y > window.innerHeight - 48 ? window.innerHeight - 56 : current.y };
       localStorage.setItem("grandLumenScanPosition", JSON.stringify(next));
       return next;
     });
@@ -173,7 +177,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
   return <>
     <div className={"gl-scan-float" + (dimmed ? " is-dimmed" : "")} style={{ left: position.x, top: position.y }}>
       <button ref={buttonRef} className="gl-scan-orb" aria-label="Open Lumen Scan" onPointerDown={beginDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onClick={activate}>
-        <QrCode size={35} strokeWidth={2.5}/>
+        <ScanLine size={23} strokeWidth={2.1}/>
       </button>
       {menuOpen && <div className={"gl-scan-menu" + (position.x < window.innerWidth / 2 ? " side-left" : "") + (position.y < window.innerHeight / 2 ? " below" : "")}>
         <button onClick={() => { setScreenshotOpen(value => !value); wake(); }}><Camera size={16}/> Screenshot <ChevronDown size={13}/></button>
@@ -244,7 +248,8 @@ export default function LumenScan() {
   };
 
   const saveScreenshot = async (file: File) => {
-    const record: ScanRecord = { id: crypto.randomUUID(), title: "Screenshot · " + new Date().toLocaleString(), text: "Screenshot captured. Choose Extract text to recognise any visible words, numbers or formulas.", createdAt: Date.now(), pageCount: 1, kind: "document", image: await imageData(file) };
+    const capturedImage = await imageData(file);
+    const record: ScanRecord = { id: crypto.randomUUID(), title: "Screenshot · " + new Date().toLocaleString(), text: "Screenshot captured. Choose Extract text to recognise any visible words, numbers or formulas.", createdAt: Date.now(), pageCount: 1, kind: "document", image: capturedImage, images: [capturedImage] };
     await writeScanRecord(record);
     setSelected(record);
     await refreshRecords();
@@ -283,7 +288,13 @@ export default function LumenScan() {
     setError("");
     setStatus("Loading object recognition model…");
     try {
-      const model = await cocoSsd.load();
+      try {
+        await tf.setBackend("webgl");
+      } catch {
+        await tf.setBackend("cpu");
+      }
+      await tf.ready();
+      const model = await cocoSsd.load({ base: "lite_mobilenet_v2" });
       const image = new Image();
       image.src = URL.createObjectURL(file);
       await new Promise<void>((resolve, reject) => {
@@ -294,7 +305,8 @@ export default function LumenScan() {
       URL.revokeObjectURL(image.src);
       const unique = [...new Set(predictions.filter(item => item.score > 0.35).map(item => item.class))];
       const description = unique.length ? "Detected: " + unique.join(", ") + ". Recognition confidence varies by object and image quality." : "No familiar object was confidently recognised. Try a clearer image with the object centred.";
-      const record: ScanRecord = { id: crypto.randomUUID(), title: unique[0] ? "Object · " + unique[0] : "Unidentified object", text: description, createdAt: Date.now(), pageCount: 1, kind: "object", image: await imageData(file) };
+      const capturedImage = await imageData(file);
+      const record: ScanRecord = { id: crypto.randomUUID(), title: unique[0] ? "Object · " + unique[0] : "Unidentified object", text: description, createdAt: Date.now(), pageCount: 1, kind: "object", image: capturedImage, images: [capturedImage] };
       await writeScanRecord(record);
       setSelected(record);
       await refreshRecords();
@@ -322,14 +334,15 @@ export default function LumenScan() {
         else setStatus(message.status);
       } });
       const pages: string[] = [];
+      const pageImages = await Promise.all(files.map(file => imageData(file)));
       for (let index = 0; index < files.length; index += 1) {
         setStatus("Reading page " + (index + 1) + " of " + files.length + "…");
         const result = await worker.recognize(files[index]);
-        pages.push("PAGE " + (index + 1) + "\n\n" + result.data.text.trim());
+        const recognisedText = result.data.text.replace(/\r/g, "").trim();
+        pages.push("PAGE " + (index + 1) + "\n\n" + (recognisedText || "[No readable text detected on this page. The original page image is preserved above for review.]"));
       }
       const text = pages.join("\n\n--------------------------------\n\n");
-      if (!text.trim()) throw new Error("No readable text was found. Try brighter, sharper images.");
-      const record: ScanRecord = { id: crypto.randomUUID(), title: "Scanned document · " + new Date().toLocaleString(), text, createdAt: Date.now(), pageCount: files.length, kind: "document", image: await imageData(files[0]) };
+      const record: ScanRecord = { id: crypto.randomUUID(), title: "Scanned document · " + new Date().toLocaleString(), text, createdAt: Date.now(), pageCount: files.length, kind: "document", image: pageImages[0], images: pageImages };
       await writeScanRecord(record);
       setSelected(record);
       setFiles([]);
@@ -464,7 +477,7 @@ export default function LumenScan() {
         {(status || error) && <div className={error ? "gl-scan-message is-error" : "gl-scan-message"}>{error || status}</div>}
         {selected && <div className="gl-scan-result">
           <div className="gl-scan-result-heading"><div><span>RECOGNISED CONTENT</span><h3>{selected.title}</h3><small>{selected.pageCount} page{selected.pageCount === 1 ? "" : "s"} · {new Date(selected.createdAt).toLocaleString()}</small></div><button onClick={() => setSelected(null)} aria-label="Close result"><X size={16}/></button></div>
-          {selected.image && <img className="gl-scan-preview" src={selected.image} alt="First scanned page or object"/>}
+          {(selected.images?.length ? selected.images : selected.image ? [selected.image] : []).length > 0 && <div className="gl-scan-preview-list">{(selected.images?.length ? selected.images : selected.image ? [selected.image] : []).map((image,index) => <figure key={selected.id + "-page-" + index}><img className="gl-scan-preview" src={image} alt={"Original scanned page " + (index + 1)}/><figcaption>{selected.kind === "object" ? "Original object photo" : "Original page " + (index + 1)}</figcaption></figure>)}</div>}
           <textarea value={selected.text} onChange={event => updateSelectedText(event.target.value)} aria-label="Edit recognised text"/>
           <div className="gl-scan-result-actions">
             <button onClick={() => void navigator.clipboard?.writeText(selected.text)}><Copy size={14}/> Copy</button>
