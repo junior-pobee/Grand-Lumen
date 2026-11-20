@@ -75,6 +75,39 @@ function imageData(file: Blob): Promise<string> {
   });
 }
 
+async function prepareOcrImage(file: File): Promise<Blob> {
+  const image = new Image();
+  const source = URL.createObjectURL(file);
+  image.src = source;
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () => reject(new Error("This page image could not be prepared for text recognition."));
+  });
+  const scale = Math.min(2.5, Math.max(1, 1800 / image.naturalWidth));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(image.naturalWidth * scale);
+  canvas.height = Math.round(image.naturalHeight * scale);
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  if (!context) {
+    URL.revokeObjectURL(source);
+    throw new Error("Image processing is not available in this browser.");
+  }
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+  for (let index = 0; index < pixels.data.length; index += 4) {
+    const grey = pixels.data[index] * 0.299 + pixels.data[index + 1] * 0.587 + pixels.data[index + 2] * 0.114;
+    const enhanced = Math.max(0, Math.min(255, (grey - 128) * 1.35 + 128));
+    pixels.data[index] = enhanced;
+    pixels.data[index + 1] = enhanced;
+    pixels.data[index + 2] = enhanced;
+  }
+  context.putImageData(pixels, 0, 0);
+  URL.revokeObjectURL(source);
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error("The page image could not be enhanced.")), "image/png");
+  });
+}
+
 function downloadText(name: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: "text/plain;charset=utf-8" }));
   const anchor = document.createElement("a");
@@ -112,7 +145,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
         const bottom = window.innerHeight - current.y - 48;
         const x = right < current.x ? window.innerWidth - 24 : -24;
         const y = bottom < current.y ? window.innerHeight - 24 : 12;
-        const next = { x: Math.max(-34, Math.min(window.innerWidth - 24, x)), y: Math.max(12, Math.min(window.innerHeight - 24, y)) };
+        const next = { x: Math.max(-24, Math.min(window.innerWidth - 24, x)), y: Math.max(12, Math.min(window.innerHeight - 24, y)) };
         localStorage.setItem("grandLumenScanPosition", JSON.stringify(next));
         return next;
       });
@@ -121,7 +154,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
 
   useEffect(() => {
     wake();
-    const resize = () => setPosition(current => ({ x: Math.max(-34, Math.min(window.innerWidth - 48, current.x)), y: Math.max(12, Math.min(window.innerHeight - 48, current.y)) }));
+    const resize = () => setPosition(current => ({ x: Math.max(-24, Math.min(window.innerWidth - 48, current.x)), y: Math.max(12, Math.min(window.innerHeight - 48, current.y)) }));
     window.addEventListener("resize", resize);
     return () => {
       window.clearTimeout(idleTimer.current);
@@ -337,7 +370,8 @@ export default function LumenScan() {
       const pageImages = await Promise.all(files.map(file => imageData(file)));
       for (let index = 0; index < files.length; index += 1) {
         setStatus("Reading page " + (index + 1) + " of " + files.length + "…");
-        const result = await worker.recognize(files[index]);
+        const enhancedPage = await prepareOcrImage(files[index]);
+        const result = await worker.recognize(enhancedPage);
         const recognisedText = result.data.text.replace(/\r/g, "").trim();
         pages.push("PAGE " + (index + 1) + "\n\n" + (recognisedText || "[No readable text detected on this page. The original page image is preserved above for review.]"));
       }
