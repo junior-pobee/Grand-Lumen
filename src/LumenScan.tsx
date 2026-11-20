@@ -235,6 +235,8 @@ export default function LumenScan() {
   const [photoRotation, setPhotoRotation] = useState(0);
   const [photoBrightness, setPhotoBrightness] = useState(100);
   const [photoContrast, setPhotoContrast] = useState(100);
+  const [photoCrop, setPhotoCrop] = useState(0);
+  const [photoAnnotation, setPhotoAnnotation] = useState("");
   const [voiceRecording, setVoiceRecording] = useState(false);
   const [voiceUrl, setVoiceUrl] = useState("");
   const [qrResult, setQrResult] = useState("");
@@ -641,16 +643,32 @@ export default function LumenScan() {
       const image = new Image();
       image.src = studioMediaUrl;
       await new Promise<void>((resolve, reject) => { image.onload = () => resolve(); image.onerror = () => reject(new Error("The photo could not be opened for editing.")); });
+      const cropFactor = 1 - photoCrop / 100;
+      const sourceWidth = image.naturalWidth * cropFactor;
+      const sourceHeight = image.naturalHeight * cropFactor;
+      const sourceX = (image.naturalWidth - sourceWidth) / 2;
+      const sourceY = (image.naturalHeight - sourceHeight) / 2;
       const sideways = Math.abs(photoRotation % 180) === 90;
       const canvas = document.createElement("canvas");
-      canvas.width = sideways ? image.naturalHeight : image.naturalWidth;
-      canvas.height = sideways ? image.naturalWidth : image.naturalHeight;
+      canvas.width = Math.round(sideways ? sourceHeight : sourceWidth);
+      canvas.height = Math.round(sideways ? sourceWidth : sourceHeight);
       const context = canvas.getContext("2d");
       if (!context) throw new Error("Photo editing is unavailable in this browser.");
       context.translate(canvas.width / 2, canvas.height / 2);
       context.rotate(photoRotation * Math.PI / 180);
       context.filter = "brightness(" + photoBrightness + "%) contrast(" + photoContrast + "%)";
-      context.drawImage(image, -image.naturalWidth / 2, -image.naturalHeight / 2);
+      context.drawImage(image, sourceX, sourceY, sourceWidth, sourceHeight, -sourceWidth / 2, -sourceHeight / 2, sourceWidth, sourceHeight);
+      if (photoAnnotation.trim()) {
+        context.filter = "none";
+        context.font = "600 " + Math.max(18, canvas.width * .035) + "px sans-serif";
+        context.textBaseline = "bottom";
+        context.lineWidth = Math.max(3, canvas.width * .006);
+        context.strokeStyle = "rgba(0,0,0,.72)";
+        context.fillStyle = "#ffffff";
+        const annotation = photoAnnotation.trim().slice(0, 140);
+        context.strokeText(annotation, 24, canvas.height - 26, canvas.width - 48);
+        context.fillText(annotation, 24, canvas.height - 26, canvas.width - 48);
+      }
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/jpeg", .94));
       if (!blob) throw new Error("The edited photo could not be exported.");
       const anchor = document.createElement("a");
@@ -724,7 +742,7 @@ export default function LumenScan() {
           {qrResult && <div className="gl-studio-qr-result"><b>QR result</b><textarea readOnly value={qrResult}/><button className="gl-scan-secondary" onClick={() => void navigator.clipboard?.writeText(qrResult)}><Copy size={14}/> Copy result</button></div>}
           <div className="gl-studio-notes"><label htmlFor="gl-quick-notes">Quick Notes · saved automatically on this device</label><textarea id="gl-quick-notes" value={quickNotes} onChange={event => setQuickNotes(event.target.value)} placeholder="Write an idea, reminder or quick note…"/></div>
           {cameraOn && <div className={"gl-scan-camera-area" + (cameraExpanded ? " is-expanded" : "")}><video ref={videoRef} muted playsInline autoPlay/><div className="gl-scan-camera-actions"><button className="gl-scan-secondary" disabled={recording} onClick={switchCamera}><FlipHorizontal size={15}/> Switch to {cameraFacing === "environment" ? "front" : "back"}</button><button className="gl-scan-secondary" onClick={() => setCameraExpanded(value => !value)}>{cameraExpanded ? <Minimize2 size={15}/> : <Maximize2 size={15}/>} {cameraExpanded ? "Fit preview" : "Expand preview"}</button>{cameraKind === "video" ? recording ? <button className="gl-scan-primary" onClick={stopVideoRecording}>Stop recording</button> : <button className="gl-scan-primary" onClick={startVideoRecording}><Video size={16}/> Start recording</button> : <button className="gl-scan-primary" onClick={() => void captureCamera()}><Camera size={16}/> {cameraKind === "qr" ? "Capture QR code" : "Take picture"}</button>}<button className="gl-scan-secondary" onClick={() => { if (recording) stopVideoRecording(); else setCameraOn(false); }}>Cancel</button></div></div>}
-          {studioMediaUrl && <div className="gl-studio-preview">{studioMediaKind === "video" ? <video src={studioMediaUrl} controls playsInline/> : <><img src={studioMediaUrl} alt="Captured creative studio photo" style={{ transform: "rotate(" + photoRotation + "deg)", filter: "brightness(" + photoBrightness + "%) contrast(" + photoContrast + "%)" }}/><div className="gl-studio-edit-tools"><button className="gl-scan-secondary" onClick={() => setPhotoRotation(value => (value + 90) % 360)}><RotateCw size={14}/> Rotate</button><label><Sun size={14}/> Brightness <input type="range" min="50" max="160" value={photoBrightness} onChange={event => setPhotoBrightness(Number(event.target.value))}/></label><label>Contrast <input type="range" min="50" max="160" value={photoContrast} onChange={event => setPhotoContrast(Number(event.target.value))}/></label><button className="gl-scan-secondary" onClick={() => { setPhotoRotation(0); setPhotoBrightness(100); setPhotoContrast(100); }}>Reset edits</button></div></>}<div><button className="gl-scan-primary" onClick={studioMediaKind === "photo" ? () => void saveEditedPhoto() : saveStudioMedia}><Download size={15}/> Save {studioMediaKind === "photo" ? "edited photo" : "video"}</button><button className="gl-scan-secondary" onClick={() => { URL.revokeObjectURL(studioMediaUrl); setStudioMediaUrl(""); setStudioMediaKind(""); setPhotoRotation(0); setPhotoBrightness(100); setPhotoContrast(100); setStatus("Ready for another capture."); }}>New capture</button></div></div>}
+          {studioMediaUrl && <div className="gl-studio-preview">{studioMediaKind === "video" ? <video src={studioMediaUrl} controls playsInline/> : <><img src={studioMediaUrl} alt="Captured creative studio photo" style={{ transform: "rotate(" + photoRotation + "deg)", filter: "brightness(" + photoBrightness + "%) contrast(" + photoContrast + "%)" }}/><div className="gl-studio-edit-tools"><button className="gl-scan-secondary" onClick={() => setPhotoRotation(value => (value + 90) % 360)}><RotateCw size={14}/> Rotate</button><label><Sun size={14}/> Brightness <input type="range" min="50" max="160" value={photoBrightness} onChange={event => setPhotoBrightness(Number(event.target.value))}/></label><label>Contrast <input type="range" min="50" max="160" value={photoContrast} onChange={event => setPhotoContrast(Number(event.target.value))}/></label><label>Crop <input type="range" min="0" max="40" value={photoCrop} onChange={event => setPhotoCrop(Number(event.target.value))}/><span>{photoCrop}%</span></label><label className="gl-studio-annotation">Annotation <input value={photoAnnotation} maxLength={140} onChange={event => setPhotoAnnotation(event.target.value)} placeholder="Add text to image"/></label><button className="gl-scan-secondary" onClick={() => { setPhotoRotation(0); setPhotoBrightness(100); setPhotoContrast(100); setPhotoCrop(0); setPhotoAnnotation(""); }}>Reset edits</button></div></>}<div><button className="gl-scan-primary" onClick={studioMediaKind === "photo" ? () => void saveEditedPhoto() : saveStudioMedia}><Download size={15}/> Save {studioMediaKind === "photo" ? "edited photo" : "video"}</button><button className="gl-scan-secondary" onClick={() => { URL.revokeObjectURL(studioMediaUrl); setStudioMediaUrl(""); setStudioMediaKind(""); setPhotoRotation(0); setPhotoBrightness(100); setPhotoContrast(100); setPhotoCrop(0); setPhotoAnnotation(""); setStatus("Ready for another capture."); }}>New capture</button></div></div>}
           <p className="gl-scan-capability">Camera and microphone activate only after you choose a capture option. Recording is visible in the studio and stops when you finish or cancel.</p>
         </div> : <><div className="gl-scan-tabs">
           <button className={mode === "document" ? "active" : ""} onClick={() => { setMode("document"); setCameraOn(false); }}><FileText size={15}/> Document scan</button>
@@ -757,7 +775,7 @@ export default function LumenScan() {
           <div className="gl-scan-result-actions">
             <button onClick={() => void navigator.clipboard?.writeText(selected.text)}><Copy size={14}/> Copy</button>
             {selected.image && <button onClick={() => { const link = document.createElement("a"); link.href = selected.image || ""; link.download = "Lumen-Screenshot-" + selected.id.slice(0, 8) + ".png"; link.click(); }}><Download size={14}/> Image</button>}
-            {selected.image && selected.text.startsWith("Screenshot captured") && <><button onClick={() => { const blob = selected.image ? fetch(selected.image).then(response => response.blob()) : Promise.resolve(new Blob()); void blob.then(value => { addFiles([new File([value], "Lumen-Screenshot.png", { type: value.type || "image/png" })]); setSelected(null); setMode("document"); }); }}><ScanLine size={14}/> Extract text</button><button onClick={() => { setWorkspaceMode("studio"); setStudioMediaUrl(selected.image || ""); setStudioMediaKind("photo"); setPhotoRotation(0); setPhotoBrightness(100); setPhotoContrast(100); }}><Aperture size={14}/> Edit screenshot</button></>}
+            {selected.image && selected.text.startsWith("Screenshot captured") && <><button onClick={() => { const blob = selected.image ? fetch(selected.image).then(response => response.blob()) : Promise.resolve(new Blob()); void blob.then(value => { addFiles([new File([value], "Lumen-Screenshot.png", { type: value.type || "image/png" })]); setSelected(null); setMode("document"); }); }}><ScanLine size={14}/> Extract text</button><button onClick={() => { setWorkspaceMode("studio"); setStudioMediaUrl(selected.image || ""); setStudioMediaKind("photo"); setPhotoRotation(0); setPhotoBrightness(100); setPhotoContrast(100); setPhotoCrop(0); setPhotoAnnotation(""); }}><Aperture size={14}/> Edit screenshot</button></>}
             <button onClick={() => void shareRecord(selected)}><Share2 size={14}/> Share</button>
             <button onClick={() => downloadText("Lumen-Scan-" + selected.id.slice(0, 8), selected.text)}><Download size={14}/> TXT</button>
             <button onClick={() => exportPdf(selected)}><Download size={14}/> PDF</button>
