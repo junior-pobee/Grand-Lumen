@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import LumenSheets from "./LumenSheets";
+import { QRCodeSVG } from "qrcode.react";
 import { connectionAwareMessage, searchLumenServices } from "./api";
 import { Activity, ArrowLeft, BookOpen, CalendarDays, CheckCircle2, Copy, Download, FileText, Globe2, Languages, Plus, Search, ShieldCheck, Trash2, Upload, Wifi, WifiOff } from "lucide-react";
 
@@ -40,7 +41,7 @@ const modules: { name: ModuleName; group: string; description: string }[] = [
   { name: "Convert", group: "Utilities", description: "Convert everyday units, measurements, data sizes and temperatures." },
   { name: "World", group: "Utilities", description: "Weather, currencies, time zones and country information." },
   { name: "Pulse", group: "Utilities", description: "Search global news and follow current developments." },
-  { name: "Scan", group: "Utilities", description: "Create QR codes and open the existing camera scanner." },
+  { name: "Scan", group: "Utilities", description: "Build custom QR codes from text, links and contact details, then download or share them." },
   { name: "Workspace", group: "Productivity", description: "Tasks, notes and a personal schedule." },
   { name: "Finance", group: "Productivity", description: "Track income, expenses, budgets and balances locally." },
   { name: "Sheets", group: "Productivity", description: "Create spreadsheets for business records, budgets and accounts." },
@@ -199,6 +200,10 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
   const [pulseResults, setPulseResults] = useState<{ title: string; url: string; source: string; date: string }[]>([]);
   const [pulseBusy, setPulseBusy] = useState(false);
   const [qrText, setQrText] = useState("");
+  const [qrLabel, setQrLabel] = useState("");
+  const [qrDetails, setQrDetails] = useState<string[]>([]);
+  const [qrDetailDraft, setQrDetailDraft] = useState("");
+  const qrPreviewRef = useRef<HTMLDivElement>(null);
   const [translateText, setTranslateText] = useState("");
   const [translateFrom, setTranslateFrom] = useState("en");
   const [translateTo, setTranslateTo] = useState("fr");
@@ -643,7 +648,25 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
 
   const currentModule = modules.find(item => item.name === active)!;
   const totalBudget = Number(budget) || 0;
-  const qrUrl = qrText.trim() ? "https://quickchart.io/qr?size=240&text=" + encodeURIComponent(qrText) : "";
+  const qrPayload = [qrLabel.trim(), qrText.trim(), ...qrDetails].filter(Boolean).join("\n");
+  const addQrDetail = () => {
+    if (!qrDetailDraft.trim()) return;
+    setQrDetails(current => [...current, qrDetailDraft.trim()]);
+    setQrDetailDraft("");
+  };
+  const downloadQrCode = () => {
+    const svg = qrPreviewRef.current?.querySelector("svg");
+    if (!svg || !qrPayload) return;
+    const copy = svg.cloneNode(true) as SVGElement;
+    copy.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    const source = new XMLSerializer().serializeToString(copy);
+    const url = URL.createObjectURL(new Blob([source], { type: "image/svg+xml;charset=utf-8" }));
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "grand-lumen-qr-code.svg";
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
 
   return <div className={highContrast ? "lumen-hub lh-contrast" : "lumen-hub"}>
     {documentWorkspace && <div className="lh-document-workspace" role="dialog" aria-modal="true" aria-label="Full-screen document workspace"><header className="lh-document-workspace-header"><button className="lh-secondary" onClick={() => setDocumentWorkspace(null)}><ArrowLeft size={16}/> Back to Document Intelligence</button><div><strong>{documentName || "Manual workspace"}</strong><span>{documentWorkspace === "read" ? "Reading mode" : "Editing mode"}</span></div><nav><button className={documentWorkspace === "read" ? "active" : ""} onClick={() => setDocumentWorkspace("read")}><BookOpen size={14}/> Read</button><button className={documentWorkspace === "edit" ? "active" : ""} onClick={() => setDocumentWorkspace("edit")}><FileText size={14}/> Edit</button></nav></header><main className="lh-document-workspace-content">{documentWorkspace === "read" ? <><div className="lh-document-reading-paper">{documentText ? documentText : "No extracted text is available yet. Return to Document Intelligence and upload a readable manual."}</div>{pdfPreviewUrl && <iframe className="lh-document-workspace-pdf" title="Original PDF manual" src={pdfPreviewUrl}/>}</> : <><textarea className="lh-document-workspace-editor" value={documentText} onChange={e => { setDocumentText(e.target.value); setDocumentSummary(""); }} placeholder="Your manual text will appear here for editing…"/><div className="lh-document-workspace-footer"><span>{documentText.trim().split(/\\s+/).filter(Boolean).length.toLocaleString()} words</span><button className="lh-action" onClick={() => setDocumentWorkspace("read")}>Save changes and read</button></div></>}</main></div>}
@@ -663,7 +686,7 @@ export default function ExpansionHub({ onOpenScanner, language = "en", userId = 
 
     {active === "Pulse" && <Panel title="Global news search" description="Search current indexed news reports. Open publishers for full reporting and context."><div className="lh-input-row"><input value={pulseQuery} onChange={e => setPulseQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && void loadPulse()} placeholder="Search a topic, country or event"/><ActionButton onClick={() => void loadPulse()} disabled={pulseBusy}>{pulseBusy ? "Searching…" : "Search news"}</ActionButton></div><div className="lh-results">{pulseResults.map((item, index) => <article key={item.url + index}><span>{item.source} · {item.date}</span><a href={item.url} target="_blank" rel="noreferrer">{item.title}</a></article>)}</div></Panel>}
 
-    {active === "Scan" && <div className="lh-two-col"><Panel title="Create a QR code" description="Generate a QR image for a URL, contact card or short text."><textarea value={qrText} onChange={e => setQrText(e.target.value)} placeholder="Paste a URL or enter text…"/>{qrUrl && <div className="lh-qr"><img src={qrUrl} alt="Generated QR code"/><a href={qrUrl} target="_blank" rel="noreferrer">Open QR image</a></div>}</Panel><Panel title="Camera scanner" description="Use the existing Grand Lumen camera scanner to read QR codes and supported barcodes."><p>Camera access is requested only when you open the scanner.</p><ActionButton onClick={() => onOpenScanner?.()}>Open camera scanner</ActionButton></Panel></div>}
+    {active === "Scan" && <div className="lh-two-col"><Panel title="Build your QR code" description="Add your information one piece at a time. Your QR code updates as you type and add details."><label className="lh-qr-field">QR title <input value={qrLabel} onChange={e => setQrLabel(e.target.value)} placeholder="Example: My contact card"/></label><label className="lh-qr-field">Main text or link <textarea value={qrText} onChange={e => setQrText(e.target.value)} placeholder="Enter a website link, message, instructions or any text…"/></label><div className="lh-qr-add-row"><input value={qrDetailDraft} onChange={e => setQrDetailDraft(e.target.value)} onKeyDown={e => e.key === "Enter" && (e.preventDefault(), addQrDetail())} placeholder="Add another detail"/><ActionButton onClick={addQrDetail} disabled={!qrDetailDraft.trim()}><Plus size={14}/> Add detail</ActionButton></div>{qrDetails.length > 0 && <div className="lh-qr-details">{qrDetails.map((detail,index) => <article key={index}><span><b>Detail {index + 1}</b>{detail}</span><button type="button" onClick={() => setQrDetails(current => current.filter((_,itemIndex) => itemIndex !== index))} aria-label={"Remove detail " + (index + 1)}><Trash2 size={14}/></button></article>)}</div>}<div className="lh-qr-builder-actions"><ActionButton onClick={() => { setQrLabel(""); setQrText(""); setQrDetails([]); setQrDetailDraft(""); }}>Clear builder</ActionButton><span className="lh-muted">{qrPayload.length.toLocaleString()} characters in QR data</span></div></Panel><Panel title="Live QR preview" description="Scan this code with a phone camera. The QR is generated on your device; your text is not sent to a QR service."><div className="lh-qr" ref={qrPreviewRef}>{qrPayload ? <QRCodeSVG value={qrPayload} size={240} level="M" includeMargin/> : <div className="lh-qr-empty"><QrCode size={38}/><span>Your QR code will appear here as you build it.</span></div>}</div><div className="lh-inline-actions"><ActionButton onClick={downloadQrCode} disabled={!qrPayload}><Download size={14}/> Download QR</ActionButton><ActionButton onClick={() => { if (qrPayload) void navigator.clipboard?.writeText(qrPayload); }} disabled={!qrPayload}><Copy size={14}/> Copy content</ActionButton></div><p className="lh-muted">Keep the information concise for easier scanning. Very long text can produce a dense QR code.</p></Panel><Panel title="Camera scanner" description="Use the existing Grand Lumen camera scanner to read QR codes and supported barcodes."><p>Camera access is requested only when you open the scanner.</p><ActionButton onClick={() => onOpenScanner?.()}>Open camera scanner</ActionButton></Panel></div>}
 
     {active === "Workspace" && <div className="lh-two-col"><Panel title="Tasks and schedule" description="Create tasks with optional due dates and mark them complete."><div className="lh-input-row"><input value={taskTitle} onChange={e => setTaskTitle(e.target.value)} placeholder="What needs to get done?"/><input type="date" value={taskDue} onChange={e => setTaskDue(e.target.value)}/><ActionButton onClick={addTask}><Plus size={14}/> Add</ActionButton></div><div className="lh-task-list">{tasks.map(task => <article key={task.id}><label><input type="checkbox" checked={task.done} onChange={() => setTasks(current => current.map(item => item.id === task.id ? { ...item, done: !item.done } : item))}/><span className={task.done ? "done" : ""}>{task.title}</span></label><small>{task.due || "No due date"}</small><button onClick={() => setTasks(current => current.filter(item => item.id !== task.id))} aria-label="Delete task"><Trash2 size={14}/></button></article>)}</div></Panel><Panel title="Notes" description="Notes are saved automatically in this browser."><textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Capture thoughts, plans and useful information…"/><div className="lh-inline-actions"><ActionButton onClick={() => navigator.clipboard?.writeText(notes)}><Copy size={14}/> Copy notes</ActionButton><span className="lh-muted">Auto-saved locally</span></div></Panel></div>}
 
