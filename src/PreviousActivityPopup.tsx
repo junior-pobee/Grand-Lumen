@@ -37,7 +37,7 @@ export default function PreviousActivityPopup({ entries, storageKey, loaded }: P
   const [copied, setCopied] = useState(false);
   const previousEntries = useMemo(() => entries
     .filter(entry => dayKey(new Date(entry.timestamp)) === yesterdayKey)
-    .filter(entry => !/^opened\\s/i.test(entry.action))
+    .filter(entry => /^(share|shared|upload|uploaded|download|downloaded|export|exported|save|saved|create|created|add|added|remove|removed|delete|deleted|send|sent|capture|captured|scan|scanned|run|generate|generated|copy|copied|compile|compiled|edit|edited|update|updated|submit|submitted|invite|invited|accept|accepted|reject|rejected|clear|cleared|import|imported|search|searched|explain|explore|explored)\b/i.test(entry.action))
     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()), [entries, yesterdayKey]);
   const summaryText = useMemo(() => {
     const dateLabel = yesterdayDate.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
