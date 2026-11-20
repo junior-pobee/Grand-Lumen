@@ -237,12 +237,19 @@ export default function LumenScan() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
 
   const refreshRecords = useCallback(async () => {
     try { setRecords(await readScanRecords()); } catch { setError("Local document storage is unavailable in this browser."); }
   }, []);
 
   useEffect(() => { void refreshRecords(); }, [refreshRecords]);
+
+  useEffect(() => {
+    if (selected?.kind === "object") {
+      requestAnimationFrame(() => resultRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
+    }
+  }, [selected]);
 
   useEffect(() => {
     if (!cameraOn || !videoRef.current) return;
@@ -302,6 +309,10 @@ export default function LumenScan() {
     }
     const file = new File([blob], "Lumen-Scan-" + Date.now() + ".jpg", { type: "image/jpeg" });
     if (cameraKind === "object") {
+      streamRef.current?.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+      setCameraOn(false);
       await identifyObject(file);
       return;
     }
@@ -393,27 +404,69 @@ export default function LumenScan() {
 
   const captureScreen = async () => {
     setError("");
-    setStatus("Choose the Grand-Lumen browser tab or app window to capture its workspace.");
+    setStatus("Capturing the visible Grand-Lumen workspace…");
     try {
-      if (!navigator.mediaDevices?.getDisplayMedia) throw new Error("Workspace screenshots are not supported by this browser. Use your device screenshot controls instead.");
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: "browser" }, audio: false });
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      video.muted = true;
-      video.playsInline = true;
-      await video.play();
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      canvas.getContext("2d")?.drawImage(video, 0, 0);
-      stream.getTracks().forEach(track => track.stop());
-      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png"));
-      if (!blob) throw new Error("The screen capture could not be created.");
-      await saveScreenshot(new File([blob], "Grand-Lumen-Workspace-" + Date.now() + ".png", { type: "image/png" }));
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const source = document.body;
+      const clone = source.cloneNode(true) as HTMLElement;
+      const copyStyles = (original: Element, copied: Element) => {
+        const computed = window.getComputedStyle(original);
+        const style = Array.from(computed).map(property => property + ":" + computed.getPropertyValue(property) + ";").join("");
+        (copied as HTMLElement).setAttribute("style", style + "box-sizing:border-box;");
+        const originalChildren = Array.from(original.children);
+        const copiedChildren = Array.from(copied.children);
+        originalChildren.forEach((child, index) => {
+          if (copiedChildren[index]) copyStyles(child, copiedChildren[index]);
+        });
+        if (original instanceof HTMLInputElement && copied instanceof HTMLInputElement) copied.setAttribute("value", original.value);
+        if (original instanceof HTMLTextAreaElement && copied instanceof HTMLTextAreaElement) copied.textContent = original.value;
+        if (original instanceof HTMLSelectElement && copied instanceof HTMLSelectElement) copied.value = original.value;
+        if (original instanceof HTMLCanvasElement && copied instanceof HTMLCanvasElement) {
+          try { copied.getContext("2d")?.drawImage(original, 0, 0); } catch {}
+        }
+      };
+      copyStyles(source, clone);
+      clone.style.position = "absolute";
+      clone.style.left = -window.scrollX + "px";
+      clone.style.top = -window.scrollY + "px";
+      clone.style.width = Math.max(source.scrollWidth, width) + "px";
+      clone.style.height = Math.max(source.scrollHeight, height) + "px";
+      clone.style.margin = "0";
+      clone.style.transform = "none";
+      const wrapper = document.createElement("div");
+      wrapper.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+      wrapper.style.width = width + "px";
+      wrapper.style.height = height + "px";
+      wrapper.style.overflow = "hidden";
+      wrapper.appendChild(clone);
+      const markup = new XMLSerializer().serializeToString(wrapper);
+      const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '"><foreignObject width="100%" height="100%">' + markup + "</foreignObject></svg>";
+      const image = new Image();
+      const imageUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+      try {
+        await new Promise<void>((resolve, reject) => {
+          image.onload = () => resolve();
+          image.onerror = () => reject(new Error("This browser could not render the workspace screenshot."));
+          image.src = imageUrl;
+        });
+        const canvas = document.createElement("canvas");
+        canvas.width = width * Math.min(2, window.devicePixelRatio || 1);
+        canvas.height = height * Math.min(2, window.devicePixelRatio || 1);
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Screenshot capture is unavailable in this browser.");
+        context.scale(canvas.width / width, canvas.height / height);
+        context.drawImage(image, 0, 0, width, height);
+        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png"));
+        if (!blob) throw new Error("The workspace screenshot could not be created.");
+        await saveScreenshot(new File([blob], "Grand-Lumen-Screenshot-" + Date.now() + ".png", { type: "image/png" }));
+      } finally {
+        URL.revokeObjectURL(imageUrl);
+      }
       setMode("document");
       setOpen(true);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : "Screen capture was cancelled or is not supported.");
+      setError(reason instanceof Error ? reason.message : "The workspace screenshot could not be captured. Use your phone's screenshot controls if this browser blocks page capture.");
       setOpen(true);
     }
   };
@@ -512,7 +565,7 @@ export default function LumenScan() {
           <small>Object recognition model downloads when first used and needs an internet connection to load. Recognition covers common model classes, not every possible object.</small>
         </div>}
         {(status || error) && <div className={error ? "gl-scan-message is-error" : "gl-scan-message"} role="alert">{error || status}</div>}
-        {selected && <div className="gl-scan-result">
+        {selected && <div className="gl-scan-result" ref={resultRef}>
           <div className="gl-scan-result-heading"><div><span>RECOGNISED CONTENT</span><h3>{selected.title}</h3><small>{selected.pageCount} page{selected.pageCount === 1 ? "" : "s"} · {new Date(selected.createdAt).toLocaleString()}</small></div><button onClick={() => setSelected(null)} aria-label="Close result"><X size={16}/></button></div>
           {(selected.images?.length ? selected.images : selected.image ? [selected.image] : []).length > 0 && <div className="gl-scan-preview-list">{(selected.images?.length ? selected.images : selected.image ? [selected.image] : []).map((image,index) => <figure key={selected.id + "-page-" + index}><img className="gl-scan-preview" src={image} alt={"Original scanned page " + (index + 1)}/><figcaption>{selected.kind === "object" ? "Original object photo" : "Original page " + (index + 1)}</figcaption></figure>)}</div>}
           <textarea value={selected.text} onChange={event => updateSelectedText(event.target.value)} aria-label="Edit recognised text"/>
