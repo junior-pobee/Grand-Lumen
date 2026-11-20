@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import LumenSheets from "./LumenSheets";
 import { QRCodeSVG } from "qrcode.react";
 import { connectionAwareMessage, searchLumenServices } from "./api";
-import { Activity, ArrowLeft, BookOpen, CalendarDays, CheckCircle2, Copy, Download, FileText, Globe2, Languages, Plus, Search, ShieldCheck, Trash2, Upload, Wifi, WifiOff } from "lucide-react";
+import { Activity, ArrowLeft, BookOpen, CalendarDays, CheckCircle2, Copy, Download, FileText, Globe2, Languages, Plus, QrCode, Search, ShieldCheck, Trash2, Upload, Wifi, WifiOff } from "lucide-react";
 
 type ModuleName = "Knowledge Graph" | "Verify" | "Document Intelligence" | "Convert" | "World" | "Pulse" | "Scan" | "Workspace" | "Finance" | "Vault" | "Academy" | "Code" | "Lab" | "Create" | "Translate" | "Accessibility" | "Offline" | "Connect" | "Alerts" | "Sheets" | "Browse";
 type Task = { id: string; title: string; due: string; done: boolean };
