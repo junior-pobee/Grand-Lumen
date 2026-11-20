@@ -2378,6 +2378,20 @@ function App() {
     }
   }
 
+  useEffect(() => {
+    const updateClock = () => setClockNow(new Date());
+    updateClock();
+    const timer = window.setInterval(updateClock, 1000);
+    const handleVisibility = () => {
+      if (!document.hidden) updateClock();
+    };
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, []);
+
   function selectSection(value: Section) {
     if (value !== section) recordActivity("Opened " + value, value);
     setSection(value);
@@ -2436,13 +2450,13 @@ function App() {
               const Icon = item.icon;
               return <button key={item.name} className={section === item.name ? "nav-item active" : "nav-item"} onClick={() => selectSection(item.name)}><Icon size={17} /><span>{item.name}</span>{item.name === "Saved" && saved.length > 0 && <i>{saved.length}</i>}</button>;
             })}
+            <div className="sidebar-clock" aria-live="off">
+              <div className="sidebar-clock-heading"><Clock size={12}/><span>LOCAL DATE &amp; TIME</span></div>
+              <time className="sidebar-clock-time">{clockNow.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
+              <div className="sidebar-clock-date">{clockNow.toLocaleDateString(undefined, { weekday: "short", year: "numeric", month: "short", day: "numeric" })}</div>
+              <div className="sidebar-clock-zone">{Intl.DateTimeFormat().resolvedOptions().timeZone || "Device local time"}</div>
+            </div>
           </nav>
-          <div className="sidebar-clock" aria-live="off">
-            <div className="sidebar-clock-heading"><Clock size={14}/><span>LOCAL DATE &amp; TIME</span></div>
-            <time className="sidebar-clock-time">{clockNow.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
-            <div className="sidebar-clock-date">{clockNow.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</div>
-            <div className="sidebar-clock-zone">{Intl.DateTimeFormat().resolvedOptions().timeZone || "Device local time"}</div>
-          </div>
           <div className="sidebar-bottom"><div className="creator-chip">{(session?.user.user_metadata?.avatar_url || localProfile?.profileImage || profilePicture) ? <img className="creator-avatar" src={session?.user.user_metadata?.avatar_url || localProfile?.profileImage || profilePicture} alt="Profile"/> : <span>{(session?.user.email || localProfile?.email || "GL").slice(0,2).toUpperCase()}</span>}<div><b>{session?.user.user_metadata?.full_name || localProfile?.fullName || "Grand-Lumen member"}</b><small>{session?.user.email || localProfile?.email || "Local browser session"}</small></div></div><span className="version">FOUNDATION 1.0</span></div>
         </aside>
         <main className="main-area">
