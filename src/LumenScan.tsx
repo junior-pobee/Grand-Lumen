@@ -254,7 +254,7 @@ export default function LumenScan() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [cameraOn, setCameraOn] = useState(false);
-  const [cameraKind, setCameraKind] = useState<"document" | "object" | "photo" | "video">("document");
+  const [cameraKind, setCameraKind] = useState<"document" | "object" | "photo" | "video" | "qr">("document");
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -339,6 +339,14 @@ export default function LumenScan() {
       return;
     }
     const file = new File([blob], "Lumen-Scan-" + Date.now() + ".jpg", { type: "image/jpeg" });
+    if (cameraKind === "qr") {
+      streamRef.current?.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+      if (videoRef.current) videoRef.current.srcObject = null;
+      setCameraOn(false);
+      await scanQrImage(file);
+      return;
+    }
     if (cameraKind === "object") {
       streamRef.current?.getTracks().forEach(track => track.stop());
       streamRef.current = null;
@@ -542,7 +550,7 @@ export default function LumenScan() {
     await refreshRecords();
   };
 
-  const startCamera = (kind: "document" | "object" | "photo" | "video") => {
+  const startCamera = (kind: "document" | "object" | "photo" | "video" | "qr") => {
     setCameraKind(kind);
     setCameraOn(true);
     setError("");
@@ -705,7 +713,8 @@ export default function LumenScan() {
             <button onClick={() => setCameraFacing(current => current === "environment" ? "user" : "environment")}><FlipHorizontal size={27}/><b>Camera: {cameraFacing === "environment" ? "Back" : "Front"}</b><span>Choose which camera opens for your next capture.</span></button>
             <button onClick={() => startCamera("video")}><Video size={27}/><b>Record a video</b><span>Record a video with microphone audio when permission is granted.</span></button>
             <button onClick={() => void startVoiceRecording()} disabled={voiceRecording}><Mic size={27}/><b>Voice recorder</b><span>Record clear audio using your microphone.</span></button>
-            <button onClick={() => qrFileRef.current?.click()}><QrCode size={27}/><b>QR scanner</b><span>Decode a QR image and show its content here.</span></button>
+            <button onClick={() => startCamera("qr")}><QrCode size={27}/><b>Scan QR with camera</b><span>Capture a visible QR code and decode it in the app.</span></button>
+            <button onClick={() => qrFileRef.current?.click()}><ImagePlus size={27}/><b>Choose QR image</b><span>Decode a QR code from an image file.</span></button>
             <button onClick={() => setStatus("Quick Notes are ready below.")}><NotebookPen size={27}/><b>Quick Notes</b><span>Write and automatically save notes on this device.</span></button>
           </div>}
           <input ref={qrFileRef} type="file" accept="image/*" hidden onChange={event => { const file = event.target.files?.[0]; if (file) void scanQrImage(file); event.currentTarget.value = ""; }}/>
@@ -714,7 +723,7 @@ export default function LumenScan() {
           {qrBusy && <div className="gl-scan-message">Decoding QR image…</div>}
           {qrResult && <div className="gl-studio-qr-result"><b>QR result</b><textarea readOnly value={qrResult}/><button className="gl-scan-secondary" onClick={() => void navigator.clipboard?.writeText(qrResult)}><Copy size={14}/> Copy result</button></div>}
           <div className="gl-studio-notes"><label htmlFor="gl-quick-notes">Quick Notes · saved automatically on this device</label><textarea id="gl-quick-notes" value={quickNotes} onChange={event => setQuickNotes(event.target.value)} placeholder="Write an idea, reminder or quick note…"/></div>
-          {cameraOn && <div className={"gl-scan-camera-area" + (cameraExpanded ? " is-expanded" : "")}><video ref={videoRef} muted playsInline autoPlay/><div className="gl-scan-camera-actions"><button className="gl-scan-secondary" disabled={recording} onClick={switchCamera}><FlipHorizontal size={15}/> Switch to {cameraFacing === "environment" ? "front" : "back"}</button><button className="gl-scan-secondary" onClick={() => setCameraExpanded(value => !value)}>{cameraExpanded ? <Minimize2 size={15}/> : <Maximize2 size={15}/>} {cameraExpanded ? "Fit preview" : "Expand preview"}</button>{cameraKind === "video" ? recording ? <button className="gl-scan-primary" onClick={stopVideoRecording}>Stop recording</button> : <button className="gl-scan-primary" onClick={startVideoRecording}><Video size={16}/> Start recording</button> : <button className="gl-scan-primary" onClick={() => void captureCamera()}><Camera size={16}/> Take picture</button>}<button className="gl-scan-secondary" onClick={() => { if (recording) stopVideoRecording(); else setCameraOn(false); }}>Cancel</button></div></div>}
+          {cameraOn && <div className={"gl-scan-camera-area" + (cameraExpanded ? " is-expanded" : "")}><video ref={videoRef} muted playsInline autoPlay/><div className="gl-scan-camera-actions"><button className="gl-scan-secondary" disabled={recording} onClick={switchCamera}><FlipHorizontal size={15}/> Switch to {cameraFacing === "environment" ? "front" : "back"}</button><button className="gl-scan-secondary" onClick={() => setCameraExpanded(value => !value)}>{cameraExpanded ? <Minimize2 size={15}/> : <Maximize2 size={15}/>} {cameraExpanded ? "Fit preview" : "Expand preview"}</button>{cameraKind === "video" ? recording ? <button className="gl-scan-primary" onClick={stopVideoRecording}>Stop recording</button> : <button className="gl-scan-primary" onClick={startVideoRecording}><Video size={16}/> Start recording</button> : <button className="gl-scan-primary" onClick={() => void captureCamera()}><Camera size={16}/> {cameraKind === "qr" ? "Capture QR code" : "Take picture"}</button>}<button className="gl-scan-secondary" onClick={() => { if (recording) stopVideoRecording(); else setCameraOn(false); }}>Cancel</button></div></div>}
           {studioMediaUrl && <div className="gl-studio-preview">{studioMediaKind === "video" ? <video src={studioMediaUrl} controls playsInline/> : <><img src={studioMediaUrl} alt="Captured creative studio photo" style={{ transform: "rotate(" + photoRotation + "deg)", filter: "brightness(" + photoBrightness + "%) contrast(" + photoContrast + "%)" }}/><div className="gl-studio-edit-tools"><button className="gl-scan-secondary" onClick={() => setPhotoRotation(value => (value + 90) % 360)}><RotateCw size={14}/> Rotate</button><label><Sun size={14}/> Brightness <input type="range" min="50" max="160" value={photoBrightness} onChange={event => setPhotoBrightness(Number(event.target.value))}/></label><label>Contrast <input type="range" min="50" max="160" value={photoContrast} onChange={event => setPhotoContrast(Number(event.target.value))}/></label><button className="gl-scan-secondary" onClick={() => { setPhotoRotation(0); setPhotoBrightness(100); setPhotoContrast(100); }}>Reset edits</button></div></>}<div><button className="gl-scan-primary" onClick={studioMediaKind === "photo" ? () => void saveEditedPhoto() : saveStudioMedia}><Download size={15}/> Save {studioMediaKind === "photo" ? "edited photo" : "video"}</button><button className="gl-scan-secondary" onClick={() => { URL.revokeObjectURL(studioMediaUrl); setStudioMediaUrl(""); setStudioMediaKind(""); setPhotoRotation(0); setPhotoBrightness(100); setPhotoContrast(100); setStatus("Ready for another capture."); }}>New capture</button></div></div>}
           <p className="gl-scan-capability">Camera and microphone activate only after you choose a capture option. Recording is visible in the studio and stops when you finish or cancel.</p>
         </div> : <><div className="gl-scan-tabs">
