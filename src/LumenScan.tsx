@@ -141,11 +141,11 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
       setMenuOpen(false);
       setScreenshotOpen(false);
       setPosition(current => {
-        const right = window.innerWidth - current.x - 48;
-        const bottom = window.innerHeight - current.y - 48;
-        const x = right < current.x ? window.innerWidth - 24 : -24;
-        const y = bottom < current.y ? window.innerHeight - 24 : 12;
-        const next = { x: Math.max(-24, Math.min(window.innerWidth - 24, x)), y: Math.max(12, Math.min(window.innerHeight - 24, y)) };
+        const centerX = current.x + 24;
+        const centerY = current.y + 24;
+        const distances = { left: centerX, right: window.innerWidth - centerX, top: centerY, bottom: window.innerHeight - centerY };
+        const nearest = Object.entries(distances).sort((a, b) => a[1] - b[1])[0][0];
+        const next = nearest === "left" ? { x: -24, y: Math.max(12, Math.min(window.innerHeight - 48, current.y)) } : nearest === "right" ? { x: window.innerWidth - 24, y: Math.max(12, Math.min(window.innerHeight - 48, current.y)) } : nearest === "top" ? { x: Math.max(12, Math.min(window.innerWidth - 48, current.x)), y: -24 } : { x: Math.max(12, Math.min(window.innerWidth - 48, current.x)), y: window.innerHeight - 24 };
         localStorage.setItem("grandLumenScanPosition", JSON.stringify(next));
         return next;
       });
@@ -154,7 +154,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
 
   useEffect(() => {
     wake();
-    const resize = () => setPosition(current => ({ x: Math.max(-24, Math.min(window.innerWidth - 48, current.x)), y: Math.max(12, Math.min(window.innerHeight - 48, current.y)) }));
+    const resize = () => setPosition(current => ({ x: Math.max(-24, Math.min(window.innerWidth - 24, current.x)), y: Math.max(-24, Math.min(window.innerHeight - 24, current.y)) }));
     window.addEventListener("resize", resize);
     return () => {
       window.clearTimeout(idleTimer.current);
@@ -215,8 +215,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
       {menuOpen && <div className={"gl-scan-menu" + (position.x < window.innerWidth / 2 ? " side-left" : "") + (position.y < window.innerHeight / 2 ? " below" : "")}>
         <button onClick={() => { setScreenshotOpen(value => !value); wake(); }}><Camera size={16}/> Screenshot <ChevronDown size={13}/></button>
         {screenshotOpen && <div className="gl-scan-submenu">
-          <button onClick={onScreenshot}>Capture screen</button>
-          <button onClick={onScan}>Camera screenshot</button>
+          <button onClick={onScreenshot}>Screenshot app workspace</button>
         </div>}
         <button onClick={onScan}><ScanLine size={16}/> Scan documents & objects</button>
       </div>}
@@ -314,6 +313,8 @@ export default function LumenScan() {
       return;
     }
     addFiles([file]);
+    setCameraOn(false);
+    setStatus("Page captured. Camera stopped; review the page and choose Recognise all pages when ready.");
   };
 
   const identifyObject = async (file: File) => {
@@ -392,8 +393,10 @@ export default function LumenScan() {
 
   const captureScreen = async () => {
     setError("");
+    setStatus("Choose the Grand-Lumen browser tab or app window to capture its workspace.");
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      if (!navigator.mediaDevices?.getDisplayMedia) throw new Error("Workspace screenshots are not supported by this browser. Use your device screenshot controls instead.");
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: "browser" }, audio: false });
       const video = document.createElement("video");
       video.srcObject = stream;
       video.muted = true;
@@ -406,7 +409,7 @@ export default function LumenScan() {
       stream.getTracks().forEach(track => track.stop());
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png"));
       if (!blob) throw new Error("The screen capture could not be created.");
-      await saveScreenshot(new File([blob], "Grand-Lumen-Screenshot-" + Date.now() + ".png", { type: "image/png" }));
+      await saveScreenshot(new File([blob], "Grand-Lumen-Workspace-" + Date.now() + ".png", { type: "image/png" }));
       setMode("document");
       setOpen(true);
     } catch (reason) {
@@ -497,7 +500,7 @@ export default function LumenScan() {
           <div className="gl-scan-capture-grid">
             <button onClick={() => startCamera("document")}><Camera size={21}/><b>Use camera</b><span>Photograph a page or question paper</span></button>
             <button onClick={() => fileInputRef.current?.click()}><ImagePlus size={21}/><b>Choose images</b><span>Add multiple pages from your device</span></button>
-            <button onClick={() => startCamera("photo")}><FileImage size={21}/><b>Camera screenshot</b><span>Capture a picture and add it to the scan</span></button>
+            <button onClick={() => startCamera("photo")}><FileImage size={21}/><b>Capture photo</b><span>Take a page photo for document recognition</span></button>
           </div>
           <input ref={fileInputRef} type="file" accept="image/*" multiple hidden onChange={event => { if (event.target.files) addFiles(event.target.files); event.currentTarget.value = ""; }}/>
           {files.length > 0 && <div className="gl-scan-queue"><div><b>{files.length} page{files.length === 1 ? "" : "s"} ready</b><button onClick={() => setFiles([])}><Trash2 size={14}/> Clear pages</button></div><div className="gl-scan-thumbs">{files.map((file,index) => <span key={file.name + index}><FileImage size={15}/>{file.name}</span>)}</div><button className="gl-scan-primary" disabled={busy} onClick={() => void runDocumentScan()}>{busy ? "Recognising…" : "Recognise all pages"}</button></div>}
@@ -508,7 +511,7 @@ export default function LumenScan() {
           <button className="gl-scan-primary" onClick={() => startCamera("object")}><Camera size={16}/> Open object camera</button>
           <small>Object recognition model downloads when first used and needs an internet connection to load. Recognition covers common model classes, not every possible object.</small>
         </div>}
-        {(status || error) && <div className={error ? "gl-scan-message is-error" : "gl-scan-message"}>{error || status}</div>}
+        {(status || error) && <div className={error ? "gl-scan-message is-error" : "gl-scan-message"} role="alert">{error || status}</div>}
         {selected && <div className="gl-scan-result">
           <div className="gl-scan-result-heading"><div><span>RECOGNISED CONTENT</span><h3>{selected.title}</h3><small>{selected.pageCount} page{selected.pageCount === 1 ? "" : "s"} · {new Date(selected.createdAt).toLocaleString()}</small></div><button onClick={() => setSelected(null)} aria-label="Close result"><X size={16}/></button></div>
           {(selected.images?.length ? selected.images : selected.image ? [selected.image] : []).length > 0 && <div className="gl-scan-preview-list">{(selected.images?.length ? selected.images : selected.image ? [selected.image] : []).map((image,index) => <figure key={selected.id + "-page-" + index}><img className="gl-scan-preview" src={image} alt={"Original scanned page " + (index + 1)}/><figcaption>{selected.kind === "object" ? "Original object photo" : "Original page " + (index + 1)}</figcaption></figure>)}</div>}
