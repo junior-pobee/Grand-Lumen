@@ -156,13 +156,12 @@ html[data-theme="light"] .gl-studio-edit-tools label{color:#64748b}
 .gl-studio-annotation input{width:100%;min-height:36px;padding:8px 10px;border:1px solid #ffffff24;border-radius:8px;background:#070d19;color:#e8efff;font:11px sans-serif}
 html[data-theme="light"] .gl-studio-annotation input{border-color:#cbd5e1;background:#fff;color:#17243a}
 
-.gl-studio-launch-grid{opacity:1;transform:translateY(0);transition:opacity .28s ease,transform .28s ease;}
-.gl-studio-launch-grid.is-faded{opacity:0;transform:translateY(10px);pointer-events:none;}
+.gl-studio-launch-grid{opacity:1;transform:translateY(0);transition:opacity .28s ease,transform .28s ease,height .28s ease,margin .28s ease,padding .28s ease;}
+.gl-studio-launch-grid.is-faded{opacity:0;transform:translateY(10px);pointer-events:none;height:0;min-height:0;overflow:hidden;margin:0;padding:0;border:0;}
 .gl-studio-focus-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;animation:gl-studio-focus-in .28s ease both;}
 .gl-studio-focus-heading>span{color:#a9d1ff;font-size:11px;font-weight:750;}
 .gl-studio-focus-heading button{min-height:36px;}
 .gl-studio-workspace:has(.gl-studio-focus-heading){position:relative;}
-.gl-studio-workspace:has(.gl-studio-focus-heading) .gl-studio-launch-grid{display:none;}
 @keyframes gl-studio-focus-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 html[data-theme="light"] .gl-studio-focus-heading>span{color:#285b96}
 @media(prefers-reduced-motion:reduce){.gl-studio-launch-grid,.gl-studio-focus-heading{transition:none;animation:none}}
