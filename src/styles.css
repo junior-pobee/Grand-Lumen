@@ -1842,3 +1842,20 @@ html,body,#root { width:100%; max-width:100%; overflow-x:clip; }
 .theme-dark .nav-item:hover .nav-icon-wrap {
   color: var(--accent);
 }
+
+
+.lh-qr-field{display:grid;gap:7px;color:var(--muted);font-size:10px;font-weight:700}
+.lh-qr-field input,.lh-qr-field textarea{width:100%;min-width:0;box-sizing:border-box;padding:10px 11px;border:1px solid var(--line);border-radius:8px;background:var(--glass);color:var(--text);font:inherit;font-size:11px}
+.lh-qr-field textarea{min-height:115px;resize:vertical;line-height:1.65}
+.lh-qr-add-row{display:flex;align-items:center;gap:8px;min-width:0;flex-wrap:wrap}
+.lh-qr-add-row input{flex:1 1 150px;min-width:0;padding:10px 11px;border:1px solid var(--line);border-radius:8px;background:var(--glass);color:var(--text);font:inherit;font-size:11px}
+.lh-qr-details{display:grid;gap:7px}
+.lh-qr-details article{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 10px;border:1px solid var(--line);border-radius:8px}
+.lh-qr-details article span{display:grid;gap:3px;min-width:0;overflow-wrap:anywhere;color:var(--text);font-size:11px}
+.lh-qr-details article b{color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:.08em}
+.lh-qr-details article button{display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;border:1px solid var(--line);border-radius:7px;background:var(--glass);color:var(--muted)}
+.lh-qr-builder-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.lh-qr{display:grid;justify-items:center;gap:8px;padding:12px;min-width:0}
+.lh-qr svg{display:block;width:min(100%,260px);height:auto;padding:9px;border-radius:10px;background:#fff}
+.lh-qr-empty{display:grid;justify-items:center;gap:10px;width:min(100%,260px);min-height:210px;place-content:center;padding:18px;border:1px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center;font-size:11px;line-height:1.6}
+@media(max-width:760px){.lh-two-col{grid-template-columns:minmax(0,1fr)}.lh-qr-add-row>.lh-action{flex:0 0 auto}.lh-qr-builder-actions{align-items:flex-start}}
