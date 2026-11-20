@@ -80,3 +80,6 @@ html[data-theme="light"] .gl-scan-message.is-error{color:#a51f2d;background:#fff
 
 .gl-scan-clear-all{display:inline-flex;align-items:center;gap:5px;margin-left:auto;padding:5px 8px;border:1px solid #ff9b9b44;border-radius:7px;background:#ff777710;color:#ffaaaa;font-size:9px}
 html[data-theme="light"] .gl-scan-clear-all{border-color:#e8b9bd;background:#fff0f0;color:#a51f2d}
+
+.gl-scan-menu.side-left{left:0;right:auto}
+.gl-scan-menu.below{top:78px;bottom:auto}
