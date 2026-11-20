@@ -1,6 +1,6 @@
-.gl-scan-float{position:fixed;z-index:12000;width:48px;height:48px;transition:opacity .45s ease,filter .45s ease;touch-action:none}
+.gl-scan-float{position:fixed;z-index:12000;width:52px;height:52px;transition:opacity .45s ease,filter .45s ease;touch-action:none}
 .gl-scan-float.is-dimmed{opacity:.78;filter:brightness(.9)}
-.gl-scan-orb{width:48px;height:48px;border:1px solid #8eafff;border-radius:13px;display:grid;place-items:center;background:linear-gradient(145deg,#203b78,#101e3d);color:#dceaff;box-shadow:0 5px 18px #142b6b38,0 0 0 3px #2949ad12;cursor:grab;touch-action:none}
+.gl-scan-orb{width:52px;height:52px;border:1px solid #8eafff;border-radius:13px;display:grid;place-items:center;background:linear-gradient(145deg,#203b78,#101e3d);color:#dceaff;box-shadow:0 5px 18px #142b6b38,0 0 0 3px #2949ad12;cursor:grab;touch-action:none}
 .gl-scan-orb:active{cursor:grabbing}
 .gl-scan-menu{position:absolute;right:0;bottom:78px;width:224px;padding:8px;border:1px solid #ffffff24;border-radius:15px;background:#101a2eF2;color:#f5f8ff;box-shadow:0 18px 55px #0007;backdrop-filter:blur(20px);display:grid;gap:5px}
 .gl-scan-menu>button,.gl-scan-submenu button{display:flex;align-items:center;gap:9px;width:100%;padding:11px;border:0;border-radius:9px;background:transparent;color:inherit;text-align:left;font-size:12px}
