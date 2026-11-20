@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { PointerEvent } from "react";
-import { Camera, Check, ChevronDown, Copy, Download, FileImage, FileText, ImagePlus, Move, QrCode, ScanLine, Share2, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { Aperture, Camera, Check, ChevronDown, Clapperboard, Copy, Download, FileImage, FileText, ImagePlus, Move, QrCode, ScanLine, Share2, Sparkles, Trash2, Upload, Video, X } from "lucide-react";
 import { createWorker } from "tesseract.js";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
 import * as tf from "@tensorflow/tfjs";
@@ -117,7 +117,7 @@ function downloadText(name: string, text: string) {
   URL.revokeObjectURL(url);
 }
 
-function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; onScan: () => void }) {
+function FloatingScanIcon({ onScreenshot, onScan, onStudio }: { onScreenshot: () => void; onScan: () => void; onStudio: () => void }) {
   const [position, setPosition] = useState<Position>(() => {
     try {
       const saved = localStorage.getItem("grandLumenScanPosition");
@@ -213,6 +213,7 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
         <QrCode size={30} strokeWidth={2.1}/>
       </button>
       {menuOpen && <div className={"gl-scan-menu" + (position.x < window.innerWidth / 2 ? " side-left" : "") + (position.y < window.innerHeight / 2 ? " below" : "")}>
+        <button className="gl-scan-menu-feature" onClick={() => { onStudio(); setMenuOpen(false); }}><Clapperboard size={17}/> Creative Studio <span>PHOTO · VIDEO</span></button>
         <button onClick={() => { setScreenshotOpen(value => !value); wake(); }}><Camera size={16}/> Screenshot <ChevronDown size={13}/></button>
         {screenshotOpen && <div className="gl-scan-submenu">
           <button onClick={onScreenshot}>Screenshot app workspace</button>
@@ -225,6 +226,12 @@ function FloatingScanIcon({ onScreenshot, onScan }: { onScreenshot: () => void; 
 
 export default function LumenScan() {
   const [open, setOpen] = useState(false);
+  const [workspaceMode, setWorkspaceMode] = useState<"scan" | "studio">("scan");
+  const [studioMediaUrl, setStudioMediaUrl] = useState("");
+  const [studioMediaKind, setStudioMediaKind] = useState<"photo" | "video" | "">("");
+  const [recording, setRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaChunksRef = useRef<Blob[]>([]);
   const [mode, setMode] = useState<"document" | "object">("document");
   const [records, setRecords] = useState<ScanRecord[]>([]);
   const [selected, setSelected] = useState<ScanRecord | null>(null);
@@ -233,7 +240,7 @@ export default function LumenScan() {
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
   const [cameraOn, setCameraOn] = useState(false);
-  const [cameraKind, setCameraKind] = useState<"document" | "object" | "photo">("document");
+  const [cameraKind, setCameraKind] = useState<"document" | "object" | "photo" | "video">("document");
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -254,7 +261,7 @@ export default function LumenScan() {
   useEffect(() => {
     if (!cameraOn || !videoRef.current) return;
     let active = true;
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: false }).then(stream => {
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: "environment" } }, audio: cameraKind === "video" }).then(stream => {
       if (!active) {
         stream.getTracks().forEach(track => track.stop());
         return;
@@ -274,7 +281,7 @@ export default function LumenScan() {
       streamRef.current = null;
       if (videoRef.current) videoRef.current.srcObject = null;
     };
-  }, [cameraOn]);
+  }, [cameraOn, cameraKind]);
 
   const addFiles = (incoming: FileList | File[]) => {
     const images = Array.from(incoming).filter(file => file.type.startsWith("image/"));
@@ -317,6 +324,14 @@ export default function LumenScan() {
       return;
     }
     if (cameraKind === "photo") {
+      if (workspaceMode === "studio") {
+        if (studioMediaUrl) URL.revokeObjectURL(studioMediaUrl);
+        setStudioMediaUrl(URL.createObjectURL(file));
+        setStudioMediaKind("photo");
+        setCameraOn(false);
+        setStatus("Photo captured. Preview or save it to your device.");
+        return;
+      }
       await saveScreenshot(file);
       setMode("document");
       setCameraOn(false);
@@ -503,22 +518,77 @@ export default function LumenScan() {
     await refreshRecords();
   };
 
-  const startCamera = (kind: "document" | "object" | "photo") => {
+  const startCamera = (kind: "document" | "object" | "photo" | "video") => {
     setCameraKind(kind);
     setCameraOn(true);
     setError("");
     setOpen(true);
   };
 
+  const openStudio = () => {
+    if (studioMediaUrl) URL.revokeObjectURL(studioMediaUrl);
+    setStudioMediaUrl("");
+    setStudioMediaKind("");
+    setWorkspaceMode("studio");
+    setError("");
+    setStatus("Choose photo or video capture to begin.");
+    setCameraOn(false);
+    setOpen(true);
+  };
+
+  const startVideoRecording = () => {
+    const stream = streamRef.current;
+    if (!stream || typeof MediaRecorder === "undefined") {
+      setError("Video recording is not supported by this browser.");
+      return;
+    }
+    const mimeType = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"].find(type => MediaRecorder.isTypeSupported(type));
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    mediaChunksRef.current = [];
+    recorder.ondataavailable = event => { if (event.data.size) mediaChunksRef.current.push(event.data); };
+    recorder.onstop = () => {
+      const blob = new Blob(mediaChunksRef.current, { type: recorder.mimeType || "video/webm" });
+      setStudioMediaUrl(URL.createObjectURL(blob));
+      setStudioMediaKind("video");
+      setRecording(false);
+      setCameraOn(false);
+      setStatus("Video captured. Preview or save it to your device.");
+    };
+    mediaRecorderRef.current = recorder;
+    recorder.start();
+    setRecording(true);
+    setStatus("Recording video. Select Stop recording when finished.");
+  };
+
+  const stopVideoRecording = () => {
+    if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+  };
+
+  const saveStudioMedia = () => {
+    if (!studioMediaUrl) return;
+    const link = document.createElement("a");
+    link.href = studioMediaUrl;
+    link.download = studioMediaKind === "video" ? "Grand-Lumen-Creative-" + Date.now() + ".webm" : "Grand-Lumen-Creative-" + Date.now() + ".jpg";
+    link.click();
+  };
+
   return <>
-    <FloatingScanIcon onScreenshot={captureScreen} onScan={() => { setMode("document"); setOpen(true); setError(""); }}/>
-    {open && <div className="gl-scan-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !busy) { setOpen(false); setCameraOn(false); } }}>
-      <section className="gl-scan-panel" role="dialog" aria-modal="true" aria-label="Lumen Scan">
+    <FloatingScanIcon onScreenshot={captureScreen} onScan={() => { setWorkspaceMode("scan"); setMode("document"); setOpen(true); setError(""); }} onStudio={openStudio}/>
+    {open && <div className="gl-scan-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget && !busy) { if (recording) stopVideoRecording(); setOpen(false); setCameraOn(false); } }}>
+      <section className="gl-scan-panel" role="dialog" aria-modal="true" aria-label={workspaceMode === "studio" ? "Creative Studio" : "Lumen Scan"}>
         <header className="gl-scan-header">
-          <div><span className="gl-scan-kicker"><ScanLine size={13}/> GRAND-LUMEN VISUAL INTELLIGENCE</span><h2>Lumen Scan</h2><p>Capture, recognise, edit and keep visual information on this device.</p></div>
-          <button className="gl-scan-close" onClick={() => { if (!busy) { setOpen(false); setCameraOn(false); } }} aria-label="Close Lumen Scan"><X size={19}/></button>
+          <div><span className="gl-scan-kicker">{workspaceMode === "studio" ? <Clapperboard size={13}/> : <ScanLine size={13}/>} GRAND-LUMEN VISUAL INTELLIGENCE</span><h2>{workspaceMode === "studio" ? "Creative Studio" : "Lumen Scan"}</h2><p>{workspaceMode === "studio" ? "Capture photos and videos directly from your device camera." : "Capture, recognise, edit and keep visual information on this device."}</p></div>
+          <button className="gl-scan-close" onClick={() => { if (!busy) { if (recording) stopVideoRecording(); setOpen(false); setCameraOn(false); } }} aria-label="Close Lumen Scan"><X size={19}/></button>
         </header>
-        <div className="gl-scan-tabs">
+        {workspaceMode === "studio" ? <div className="gl-studio-workspace">
+          {!cameraOn && !studioMediaUrl && <div className="gl-studio-launch-grid">
+            <button onClick={() => startCamera("photo")}><Aperture size={27}/><b>Take a picture</b><span>Capture a photo with your device camera.</span></button>
+            <button onClick={() => startCamera("video")}><Video size={27}/><b>Record a video</b><span>Record a video with microphone audio when permission is granted.</span></button>
+          </div>}
+          {cameraOn && <div className="gl-scan-camera-area"><video ref={videoRef} muted playsInline autoPlay/><div className="gl-scan-camera-actions">{cameraKind === "video" ? recording ? <button className="gl-scan-primary" onClick={stopVideoRecording}>Stop recording</button> : <button className="gl-scan-primary" onClick={startVideoRecording}><Video size={16}/> Start recording</button> : <button className="gl-scan-primary" onClick={() => void captureCamera()}><Camera size={16}/> Take picture</button>}<button className="gl-scan-secondary" onClick={() => { if (recording) stopVideoRecording(); else setCameraOn(false); }}>Cancel</button></div></div>}
+          {studioMediaUrl && <div className="gl-studio-preview">{studioMediaKind === "video" ? <video src={studioMediaUrl} controls playsInline/> : <img src={studioMediaUrl} alt="Captured creative studio photo"/>}<div><button className="gl-scan-primary" onClick={saveStudioMedia}><Download size={15}/> Save to device</button><button className="gl-scan-secondary" onClick={() => { URL.revokeObjectURL(studioMediaUrl); setStudioMediaUrl(""); setStudioMediaKind(""); setStatus("Ready for another capture."); }}>New capture</button></div></div>}
+          <p className="gl-scan-capability">Camera and microphone activate only after you choose a capture option. Recording is visible in the studio and stops when you finish or cancel.</p>
+        </div> : <><div className="gl-scan-tabs">
           <button className={mode === "document" ? "active" : ""} onClick={() => { setMode("document"); setCameraOn(false); }}><FileText size={15}/> Document scan</button>
           <button className={mode === "object" ? "active" : ""} onClick={() => { setMode("object"); setCameraOn(false); }}><Sparkles size={15}/> Object recognition</button>
         </div>
@@ -540,6 +610,7 @@ export default function LumenScan() {
           <button className="gl-scan-primary" onClick={() => startCamera("object")}><Camera size={16}/> Open object camera</button>
           <small>Object recognition model downloads when first used and needs an internet connection to load. Recognition covers common model classes, not every possible object.</small>
         </div>}
+        </>}
         {(status || error) && <div className={error ? "gl-scan-message is-error" : "gl-scan-message"} role="alert">{error || status}</div>}
         {selected && <div className="gl-scan-result" ref={resultRef}>
           <div className="gl-scan-result-heading"><div><span>RECOGNISED CONTENT</span><h3>{selected.title}</h3><small>{selected.pageCount} page{selected.pageCount === 1 ? "" : "s"} · {new Date(selected.createdAt).toLocaleString()}</small></div><button onClick={() => setSelected(null)} aria-label="Close result"><X size={16}/></button></div>
