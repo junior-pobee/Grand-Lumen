@@ -2420,7 +2420,7 @@ function App() {
         <div className="ls-credit">A NEW WORLD OF POSSIBILITIES</div>
       </div>}
       <GlobalReminderMonitor />
-      <LumenScan />
+      {!loading && <LumenScan />}
       <div className={theme === "light" ? "app-shell theme-light" : "app-shell theme-dark"} style={{ "--gl-font-scale": fontScale, "--gl-interface-scale": interfaceScale, "--gl-font-family": fontFamily, "--gl-font-weight": fontWeight } as React.CSSProperties}>
         {appLanguage !== "en" && <button className="language-default-fab" onClick={resetToEnglish} aria-label="Switch back to English"><Globe2 size={15} /><span>English</span><ArrowRight size={13} /></button>}
         <aside className={mobileMenu ? "sidebar open" : "sidebar"}>
