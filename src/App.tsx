@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Activity, Bell, Utensils, Newspaper, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, CheckCircle2, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, Eye, EyeOff, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, LocateFixed, LockKeyhole, LogIn, LogOut, Mail, MapPin, Maximize2, Menu, Moon, MonitorSmartphone, Navigation, Play, Plus, Search, Send, Settings, ShieldCheck, Sparkles, Sun, Terminal, UserRound, Video, Wallet, X, Zap, QrCode, ScanLine, Share2, Upload, Download, Smartphone } from "lucide-react";
+import { Activity, Bell, Clock, Utensils, Newspaper, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, CheckCircle2, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, Eye, EyeOff, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, LocateFixed, LockKeyhole, LogIn, LogOut, Mail, MapPin, Maximize2, Menu, Moon, MonitorSmartphone, Navigation, Play, Plus, Search, Send, Settings, ShieldCheck, Sparkles, Sun, Terminal, UserRound, Video, Wallet, X, Zap, QrCode, ScanLine, Share2, Upload, Download, Smartphone } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import Peer from "peerjs";
 import GraphWorkspace from "./GraphWorkspace";
@@ -1996,6 +1996,8 @@ function App() {
   const [shareDraft, setShareDraft] = useState("");
   const openShare = (value: string) => { setShareDraft(value); setSection("Share"); setMobileMenu(false); };
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [clockNow, setClockNow] = useState(() => new Date());
+  const [frequentSections, setFrequentSections] = useState<{ name: Section; count: number }[]>(() => readWorkspaceData("grandLumenFrequentSections", []));
   const [projectName, setProjectName] = useState("");
   const [projects, setProjects] = useState<string[]>(() => readWorkspaceData("grandLumenProjects", []));
   const [installPrompt, setInstallPrompt] = useState<any>(null);
@@ -2435,6 +2437,12 @@ function App() {
               return <button key={item.name} className={section === item.name ? "nav-item active" : "nav-item"} onClick={() => selectSection(item.name)}><Icon size={17} /><span>{item.name}</span>{item.name === "Saved" && saved.length > 0 && <i>{saved.length}</i>}</button>;
             })}
           </nav>
+          <div className="sidebar-clock" aria-live="off">
+            <div className="sidebar-clock-heading"><Clock size={14}/><span>LOCAL DATE &amp; TIME</span></div>
+            <time className="sidebar-clock-time">{clockNow.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
+            <div className="sidebar-clock-date">{clockNow.toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" })}</div>
+            <div className="sidebar-clock-zone">{Intl.DateTimeFormat().resolvedOptions().timeZone || "Device local time"}</div>
+          </div>
           <div className="sidebar-bottom"><div className="creator-chip">{(session?.user.user_metadata?.avatar_url || localProfile?.profileImage || profilePicture) ? <img className="creator-avatar" src={session?.user.user_metadata?.avatar_url || localProfile?.profileImage || profilePicture} alt="Profile"/> : <span>{(session?.user.email || localProfile?.email || "GL").slice(0,2).toUpperCase()}</span>}<div><b>{session?.user.user_metadata?.full_name || localProfile?.fullName || "Grand-Lumen member"}</b><small>{session?.user.email || localProfile?.email || "Local browser session"}</small></div></div><span className="version">FOUNDATION 1.0</span></div>
         </aside>
         <main className="main-area">
@@ -2449,6 +2457,7 @@ function App() {
               <div className="hero-block"><div className="eyebrow"><Sparkles size={13} /> YOUR EXPANDED DIGITAL UNIVERSE</div><h1>Explore beyond<br /><span>what you know.</span></h1><p>One workspace for discovery, research, learning, development and creation. Your next idea starts here.</p><div className="hero-search"><Search size={19} /><input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && runSearch()} placeholder="Search knowledge, ideas, technology..." /><button onClick={() => { selectSection("Search"); runSearch(); }}>Explore <ArrowRight size={15} /></button></div><div className="quick-tags"><button onClick={() => { setQuery("artificial intelligence"); selectSection("Search"); }}>Artificial intelligence</button><button onClick={() => { setQuery("space exploration"); selectSection("Search"); }}>Space exploration</button><button onClick={() => { setQuery("web development"); selectSection("Search"); }}>Web development</button></div></div>
               <div className="section-heading"><div><span className="eyebrow">THE WORKSPACE</span><h2>Everything in one orbit.</h2></div><span className="muted">12 connected spaces</span></div>
               <div className="feature-grid">{[{n:"Research Studio",d:"Explore subjects, collect sources and build understanding.",i:FlaskConical,s:"Research"},{n:"Code Lab",d:"Experiment with 15 programming and markup languages.",i:Code2,s:"Code Lab"},{n:"API Library",d:"Discover open data and connect useful services.",i:Database,s:"API Library"},{n:"Learning Hub",d:"Build skills through guided, practical lessons.",i:GraduationCap,s:"Learn"},{n:"Visual Discovery",d:"Explore visual ideas and media collections.",i:Image,s:"Images"},{n:"Smart Tools",d:"Use calculators, dictionaries and live data utilities.",i:Zap,s:"Tools"}].map(card => { const Icon = card.i; return <button className="feature-card" key={card.n} onClick={() => selectSection(card.s as Section)}><span className="feature-icon"><Icon size={20} /></span><span className="feature-title">{card.n}</span><span className="feature-description">{card.d}</span><ArrowRight className="feature-arrow" size={16} /></button>; })}</div>
+              {frequentSections.length > 0 && <section className="frequent-section"><div className="section-heading"><div><span className="eyebrow">YOUR WORKFLOW</span><h2>Frequently used</h2></div><span className="muted">Quick access to your recent spaces</span></div><div className="frequent-grid">{frequentSections.slice(0,6).map(item => { const sectionItem = sections.find(entry => entry.name === item.name); if (!sectionItem) return null; const Icon = sectionItem.icon; return <button className="frequent-card" key={item.name} onClick={() => selectSection(item.name)}><span className="frequent-card-icon"><Icon size={18}/></span><span><b>{item.name}</b><small>Opened {item.count} {item.count === 1 ? "time" : "times"}</small></span><ArrowUpRight size={15}/></button>; })}</div></section>}
               <article className="marketlink-promo">
                 <div className="marketlink-promo-mark"><span>ML</span></div>
                 <div className="marketlink-promo-copy">
