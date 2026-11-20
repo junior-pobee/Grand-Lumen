@@ -1800,28 +1800,21 @@ html,body,#root { width:100%; max-width:100%; overflow-x:clip; }
   gap: 12px;
 }
 .nav-icon-wrap {
-  position: relative;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  flex: 0 0 22px;
-  width: 22px;
+  justify-content: flex-start;
+  gap: 4px;
+  flex: 0 0 42px;
+  width: 42px;
   height: 24px;
   color: currentColor;
 }
 .nav-icon-wrap svg {
+  flex: 0 0 19px;
   width: 19px;
   height: 19px;
   stroke-width: 2.8px;
   filter: drop-shadow(0 0 .35px currentColor);
-}
-.nav-icon-wrap .nav-icon-duplicate {
-  position: absolute;
-  inset: 0;
-  transform: translateX(2.5px);
-  clip-path: inset(0 0 0 48%);
-  opacity: .9;
-  pointer-events: none;
 }
 .theme-light .nav-icon-wrap {
   color: #385675;
