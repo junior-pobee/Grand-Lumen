@@ -8,6 +8,7 @@ import ExpansionHub from "./ExpansionHub";
 import TeamWorkspace from "./TeamWorkspace";
 import LumenSheets from "./LumenSheets";
 import ActivityDigest, { type ActivityEntry } from "./ActivityDigest";
+import PreviousActivityPopup from "./PreviousActivityPopup";
 import WelcomeTour from "./WelcomeTour";
 import LumenScan from "./LumenScan";
 import RecipeWorkspace from "./RecipeWorkspace";
@@ -1833,6 +1834,7 @@ function App() {
   const [localProfile, setLocalProfile] = useState<{ fullName: string; email: string; profileImage?: string; onboardingPending?: boolean } | null>(null);
   const [welcomeTourOpen, setWelcomeTourOpen] = useState(false);
   const [activityEntries, setActivityEntries] = useState<ActivityEntry[]>([]);
+  const [activityLoaded, setActivityLoaded] = useState(false);
   const [clearDataOpen, setClearDataOpen] = useState(false);
   const [clearDataPassword, setClearDataPassword] = useState("");
   const [clearDataError, setClearDataError] = useState("");
@@ -2060,29 +2062,21 @@ function App() {
     });
   };
   useEffect(() => {
+    setActivityLoaded(false);
     setActivityEntries(readWorkspaceData<ActivityEntry[]>(activityStorageKey, []));
+    setActivityLoaded(true);
   }, [activityStorageKey]);
   useEffect(() => {
+    const meaningfulAction = /^(share|shared|upload|uploaded|download|downloaded|export|exported|save|saved|create|created|add|added|remove|removed|delete|deleted|send|sent|capture|captured|scan|scanned|run|generate|generated|copy|copied|compile|compiled|edit|edited|update|updated|submit|submitted|invite|invited|accept|accepted|reject|rejected|clear|cleared|import|imported|search|searched|explain|explore|explored)\\b/i;
     const captureActivity = (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target.closest<HTMLElement>("button, a, [role=button]") : null;
-      if (!target || target.closest(".nav-item, .feature-card, .activity-digest")) return;
-      const action = (target.innerText || target.getAttribute("aria-label") || target.getAttribute("title") || "").replace(/\s+/g, " ").trim();
-      if (!action || action.length < 2) return;
+      if (!target || target.closest(".nav-item, .feature-card, .frequent-card, .activity-digest, .previous-summary-card")) return;
+      const action = (target.innerText || target.getAttribute("aria-label") || target.getAttribute("title") || "").replace(/\\s+/g, " ").trim();
+      if (!action || action.length < 2 || !meaningfulAction.test(action)) return;
       recordActivity(action.slice(0, 100));
     };
-    const captureFieldChange = (event: Event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement)) return;
-      if (target instanceof HTMLInputElement && ["password", "hidden", "file"].includes(target.type)) return;
-      const label = target.getAttribute("aria-label") || target.getAttribute("placeholder") || target.name || target.closest("label")?.innerText || target.tagName.toLowerCase();
-      recordActivity("Updated " + label.replace(/\s+/g, " ").trim().slice(0, 70));
-    };
     document.addEventListener("click", captureActivity, true);
-    document.addEventListener("change", captureFieldChange, true);
-    return () => {
-      document.removeEventListener("click", captureActivity, true);
-      document.removeEventListener("change", captureFieldChange, true);
-    };
+    return () => document.removeEventListener("click", captureActivity, true);
   }, [activityStorageKey, section]);
   useEffect(() => {
     const captureInstall = (event: Event) => {
@@ -2389,7 +2383,6 @@ function App() {
   }, [section, session?.user.id, localProfile?.email, guestMode, authReady]);
 
   function selectSection(value: Section) {
-    if (value !== section) recordActivity("Opened " + value, value);
     setSection(value);
     setMobileMenu(false);
     setError("");
@@ -2494,6 +2487,7 @@ function App() {
         </main>
       </div>
       {welcomeTourOpen && <WelcomeTour name={session?.user.user_metadata?.full_name || localProfile?.fullName || session?.user.email || "explorer"} onComplete={completeWelcomeTour} />}
+      <PreviousActivityPopup entries={activityEntries} storageKey={activityStorageKey} loaded={activityLoaded && !welcomeTourOpen} />
     </>
   );
 }
