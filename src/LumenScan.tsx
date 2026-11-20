@@ -238,6 +238,14 @@ export default function LumenScan() {
     setError("");
   };
 
+  const saveScreenshot = async (file: File) => {
+    const record: ScanRecord = { id: crypto.randomUUID(), title: "Screenshot · " + new Date().toLocaleString(), text: "Screenshot captured. Choose Extract text to recognise any visible words, numbers or formulas.", createdAt: Date.now(), pageCount: 1, kind: "document", image: await imageData(file) };
+    await writeScanRecord(record);
+    setSelected(record);
+    await refreshRecords();
+    setStatus("Screenshot saved on this device.");
+  };
+
   const captureCamera = async () => {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
@@ -255,11 +263,14 @@ export default function LumenScan() {
       await identifyObject(file);
       return;
     }
-    addFiles([file]);
     if (cameraKind === "photo") {
+      await saveScreenshot(file);
+      setMode("document");
       setCameraOn(false);
       setOpen(true);
+      return;
     }
+    addFiles([file]);
   };
 
   const identifyObject = async (file: File) => {
@@ -341,7 +352,7 @@ export default function LumenScan() {
       stream.getTracks().forEach(track => track.stop());
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png"));
       if (!blob) throw new Error("The screen capture could not be created.");
-      addFiles([new File([blob], "Grand-Lumen-Screenshot-" + Date.now() + ".png", { type: "image/png" })]);
+      await saveScreenshot(new File([blob], "Grand-Lumen-Screenshot-" + Date.now() + ".png", { type: "image/png" }));
       setMode("document");
       setOpen(true);
     } catch (reason) {
@@ -384,6 +395,20 @@ export default function LumenScan() {
     const next = { ...selected, text };
     setSelected(next);
     void writeScanRecord(next).then(refreshRecords);
+  };
+
+  const clearAllRecords = async () => {
+    if (!window.confirm("Delete every saved Lumen Scan item from this device?")) return;
+    const database = await openScanDatabase();
+    await new Promise<void>((resolve, reject) => {
+      const transaction = database.transaction(STORE_NAME, "readwrite");
+      transaction.objectStore(STORE_NAME).clear();
+      transaction.oncomplete = () => resolve();
+      transaction.onerror = () => reject(transaction.error);
+    });
+    setSelected(null);
+    await refreshRecords();
+    setStatus("All saved scans were cleared from this device.");
   };
 
   const removeRecord = async (record: ScanRecord) => {
@@ -436,6 +461,8 @@ export default function LumenScan() {
           <textarea value={selected.text} onChange={event => updateSelectedText(event.target.value)} aria-label="Edit recognised text"/>
           <div className="gl-scan-result-actions">
             <button onClick={() => void navigator.clipboard?.writeText(selected.text)}><Copy size={14}/> Copy</button>
+            {selected.image && <button onClick={() => { const link = document.createElement("a"); link.href = selected.image || ""; link.download = "Lumen-Screenshot-" + selected.id.slice(0, 8) + ".png"; link.click(); }}><Download size={14}/> Image</button>}
+            {selected.image && selected.text.startsWith("Screenshot captured") && <button onClick={() => { const blob = selected.image ? fetch(selected.image).then(response => response.blob()) : Promise.resolve(new Blob()); void blob.then(value => { addFiles([new File([value], "Lumen-Screenshot.png", { type: value.type || "image/png" })]); setSelected(null); setMode("document"); }); }}><ScanLine size={14}/> Extract text</button>}
             <button onClick={() => void shareRecord(selected)}><Share2 size={14}/> Share</button>
             <button onClick={() => downloadText("Lumen-Scan-" + selected.id.slice(0, 8), selected.text)}><Download size={14}/> TXT</button>
             <button onClick={() => exportPdf(selected)}><Download size={14}/> PDF</button>
@@ -443,7 +470,7 @@ export default function LumenScan() {
           </div>
         </div>}
         <div className="gl-scan-library">
-          <div><b>Saved scans</b><span>{records.length} stored on this device</span></div>
+          <div><b>Saved scans</b><span>{records.length} stored on this device</span>{records.length > 0 && <button className="gl-scan-clear-all" onClick={() => void clearAllRecords()}><Trash2 size={12}/> Clear all</button>}</div>
           {records.length ? records.map(record => <button className={selected?.id === record.id ? "selected" : ""} key={record.id} onClick={() => { setSelected(record); setMode(record.kind); setError(""); }}><span>{record.kind === "object" ? <Sparkles size={15}/> : <FileText size={15}/>}<span><b>{record.title}</b><small>{record.pageCount} page{record.pageCount === 1 ? "" : "s"} · {new Date(record.createdAt).toLocaleDateString()}</small></span></span><Check size={14}/></button>) : <p>No saved scans yet. Your documents stay in this browser.</p>}
         </div>
         <footer className="gl-scan-footer"><span><Move size={13}/> Drag the floating scanner to reposition it.</span><button onClick={() => { setOpen(false); setCameraOn(false); }}>Done</button></footer>
