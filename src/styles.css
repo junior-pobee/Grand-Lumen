@@ -1464,3 +1464,10 @@ html[data-theme="light"] .gl-studio-launch-grid span,
 html[data-theme="light"] .gl-studio-edit-tools label {
   color:#52627a;
 }
+
+.theme-light .nav-item svg,
+.theme-dark .nav-item svg {
+  width:18px;
+  height:18px;
+  flex:0 0 18px;
+}
