@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Activity, Bell, Newspaper, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, CheckCircle2, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, Eye, EyeOff, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, LocateFixed, LockKeyhole, LogIn, LogOut, Mail, MapPin, Maximize2, Menu, Moon, MonitorSmartphone, Navigation, Play, Plus, Search, Send, Settings, ShieldCheck, Sparkles, Sun, Terminal, UserRound, Video, Wallet, X, Zap, QrCode, ScanLine, Share2, Upload, Download, Smartphone } from "lucide-react";
+import { Activity, Bell, Utensils, Newspaper, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, CheckCircle2, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, Eye, EyeOff, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, LocateFixed, LockKeyhole, LogIn, LogOut, Mail, MapPin, Maximize2, Menu, Moon, MonitorSmartphone, Navigation, Play, Plus, Search, Send, Settings, ShieldCheck, Sparkles, Sun, Terminal, UserRound, Video, Wallet, X, Zap, QrCode, ScanLine, Share2, Upload, Download, Smartphone } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
 import Peer from "peerjs";
 import GraphWorkspace from "./GraphWorkspace";
@@ -10,6 +10,7 @@ import LumenSheets from "./LumenSheets";
 import ActivityDigest, { type ActivityEntry } from "./ActivityDigest";
 import WelcomeTour from "./WelcomeTour";
 import LumenScan from "./LumenScan";
+import RecipeWorkspace from "./RecipeWorkspace";
 import { supabase, supabaseConfigured } from "./auth";
 import { getCurrency, getDictionary, getHoliday, getPokemon, getWeather, researchTopic, searchArchiveVideos, searchCommonsImages, searchHackerNews, searchWikipedia, searchGlobalNews, type SearchItem, type NewsItem, connectionAwareMessage } from "./api";
 
@@ -72,11 +73,12 @@ async function hashLocalPassword(password: string, salt: string): Promise<string
   return Array.from(new Uint8Array(bits)).map(value => value.toString(16).padStart(2, "0")).join("");
 }
 
-type Section = "Lumen Hub" | "Home" | "Search" | "Research" | "News" | "Images" | "Videos" | "Maps" | "Code Lab" | "Learn" | "API Library" | "Tools" | "Scanner" | "Share" | "Saved" | "Activity Digest" | "Projects" | "Creative Studio" | "Messages" | "Team" | "Settings";
+type Section = "Lumen Hub" | "Home" | "Recipes" | "Search" | "Research" | "News" | "Images" | "Videos" | "Maps" | "Code Lab" | "Learn" | "API Library" | "Tools" | "Scanner" | "Share" | "Saved" | "Activity Digest" | "Projects" | "Creative Studio" | "Messages" | "Team" | "Settings";
 const sections: { name: Section; icon: any; group: string }[] = [
   { name: "Home", icon: Compass, group: "Workspace" },
   { name: "Search", icon: Search, group: "Workspace" },
   { name: "Research", icon: FlaskConical, group: "Workspace" },
+  { name: "Recipes", icon: Utensils, group: "Explore" },
   { name: "News", icon: Newspaper, group: "Explore" },
   { name: "Images", icon: Image, group: "Explore" },
   { name: "Videos", icon: Video, group: "Explore" },
@@ -2386,6 +2388,7 @@ function App() {
   const heading: Record<Section, string> = {
     "Lumen Hub": "One workspace. More possibilities.",
     Home: "Explore beyond.",
+    Recipes: "Discover food worth ordering.",
     Search: "Find what matters.",
     Research: "Think deeper.",
     News: "The world, in view.",
@@ -2459,6 +2462,7 @@ function App() {
               <div className="stats-strip"><div><b>15</b><span>LANGUAGE TRACKS</span></div><div><b>20+</b><span>API CATALOGUE</span></div><div><b>06</b><span>LIVE DATA TOOLS</span></div><div><b>{saved.length.toString().padStart(2,"0")}</b><span>SAVED ITEMS</span></div></div>
             </section>}
             {section === "Search" && <section><PageTitle eyebrow="DISCOVERY ENGINE" title={heading.Search} description="Search across knowledge sources and developer communities without leaving your workspace." /><div className="search-panel"><Search size={18} /><input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && runSearch()} placeholder="What would you like to discover?" /><button onClick={() => runSearch()} disabled={busy}>Search</button></div><div className="filter-row"><button onClick={() => runSearch("all")}>All sources</button><button onClick={() => runSearch("wiki")}>Wikipedia</button><button onClick={() => runSearch("hn")}>Hacker News</button></div><Results items={results} saved={saved} onSave={toggleSave} onShare={item => openShare(item.title + "\n\n" + item.description + "\n\n" + item.url)} busy={busy} error={error} /></section>}
+            {section === "Recipes" && <section><PageTitle eyebrow="FOOD DISCOVERY & ORDERING" title={heading.Recipes} description="Explore dishes from around the world, preview recipe details and find ready-made meals through food-ordering providers."/><RecipeWorkspace/></section>}
             {section === "Scanner" && <section><PageTitle eyebrow="CAMERA TOOLS" title={heading.Scanner} description="Scan QR codes and common product barcodes using your device camera."/><BarcodeScanner/></section>}
             {section === "Share" && <section><PageTitle eyebrow="DEVICE-TO-DEVICE TRANSFER" title={heading.Share} description="Share files, pictures, videos, links, research results and code with a connected device."/><ShareWorkspace initialText={shareDraft}/></section>}
             {section === "Messages" && <section><PageTitle eyebrow="LUMEN MESSAGES" title={heading.Messages} description="Find answers to questions about Grand Lumen."/><MessagesWorkspace session={session}/></section>}
