@@ -1599,3 +1599,199 @@ html,body,#root { width:100%; max-width:100%; overflow-x:clip; }
     padding-top: 5px;
   }
 }
+
+.recipe-workspace,
+.recipe-workspace * {
+  box-sizing: border-box;
+  min-width: 0;
+}
+.recipe-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+}
+.recipe-search-panel,
+.recipe-order-section,
+.recipe-results-heading,
+.recipe-results-grid,
+.recipe-provider-grid {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.recipe-search-panel {
+  overflow: hidden;
+}
+.recipe-search-form {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 100%;
+}
+.recipe-search-form > svg {
+  flex: 0 0 auto;
+}
+.recipe-search-form input {
+  flex: 1 1 180px;
+  width: 1%;
+  max-width: 100%;
+}
+.recipe-search-form button {
+  flex: 0 1 auto;
+  max-width: 100%;
+}
+.recipe-location {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  width: 100%;
+  max-width: 100%;
+}
+.recipe-location input {
+  width: 100%;
+  max-width: 100%;
+}
+.recipe-category-row {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
+}
+.recipe-category-row button {
+  flex: 0 1 auto;
+  max-width: 100%;
+  white-space: normal;
+}
+.recipe-results-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+.recipe-results-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+  gap: clamp(10px, 1.5vw, 16px);
+}
+.recipe-card,
+.recipe-card-body,
+.recipe-image-button,
+.recipe-provider-card,
+.recipe-order-search,
+.recipe-price-note {
+  min-width: 0;
+  max-width: 100%;
+}
+.recipe-card h3,
+.recipe-provider-card b,
+.recipe-provider-card small,
+.recipe-order-search span,
+.recipe-price-note p {
+  overflow-wrap: anywhere;
+}
+.recipe-order-search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+.recipe-order-search > div {
+  min-width: 0;
+  flex: 1 1 220px;
+}
+.recipe-order-search > a {
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.recipe-provider-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+}
+.recipe-provider-card {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 900px) {
+  .recipe-results-grid {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 230px), 1fr));
+  }
+}
+@media (max-width: 620px) {
+  .recipe-search-panel,
+  .recipe-order-section {
+    padding: 15px;
+    border-radius: 14px;
+  }
+  .recipe-search-heading {
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .recipe-search-heading > div:last-child {
+    min-width: 0;
+  }
+  .recipe-search-heading h2,
+  .recipe-results-heading h2,
+  .recipe-order-intro h2 {
+    font-size: clamp(19px, 6vw, 24px);
+    overflow-wrap: anywhere;
+  }
+  .recipe-search-form {
+    gap: 9px;
+    padding: 10px;
+  }
+  .recipe-search-form input {
+    flex: 1 1 calc(100% - 36px);
+    width: auto;
+  }
+  .recipe-search-form button {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+  .recipe-location {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 7px;
+  }
+  .recipe-location span {
+    grid-column: 2;
+  }
+  .recipe-location input {
+    grid-column: 1 / -1;
+  }
+  .recipe-category-row {
+    gap: 7px;
+  }
+  .recipe-category-row button {
+    padding: 7px 10px;
+    font-size: 10px;
+  }
+  .recipe-results-grid,
+  .recipe-provider-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .recipe-image-button {
+    height: clamp(170px, 55vw, 230px);
+  }
+  .recipe-order-search {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .recipe-order-search > a {
+    align-self: flex-start;
+  }
+}
+@media (max-width: 380px) {
+  .recipe-search-panel,
+  .recipe-order-section {
+    padding: 12px;
+  }
+  .recipe-mark {
+    width: 38px;
+    height: 38px;
+    flex-basis: 38px;
+  }
+  .recipe-category-row button {
+    padding: 6px 8px;
+    font-size: 9px;
+  }
+}
