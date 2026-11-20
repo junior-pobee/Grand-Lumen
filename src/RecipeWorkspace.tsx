@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 import { ArrowUpRight, ChefHat, ChevronDown, Clock3, ExternalLink, MapPin, Search, ShoppingBag, Utensils, X } from "lucide-react";
 
 type Meal = {
@@ -80,12 +81,12 @@ export default function RecipeWorkspace() {
   }
 
   useEffect(() => {
-    void searchMeals("", "All dishes");
+    void searchMeals("chicken", "All dishes");
   }, []);
 
   const orderSearchUrl = useMemo(() => "https://www.google.com/search?q=" + encodeURIComponent("order " + search + " restaurant menu price " + location), [search, location]);
 
-  function handleSearch(event: React.FormEvent<HTMLFormElement>) {
+  function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setCategory("All dishes");
     void searchMeals(search, "All dishes");
