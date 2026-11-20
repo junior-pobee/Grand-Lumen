@@ -1859,3 +1859,10 @@ html,body,#root { width:100%; max-width:100%; overflow-x:clip; }
 .lh-qr svg{display:block;width:min(100%,260px);height:auto;padding:9px;border-radius:10px;background:#fff}
 .lh-qr-empty{display:grid;justify-items:center;gap:10px;width:min(100%,260px);min-height:210px;place-content:center;padding:18px;border:1px dashed var(--line);border-radius:12px;color:var(--muted);text-align:center;font-size:11px;line-height:1.6}
 @media(max-width:760px){.lh-two-col{grid-template-columns:minmax(0,1fr)}.lh-qr-add-row>.lh-action{flex:0 0 auto}.lh-qr-builder-actions{align-items:flex-start}}
+
+
+.app-shell{height:100dvh;min-height:0;overflow:hidden}
+.main-area{height:100dvh;min-height:0;overflow:hidden}
+.topbar{position:sticky;top:0;z-index:30;flex:0 0 66px;height:66px}
+.content-wrap{flex:1 1 auto;min-height:0;height:calc(100dvh - 66px);overflow-x:hidden;overflow-y:auto;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;scroll-behavior:auto}
+@media(max-width:520px){.topbar{flex-basis:58px;height:58px}.content-wrap{height:calc(100dvh - 58px)}}
