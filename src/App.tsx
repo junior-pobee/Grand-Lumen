@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Activity, Bell, Clock, Utensils, Newspaper, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, CheckCircle2, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, Eye, EyeOff, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, LocateFixed, LockKeyhole, LogIn, LogOut, Mail, MapPin, Maximize2, Menu, Moon, MonitorSmartphone, Navigation, Play, Plus, Search, Send, Settings, ShieldCheck, Sparkles, Sun, Terminal, UserRound, Video, Wallet, X, Zap, QrCode, ScanLine, Share2, Upload, Download, Smartphone } from "lucide-react";
 import type { Session } from "@supabase/supabase-js";
@@ -2391,10 +2391,18 @@ function App() {
     };
   }, []);
 
-  useEffect(() => {
-    contentRef.current?.scrollTo({ top: 0, left: 0, behavior: "auto" });
-    window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  useLayoutEffect(() => {
+    const content = contentRef.current;
+    if (!content) return;
+    content.scrollTop = 0;
+    content.scrollLeft = 0;
   }, [section, session?.user.id, localProfile?.email, guestMode, authReady]);
+
+  useEffect(() => {
+    const workspaceReady = authReady && Boolean(session || guestMode);
+    document.documentElement.classList.toggle("grand-lumen-workspace-ready", workspaceReady);
+    return () => document.documentElement.classList.remove("grand-lumen-workspace-ready");
+  }, [authReady, session?.user.id, guestMode]);
 
   function selectSection(value: Section) {
     setSection(value);
