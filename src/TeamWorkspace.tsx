@@ -6,7 +6,7 @@ import { supabase } from "./auth";
 type Profile = { id: string; display_name: string | null; email: string | null; avatar_url: string | null };
 type Connection = { id: string; user_low: string; user_high: string };
 type RequestRow = { id: string; requester_id: string; recipient_id: string; status: string; created_at: string };
-type Message = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string };
+type Message = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; deleted_for_everyone?: boolean };
 type Project = { id: string; user_id: string; name: string; description: string; status: string };
 type CallInvite = { id: string; connection_id: string; caller_id: string; recipient_id: string; peer_id: string; media_type: "audio" | "video"; status: string; expires_at: string };
 
@@ -21,6 +21,9 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   const [sentRequests, setSentRequests] = useState<RequestRow[]>([]);
   const [selected, setSelected] = useState<Connection | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [hiddenMessageIds, setHiddenMessageIds] = useState<string[]>([]);
+  const [messageMenu, setMessageMenu] = useState<Message | null>(null);
+  const messagePressTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
@@ -253,13 +256,23 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       const conversation = await client.from("grand_lumen_team_conversations").select("id").eq("connection_id", selected.id).single();
       if (conversation.error) { if (alive) setNotice(conversation.error.message); return; }
       const conversationId = conversation.data.id as string;
-      const result = await client.from("grand_lumen_team_messages").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: true }).limit(150);
+      const [result, hiddenResult] = await Promise.all([
+        client.from("grand_lumen_team_messages").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: true }).limit(150),
+        client.from("grand_lumen_team_message_hides").select("message_id").eq("user_id", userId)
+      ]);
       if (!alive) return;
-      if (!result.error) setMessages((result.data || []) as Message[]);
+      if (result.error) { setNotice(result.error.message); return; }
+      if (hiddenResult.error) { setNotice(hiddenResult.error.message); return; }
+      setMessages((result.data || []) as Message[]);
+      setHiddenMessageIds((hiddenResult.data || []).map(item => String(item.message_id)));
       channel = client.channel("grand-lumen-chat-" + conversationId)
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_team_messages", filter: "conversation_id=eq." + conversationId }, payload => {
           const message = payload.new as Message;
           if (alive && message.conversation_id === conversationId) setMessages(current => current.some(item => item.id === message.id) ? current : [...current, message]);
+        })
+        .on("postgres_changes", { event: "UPDATE", schema: "public", table: "grand_lumen_team_messages", filter: "conversation_id=eq." + conversationId }, payload => {
+          const message = payload.new as Message;
+          if (alive && message.conversation_id === conversationId) setMessages(current => current.map(item => item.id === message.id ? message : item));
         }).subscribe();
     };
     void loadMessages();
@@ -437,6 +450,33 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     else setMessages(current => current.some(item => item.id === result.data.id) ? current : [...current, result.data as Message]);
   };
 
+  const deleteMessageForMe = async (message: Message) => {
+    if (!supabase) return;
+    const result = await supabase.rpc("grand_lumen_hide_team_message", { p_message_id: message.id });
+    if (result.error) { setNotice(result.error.message); return; }
+    setHiddenMessageIds(current => current.includes(message.id) ? current : [...current, message.id]);
+    setMessageMenu(null);
+  };
+
+  const deleteMessageForEveryone = async (message: Message) => {
+    if (!supabase || message.sender_id !== userId) return;
+    const result = await supabase.rpc("grand_lumen_delete_team_message_for_everyone", { p_message_id: message.id });
+    if (result.error) { setNotice(result.error.message); return; }
+    setMessages(current => current.map(item => item.id === message.id ? { ...item, body: "This message was deleted", deleted_for_everyone: true } : item));
+    setMessageMenu(null);
+  };
+
+  const beginMessagePress = (message: Message) => {
+    if (message.deleted_for_everyone) return;
+    if (messagePressTimer.current) window.clearTimeout(messagePressTimer.current);
+    messagePressTimer.current = window.setTimeout(() => setMessageMenu(message), 550);
+  };
+
+  const cancelMessagePress = () => {
+    if (messagePressTimer.current) window.clearTimeout(messagePressTimer.current);
+    messagePressTimer.current = null;
+  };
+
   if (!supabase) return <div className="team-workspace"><div className="team-empty"><h3>Cloud account required</h3><p>Sign in with a Grand Lumen cloud account to connect with other people across devices. Local browser accounts cannot use Team.</p></div></div>;
 
   return <div className="team-workspace">
@@ -455,6 +495,6 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR NETWORK</span><h3>Connected members</h3></div><span className="team-count">{connections.length}</span></div>{connections.length ? <div className="team-contacts">{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; const profile = profiles[memberId]; return <button className="team-contact" key={connection.id} onClick={() => setSelected(connection)}><span className="team-avatar">{(profile?.display_name || profile?.email || "GL").slice(0, 1).toUpperCase()}</span><span><b>{profile?.display_name || "Grand Lumen member"}</b><small>{profile?.email || "Connected account"}</small></span></button>; })}</div> : <p className="team-muted">Your connections will appear here after they approve your requests.</p>}</section>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">SHARED WORK</span><h3>Team projects</h3></div><span className="team-count">{projects.length}</span></div><div className="team-project-create"><input value={projectName} onChange={event => setProjectName(event.target.value)} placeholder="Project name"/><input value={projectDescription} onChange={event => setProjectDescription(event.target.value)} placeholder="Short project description"/><button className="team-primary" onClick={() => void createProject()} disabled={!projectName.trim() || busy}>Create project</button></div>{projects.map(project => <article className="team-project-row" key={project.id}><div><b>{project.name}</b><small>{project.description || "No description"} · {project.user_id === userId ? "Owner" : "Shared with you"}</small></div>{project.user_id === userId && <div className="team-project-share">{connections.length > 0 && <><select value={projectMember} onChange={event => setProjectMember(event.target.value)}><option value="">Choose member</option><option value="__all__">All connected members</option>{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; return <option key={memberId} value={memberId}>{profiles[memberId]?.display_name || profiles[memberId]?.email || memberId.slice(0, 8)}</option>; })}</select><select value={projectRole} onChange={event => setProjectRole(event.target.value as "viewer" | "editor" | "manager")}><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="manager">Manager</option></select><button className="team-secondary" onClick={() => void shareProject(project.id)} disabled={!projectMember || busy}>Share</button></>}<button className="team-danger team-project-delete" onClick={() => void deleteProject(project)} disabled={busy}>Delete</button></div>}</article>)}{!projects.length && <p className="team-muted">Create a cloud project, then share it with connected members.</p>}</section>
     </>}
-    {selected && <section className="team-card team-chat team-chat-fullscreen"><div className="team-card-heading"><div className="team-chat-title-row"><button className="team-secondary team-chat-back" onClick={() => setSelected(null)}>← Back to Team</button><div><span className="eyebrow">PRIVATE CONVERSATION</span><h3>{(() => { const memberId = selected.user_low === userId ? selected.user_high : selected.user_low; return profiles[memberId]?.display_name || "Team member"; })()}</h3></div></div><div className="team-actions"><button className="team-secondary" onClick={() => void startCall("audio")}>Voice call</button><button className="team-secondary" onClick={() => void startCall("video")}>Video call</button><button className="team-secondary" onClick={openWhatsApp}>WhatsApp</button></div></div><div className="team-message-list">{messages.map(message => <article className={message.sender_id === userId ? "team-message own" : "team-message"} key={message.id}><p>{message.body}</p><small>{new Date(message.created_at).toLocaleString()}</small></article>)}{!messages.length && <p className="team-muted">Start the conversation.</p>}</div><form className="team-compose" onSubmit={event => { event.preventDefault(); void sendMessage(); }}><input value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write a message…" maxLength={12000}/><button className="team-primary" disabled={!draft.trim()}>Send</button></form><div className="team-call-note">Messages and calls stay in this private conversation.</div>{incomingCall && <section className="team-incoming-call"><div><b>Incoming {incomingCall.media_type === "video" ? "video" : "voice"} call</b><small>A connected Team member is calling you.</small></div><div className="team-actions"><button className="team-secondary" onClick={() => void declineCall()}>Decline</button><button className="team-primary" onClick={() => void acceptCall()}>Accept</button></div></section>}{callStatus && <section className="team-call-panel"><div className="team-card-heading"><div><span className="eyebrow">LIVE {activeMediaType === "video" ? "VIDEO" : "VOICE"} CALL</span><h3>{callStatus}</h3></div><button className="team-danger team-call-end" onClick={() => void finishCall()}>End call</button></div><div className="team-call-media">{remoteStream && <video ref={remoteVideoRef} autoPlay playsInline/>}{localStream && <video ref={localVideoRef} autoPlay playsInline muted/>}{activeMediaType === "audio" && <audio ref={remoteAudioRef} autoPlay/>}</div><small>Tap End call whenever you want to stop the conversation.</small></section>}</section>}
+    {selected && <section className="team-card team-chat team-chat-fullscreen"><div className="team-card-heading"><div className="team-chat-title-row"><button className="team-secondary team-chat-back" onClick={() => setSelected(null)}>← Back to Team</button><div><span className="eyebrow">PRIVATE CONVERSATION</span><h3>{(() => { const memberId = selected.user_low === userId ? selected.user_high : selected.user_low; return profiles[memberId]?.display_name || "Team member"; })()}</h3></div></div><div className="team-actions"><button className="team-secondary" onClick={() => void startCall("audio")}>Voice call</button><button className="team-secondary" onClick={() => void startCall("video")}>Video call</button><button className="team-secondary" onClick={openWhatsApp}>WhatsApp</button></div></div><div className="team-message-list">{messages.filter(message => !hiddenMessageIds.includes(message.id)).map(message => <article className={(message.sender_id === userId ? "team-message own" : "team-message") + (message.deleted_for_everyone ? " deleted" : "")} key={message.id} onContextMenu={event => { event.preventDefault(); setMessageMenu(message.deleted_for_everyone ? null : message); }} onTouchStart={() => beginMessagePress(message)} onTouchEnd={cancelMessagePress} onTouchMove={cancelMessagePress} onTouchCancel={cancelMessagePress}><p>{message.deleted_for_everyone ? "This message was deleted" : message.body}</p><small>{new Date(message.created_at).toLocaleString()}</small></article>)}{!messages.filter(message => !hiddenMessageIds.includes(message.id)).length && <p className="team-muted">Start the conversation.</p>}</div>{messageMenu && <div className="team-message-menu-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setMessageMenu(null); }}><section className="team-message-menu" role="dialog" aria-modal="true" aria-label="Message options"><span>MESSAGE OPTIONS</span><button type="button" onClick={() => void deleteMessageForMe(messageMenu)}>Delete for me</button>{messageMenu.sender_id === userId && <button type="button" className="delete-everyone" onClick={() => void deleteMessageForEveryone(messageMenu)}>Delete for everyone</button>}<button type="button" className="cancel" onClick={() => setMessageMenu(null)}>Cancel</button></section></div>}<form className="team-compose" onSubmit={event => { event.preventDefault(); void sendMessage(); }}><input value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write a message…" maxLength={12000}/><button className="team-primary" disabled={!draft.trim()}>Send</button></form><div className="team-call-note">Messages and calls stay in this private conversation.</div>{incomingCall && <section className="team-incoming-call"><div><b>Incoming {incomingCall.media_type === "video" ? "video" : "voice"} call</b><small>A connected Team member is calling you.</small></div><div className="team-actions"><button className="team-secondary" onClick={() => void declineCall()}>Decline</button><button className="team-primary" onClick={() => void acceptCall()}>Accept</button></div></section>}{callStatus && <section className="team-call-panel"><div className="team-card-heading"><div><span className="eyebrow">LIVE {activeMediaType === "video" ? "VIDEO" : "VOICE"} CALL</span><h3>{callStatus}</h3></div><button className="team-danger team-call-end" onClick={() => void finishCall()}>End call</button></div><div className="team-call-media">{remoteStream && <video ref={remoteVideoRef} autoPlay playsInline/>}{localStream && <video ref={localVideoRef} autoPlay playsInline muted/>}{activeMediaType === "audio" && <audio ref={remoteAudioRef} autoPlay/>}</div><small>Tap End call whenever you want to stop the conversation.</small></section>}</section>}
   </div>;
 }
