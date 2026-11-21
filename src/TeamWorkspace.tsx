@@ -190,6 +190,25 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   }, [loadTeam, userId]);
 
   useEffect(() => {
+    void refreshUnreadCounts();
+    if (!supabase) return;
+    const channel = supabase.channel("grand-lumen-message-counts-" + userId)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_team_messages" }, () => void refreshUnreadCounts())
+      .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_team_message_reads", filter: "user_id=eq." + userId }, () => void refreshUnreadCounts())
+      .subscribe();
+    return () => { void supabase?.removeChannel(channel); };
+  }, [refreshUnreadCounts, userId]);
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    let active = true;
+    void navigator.serviceWorker.ready.then(registration => registration.pushManager.getSubscription()).then(subscription => {
+      if (active) setNotificationReady(Boolean(subscription));
+    }).catch(() => {});
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
     if (!supabase) return;
     const channel = supabase.channel("grand-lumen-call-invites-" + userId)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_team_call_invites", filter: "recipient_id=eq." + userId }, payload => {
