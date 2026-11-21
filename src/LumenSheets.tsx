@@ -92,7 +92,7 @@ function parseCsv(source: string): string[][] {
     const char = source[i];
     if (char === '"' && quoted && source[i + 1] === '"') { value += '"'; i += 1; }
     else if (char === '"') quoted = !quoted;
-    else if (char === "," && !quoted) { row.push(value); value = ""; }
+    else if (char === delimiter && !quoted) { row.push(value); value = ""; }
     else if ((char === "\n" || char === "\r") && !quoted) {
       if (char === "\r" && source[i + 1] === "\n") i += 1;
       row.push(value); rows.push(row); row = []; value = "";
@@ -428,9 +428,14 @@ export default function LumenSheets({ userId }: { userId: string }) {
       if (!match) return;
       const row = Number(match[2]) + (event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0);
       const col = columnIndex(match[1]) + (event.key === "ArrowLeft" ? -1 : event.key === "ArrowRight" ? 1 : 0);
-      const next = cellRef(Math.max(1, row), Math.max(0, col));
+      const safeRow = Math.max(1, Math.min(10000, row));
+      const safeCol = Math.max(0, Math.min(499, col));
+      const next = cellRef(safeRow, safeCol);
       setSelected(next);
-      gridRef.current?.querySelector<HTMLButtonElement>('[data-cell="' + next + '"]')?.focus();
+      if (safeRow > rowCount) { setRowCount(safeRow); setRowDraft(String(safeRow)); }
+      if (safeCol + 1 > columnCount) { setColumnCount(safeCol + 1); setColumnDraft(String(safeCol + 1)); }
+      gridRef.current?.scrollTo({ top: (safeRow - 1) * 32, left: safeCol * 120, behavior: "auto" });
+      window.requestAnimationFrame(() => gridRef.current?.querySelector<HTMLButtonElement>('[data-cell="' + next + '"]')?.focus());
     }
     if (event.key === "Enter" || event.key === "F2") { event.preventDefault(); document.querySelector<HTMLInputElement>(".sheets-cell-editor input")?.focus(); }
   };
