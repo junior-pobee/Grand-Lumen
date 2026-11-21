@@ -129,6 +129,7 @@ async function applyWorkspaceSnapshot(snapshot: WorkspaceSnapshot | { version: 1
   });
   if (snapshot.version === 2) await replaceScanRecords(Array.isArray(snapshot.scanRecords) ? snapshot.scanRecords : []);
   window.dispatchEvent(new CustomEvent("grand-lumen-workspace-restored"));
+  window.dispatchEvent(new Event("storage"));
   window.dispatchEvent(new CustomEvent("lumen-reminders-updated"));
 }
 
