@@ -89,7 +89,13 @@ export async function startWorkspaceCloudSync(
 
   const persist = () => {
     if (disposed) return;
-    const snapshot = readWorkspaceSnapshot();
+    let snapshot: WorkspaceSnapshot;
+    try {
+      snapshot = readWorkspaceSnapshot();
+    } catch (error) {
+      onStatus(error instanceof Error ? error.message : "Workspace is too large to sync");
+      return;
+    }
     saveQueue = saveQueue.then(async () => {
       if (disposed) return;
       const { error } = await client
