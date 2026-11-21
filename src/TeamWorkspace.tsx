@@ -8,7 +8,7 @@ type Connection = { id: string; user_low: string; user_high: string };
 type RequestRow = { id: string; requester_id: string; recipient_id: string; status: string; created_at: string };
 type Message = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; deleted_for_everyone?: boolean };
 type ReadReceipt = { message_id: string; user_id: string; read_at: string };
-const TEAM_PUSH_PUBLIC_KEY = "BCIv4zjQlQ9SNsUiMS8qTC7BQZlr2kmCYqg5Dn8CJqmGHRrDhEPAf1MffEyK6a/K6KIFXGcu9YTprAJ/cA9oIvE=";
+const TEAM_PUSH_PUBLIC_KEY = "BM8kSi-ABGU8h9sWWvav5LPIZlRA2_6ZzMKaiYFN0iHA-2zUx90W3GIYrAa0zQoEuV99lBx3EPBdH1gZntBtzJc";
 type MessageAttachment = { name: string; path: string; mime: string; size: number; kind: "image" | "video" | "audio" | "file" };
 type Project = { id: string; user_id: string; name: string; description: string; status: string };
 type CallInvite = { id: string; connection_id: string; caller_id: string; recipient_id: string; peer_id: string; media_type: "audio" | "video"; status: string; expires_at: string };
