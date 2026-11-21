@@ -296,19 +296,21 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
 
   useEffect(() => {
     if (!supabase) return;
+    const client = supabase;
     let active = true;
     const pending = messages.filter(message => !message.deleted_for_everyone && readAttachment(message.body) && !attachmentUrls[message.id]);
     if (!pending.length) return;
     void Promise.all(pending.map(async message => {
       const attachment = readAttachment(message.body);
       if (!attachment) return null;
-      const result = await supabase.storage.from("grand-lumen-team-attachments").createSignedUrl(attachment.path, 60 * 60);
+      const result = await client.storage.from("grand-lumen-team-attachments").createSignedUrl(attachment.path, 60 * 60);
       return result.data?.signedUrl ? [message.id, result.data.signedUrl] as const : null;
     })).then(results => {
       if (!active) return;
-      setAttachmentUrls(current => {
+      const resolved = results.filter((item): item is readonly [string, string] => Boolean(item));
+      if (resolved.length) setAttachmentUrls(current => {
         const next = { ...current };
-        for (const item of results) if (item) next[item[0]] = item[1];
+        for (const item of resolved) next[item[0]] = item[1];
         return next;
       });
     });
