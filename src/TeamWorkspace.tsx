@@ -340,7 +340,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       await loadTeam();
       setNotice(accept ? "Connection accepted. The member should now appear in your network and private chat." : "Request declined.");
     } catch (reason) {
-      setNotice(reason instanceof Error ? reason.message : "The connection request could not be processed.");
+      setNotice(reason instanceof Error ? reason.message : reason && typeof reason === "object" && "message" in reason ? String(reason.message || JSON.stringify(reason)) : String(reason || "The connection request could not be processed."));
     } finally {
       setBusy(false);
     }
