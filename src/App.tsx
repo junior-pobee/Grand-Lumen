@@ -1339,16 +1339,44 @@ function CodeStudioWorkspace() {
   const [showTerminal, setShowTerminal] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
   const [previewExpanded, setPreviewExpanded] = useState(false);
+  const [workspaceExpanded, setWorkspaceExpanded] = useState(false);
+  const [selectedCodeTheme, setSelectedCodeTheme] = useState(() => localStorage.getItem("grandLumenCodeTheme") || "midnight");
+  const [previewDevice, setPreviewDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
+  const [previewMessages, setPreviewMessages] = useState<string[]>([]);
   const [previewKey, setPreviewKey] = useState(0);
+  const previewFrameRef = useRef<HTMLIFrameElement>(null);
   const importRef = useRef<HTMLInputElement>(null);
   const commandRef = useRef<HTMLInputElement>(null);
   const activeFile = files.find(file => file.id === activeId) || files[0];
+  const codeThemes = [{id:"midnight",name:"Midnight",background:"#0b1422",foreground:"#d5e5f8",accent:"#82aaff"},{id:"ocean",name:"Ocean",background:"#071d2b",foreground:"#c9f1ff",accent:"#52d6e8"},{id:"forest",name:"Forest",background:"#102018",foreground:"#d8f5df",accent:"#8bd6a0"},{id:"sunset",name:"Sunset",background:"#261522",foreground:"#ffe0d1",accent:"#ff9c83"},{id:"paper",name:"Paper",background:"#f3f0e8",foreground:"#263244",accent:"#315f9c"}];
   const extensionLanguage = (name: string) => {
     const ext = name.split(".").pop()?.toLowerCase();
     const types: Record<string,string> = {html:"HTML",htm:"HTML",css:"CSS",js:"JavaScript",jsx:"JavaScript",ts:"TypeScript",tsx:"TypeScript",py:"Python",c:"C",h:"C",cpp:"C++",cc:"C++",java:"Java",cs:"C#",go:"Go",rs:"Rust",php:"PHP",rb:"Ruby",sql:"SQL",sh:"Bash",md:"Markdown",json:"JSON"};
     return types[ext || ""] || "Plain text";
   };
   const updateActive = (content: string) => setFiles(current => current.map(file => file.id === activeId ? { ...file, content } : file));
+
+  useEffect(() => {
+    localStorage.setItem("grandLumenCodeTheme", selectedCodeTheme);
+  }, [selectedCodeTheme]);
+
+  useEffect(() => {
+    if (!workspaceExpanded) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const handleKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") setWorkspaceExpanded(false); };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => { document.body.style.overflow = previousOverflow; window.removeEventListener("keydown", handleKeyDown); };
+  }, [workspaceExpanded]);
+
+  useEffect(() => {
+    const receivePreviewMessage = (event: MessageEvent) => {
+      if (event.source !== previewFrameRef.current?.contentWindow || event.data?.type !== "grand-lumen-preview") return;
+      setPreviewMessages(current => [...current.slice(-99), String(event.data.message)]);
+    };
+    window.addEventListener("message", receivePreviewMessage);
+    return () => window.removeEventListener("message", receivePreviewMessage);
+  }, []);
 
   useEffect(() => {
     try {
@@ -1421,7 +1449,8 @@ function CodeStudioWorkspace() {
     const css = files.filter(file => file.name.toLowerCase().endsWith(".css")).map(file => file.content).join("\n");
     const js = files.filter(file => /\.(js|mjs|cjs)$/i.test(file.name)).map(file => file.content).join("\n");
     const style = "<style>" + css.replace(/<\/style/gi, "<\\/style") + "</style>";
-    const script = "<script>" + js.replace(/<\/script/gi, "<\\/script") + "<\/script>";
+    const bridge = "<script>(function(){const send=(type,message)=>parent.postMessage({type:'grand-lumen-preview',message:type+'  '+String(message)},'*');['log','info','warn','error'].forEach(level=>{const original=console[level].bind(console);console[level]=(...args)=>{original(...args);send(level,args.map(value=>{try{return typeof value==='object'?JSON.stringify(value):String(value)}catch{return String(value)}}).join(' '))}});window.addEventListener('error',event=>send('error',event.message+' at '+event.filename+':'+event.lineno));window.addEventListener('unhandledrejection',event=>send('error',event.reason?.message||event.reason||'Unhandled promise rejection'));send('ready','Preview loaded');})();<\/script>";
+    const script = bridge + "<script>" + js.replace(/<\/script/gi, "<\\/script") + "<\/script>";
     const withStyle = /<\/head>/i.test(html) ? html.replace(/<\/head>/i, style + "</head>") : style + html;
     return /<\/body>/i.test(withStyle) ? withStyle.replace(/<\/body>/i, script + "</body>") : withStyle + script;
   }, [files, previewKey]);
@@ -1508,13 +1537,14 @@ for number in range(1, 6):
   };
 
 
-  return <div className={"studio-shell" + (showPreview ? " studio-has-preview" : " studio-editor-focused") + (previewExpanded ? " studio-preview-expanded" : "")}>
-    <div className="studio-topbar"><div className="studio-brand"><span className="studio-brand-mark"><Code2 size={17}/></span><div><b>GRAND-LUMEN STUDIO</b><small>WORKSPACE / LOCAL PROJECT</small></div></div><div className="studio-actions"><span className="studio-save-state"><span/> Auto-saved</span><button onClick={() => setShowTerminal(value => !value)}><Terminal size={14}/> Terminal</button><button onClick={() => { setShowPreview(true); setPreviewKey(value => value + 1); }}><Play size={14}/> Run</button><button onClick={() => void runPython()} disabled={pythonBusy}><Terminal size={14}/> Run Python</button><select className="studio-template-select" aria-label="Project template" value={selectedTemplate} onChange={event => setSelectedTemplate(event.target.value)}><option value="html">HTML starter</option><option value="python">Python starter</option><option value="portfolio">Portfolio starter</option></select><button onClick={applyTemplate}><Plus size={14}/> New template</button><button onClick={exportWorkspace}><Download size={14}/> JSON backup</button><button className="studio-export" onClick={exportZip}><Boxes size={14}/> Export ZIP</button></div></div>
+  return <div className={"studio-shell" + (showPreview ? " studio-has-preview" : " studio-editor-focused") + (previewExpanded ? " studio-preview-expanded" : "") + (workspaceExpanded ? " studio-expanded" : "")} data-code-theme={selectedCodeTheme}>
+    <div className="studio-topbar"><div className="studio-brand"><span className="studio-brand-mark"><Code2 size={17}/></span><div><b>GRAND-LUMEN STUDIO</b><small>WORKSPACE / LOCAL PROJECT</small></div></div><div className="studio-actions"><span className="studio-save-state"><span/> Auto-saved</span><button onClick={() => setShowTerminal(value => !value)}><Terminal size={14}/> Terminal</button><button onClick={() => { setShowPreview(true); setPreviewMessages([]); setPreviewKey(value => value + 1); }}><Play size={14}/> Run</button><button onClick={() => setWorkspaceExpanded(value => !value)} title={workspaceExpanded ? "Exit expanded view" : "Open expanded view"}>{workspaceExpanded ? <ArrowLeft size={14}/> : <Maximize2 size={14}/>} {workspaceExpanded ? "Back to app" : "Expand view"}</button><button onClick={() => void runPython()} disabled={pythonBusy}><Terminal size={14}/> Run Python</button><select className="studio-template-select" aria-label="Project template" value={selectedTemplate} onChange={event => setSelectedTemplate(event.target.value)}><option value="html">HTML starter</option><option value="python">Python starter</option><option value="portfolio">Portfolio starter</option></select><button onClick={applyTemplate}><Plus size={14}/> New template</button><button onClick={exportWorkspace}><Download size={14}/> JSON backup</button><button className="studio-export" onClick={exportZip}><Boxes size={14}/> Export ZIP</button></div></div>
+    <div className="studio-theme-picker" aria-label="Editor background templates">{codeThemes.map(theme => <button key={theme.id} className={selectedCodeTheme === theme.id ? "active" : ""} onClick={() => setSelectedCodeTheme(theme.id)} aria-pressed={selectedCodeTheme === theme.id} title={theme.name}><span className={"studio-theme-swatch studio-theme-swatch-" + theme.id}/><span>{theme.name}</span></button>)}</div>
     <div className="studio-main">
       <aside className="studio-explorer"><div className="studio-pane-title"><span>EXPLORER</span><button title="Import files" onClick={() => importRef.current?.click()}><Upload size={14}/></button></div><div className="studio-project-name"><Boxes size={15}/> GRAND-LUMEN-PROJECT</div><div className="studio-file-list">{files.map(file => <div key={file.id} className={file.id === activeId ? "studio-file active" : "studio-file"}><button onClick={() => setActiveId(file.id)}><FileText size={14}/><span>{file.name}</span></button><button className="studio-file-remove" title={"Remove " + file.name} onClick={() => { const next = files.filter(item => item.id !== file.id); setFiles(next); if (activeId === file.id && next[0]) setActiveId(next[0].id); }}><X size={12}/></button></div>)}</div><div className="studio-new-file"><input value={newName} onChange={event => setNewName(event.target.value)} onKeyDown={event => event.key === "Enter" && addFile()} placeholder="src/new-file.js"/><button onClick={addFile} disabled={!newName.trim()} title="Create file"><Plus size={15}/></button></div><input ref={importRef} type="file" multiple hidden onChange={importFiles}/><div className="studio-explorer-foot">FOLDERS · FILES · LOCAL AUTOSAVE</div></aside>
       <div className="studio-editor-area"><div className="studio-tabs">{files.map(file => <button key={file.id} className={file.id === activeId ? "active" : ""} onClick={() => setActiveId(file.id)}><FileText size={13}/>{file.name}{file.id === activeId && <span/>}</button>)}</div><div className="studio-editor-meta"><span>{activeFile?.name || "No file selected"}</span><span>{extensionLanguage(activeFile?.name || "")} · {activeFile?.content.split("\n").length || 0} lines</span></div><div className="studio-editor-wrap">{activeFile ? <><div className="studio-line-numbers">{activeFile.content.split("\n").map((_, index) => <span key={index}>{index + 1}</span>)}</div><div className="studio-code-layer"><pre className="studio-code-highlight" aria-hidden="true" dangerouslySetInnerHTML={{ __html: highlightCode(activeFile.content) + "\n" }}/><textarea className="studio-code-input" spellCheck={false} autoCapitalize="off" autoCorrect="off" value={activeFile.content} onChange={event => updateActive(event.target.value)} aria-label="Code editor" /></div></> : <div className="studio-no-file">Create or import a file to begin.</div>}</div><div className="studio-statusbar"><span><span className="studio-status-dot"/> Ready</span><span>{extensionLanguage(activeFile?.name || "")}</span><span>UTF-8</span><span>Grand-Lumen Studio</span></div>
       {showTerminal && <div className="studio-terminal"><div className="studio-terminal-head"><span><Terminal size={13}/> TERMINAL</span><button onClick={() => setShowTerminal(false)}><X size={13}/></button></div><div className="studio-terminal-output">{terminalLines.map((line, index) => <pre key={index}>{line}</pre>)}</div><form className="studio-terminal-command" onSubmit={event => { event.preventDefault(); void runCommand(); }}><span>$</span><input ref={commandRef} value={command} onChange={event => setCommand(event.target.value)} placeholder={pythonBusy ? "Python is starting..." : "Try help, python, template html"}/><button type="submit" disabled={pythonBusy}><ArrowRight size={14}/></button></form></div>}</div>
-      {showPreview && <aside className="studio-preview"><div className="studio-preview-head"><span><MonitorSmartphone size={14}/> LIVE PREVIEW</span><div className="studio-preview-controls"><button onClick={() => setPreviewExpanded(value => !value)} title={previewExpanded ? "Restore preview size" : "Enlarge preview"}><Maximize2 size={13}/>{previewExpanded ? "Restore" : "Enlarge"}</button><button onClick={() => setShowPreview(false)} title="Close preview"><X size={13}/></button></div></div><iframe key={previewKey} title="Grand-Lumen project preview" sandbox="allow-scripts" srcDoc={previewDocument}/><div className="studio-preview-foot">SANDBOXED BROWSER PREVIEW · HTML / CSS / JS</div></aside>}
+      {showPreview && <aside className={"studio-preview" + (previewExpanded ? " studio-preview-maximized" : "")}><div className="studio-preview-head"><span><MonitorSmartphone size={14}/> RUN SCREEN <small>LIVE PREVIEW</small></span><div className="studio-preview-controls"><button onClick={() => setPreviewDevice("desktop")} className={previewDevice === "desktop" ? "active" : ""}>Desktop</button><button onClick={() => setPreviewDevice("tablet")} className={previewDevice === "tablet" ? "active" : ""}>Tablet</button><button onClick={() => setPreviewDevice("mobile")} className={previewDevice === "mobile" ? "active" : ""}>Mobile</button><button onClick={() => { setPreviewMessages([]); setPreviewKey(value => value + 1); }} title="Refresh preview"><Activity size={13}/> Refresh</button><button onClick={() => setPreviewExpanded(value => !value)} title={previewExpanded ? "Restore preview size" : "Enlarge preview"}><Maximize2 size={13}/>{previewExpanded ? "Restore" : "Enlarge"}</button><button onClick={() => setShowPreview(false)} title="Close preview"><X size={13}/></button></div></div><div className={"studio-preview-stage studio-preview-" + previewDevice}><iframe ref={previewFrameRef} key={previewKey} title="Grand-Lumen project preview" sandbox="allow-scripts" srcDoc={previewDocument}/></div><div className="studio-preview-console"><div><b><Terminal size={13}/> PREVIEW CONSOLE</b><button onClick={() => setPreviewMessages([])}>Clear</button></div><div className="studio-preview-console-lines">{previewMessages.length ? previewMessages.map((message,index)=><pre key={index}>{message}</pre>) : <span>Run your project to see console output and runtime errors here.</span>}</div></div><div className="studio-preview-foot">SANDBOXED RUN SCREEN · HTML / CSS / JAVASCRIPT · {previewDevice.toUpperCase()} VIEW</div></aside>}
     </div>
     <div className="studio-footer-note">Folder paths are supported, such as src/app.js. Export a ZIP to move the complete project.</div>
   </div>;
