@@ -13,7 +13,6 @@ import PreviousActivityPopup from "./PreviousActivityPopup";
 import WelcomeTour from "./WelcomeTour";
 import LumenScan from "./LumenScan";
 import RecipeWorkspace from "./RecipeWorkspace";
-import { createClient } from "@supabase/supabase-js";
 import { supabase, supabaseConfigured } from "./auth";
 import { clearWorkspaceData as clearCloudWorkspaceData, startWorkspaceCloudSync } from "./workspaceSync";
 import { getCurrency, getDictionary, getHoliday, getPokemon, getWeather, researchTopic, searchArchiveVideos, searchCommonsImages, searchHackerNews, searchWikipedia, searchGlobalNews, type SearchItem, type NewsItem, connectionAwareMessage } from "./api";
@@ -2073,25 +2072,33 @@ function App() {
   const verifyActivityPassword = async (password: string): Promise<boolean> => {
     if (!password) return false;
     if (session && supabase && session.user.email) {
-      const verifier = createClient(import.meta.env.VITE_SUPABASE_URL || "", import.meta.env.VITE_SUPABASE_ANON_KEY || "", {
-        auth: {
-          persistSession: false,
-          autoRefreshToken: false,
-          detectSessionInUrl: false
-        }
+      const authUrl = import.meta.env.VITE_SUPABASE_URL;
+      const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      if (!authUrl || !anonKey) throw new Error("Account password verification is not configured. Refresh the app and try again.");
+      const response = await fetch(authUrl.replace(/\\/$/, "") + "/auth/v1/token?grant_type=password", {
+        method: "POST",
+        headers: {
+          apikey: anonKey,
+          Authorization: "Bearer " + anonKey,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ email: session.user.email, password })
       });
-      const { error: authError } = await verifier.auth.signInWithPassword({ email: session.user.email, password });
-      if (authError) {
-        if (authError.status === 0 || authError.name === "AuthRetryableFetchError" || /network|fetch failed|failed to fetch|load failed|connection|timeout/i.test(authError.message)) throw authError;
-        return false;
+      let result: { access_token?: string; error_description?: string; msg?: string; message?: string } = {};
+      try {
+        result = await response.json();
+      } catch {
+        throw new Error("The authentication service returned an unreadable response. Try again.");
       }
+      if (response.status === 400 || response.status === 401) return false;
+      if (!response.ok || !result.access_token) throw new Error(result.message || result.msg || result.error_description || "Password verification is temporarily unavailable.");
       return true;
     }
     const email = (localProfile?.email || "").trim().toLowerCase();
-    if (!email) return false;
+    if (!email) throw new Error("Your account could not be identified. Sign out and sign in again.");
     const accounts = readWorkspaceData<{ fullName: string; email: string; salt: string; passwordHash: string }[]>("grandLumenLocalAccounts", []);
     const account = accounts.find(item => item.email.toLowerCase() === email);
-    if (!account) return false;
+    if (!account) throw new Error("The local account credentials could not be found on this device.");
     return await hashLocalPassword(password, account.salt) === account.passwordHash;
   };
   const clearWorkspaceData = async () => {
