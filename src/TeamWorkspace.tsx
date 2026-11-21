@@ -155,13 +155,14 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   useEffect(() => {
     void refreshUnreadCounts();
     if (!supabase) return;
-    const channel = supabase.channel("grand-lumen-message-counts-" + userId)
+    const client = supabase;
+    const channel = client.channel("grand-lumen-message-counts-" + userId)
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_team_messages" }, payload => {
         void refreshUnreadCounts();
         const incoming = payload.new as Message;
         if (incoming.sender_id === userId) return;
         void (async () => {
-          const conversation = await supabase.from("grand_lumen_team_conversations").select("connection_id").eq("id", incoming.conversation_id).maybeSingle();
+          const conversation = await client.from("grand_lumen_team_conversations").select("connection_id").eq("id", incoming.conversation_id).maybeSingle();
           const connectionId = String(conversation.data?.connection_id || "");
           if (!connectionId || selected?.id === connectionId) return;
           const profile = await supabase.from("grand_lumen_profiles").select("display_name,email").eq("id", incoming.sender_id).maybeSingle();
@@ -172,7 +173,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_team_message_reads", filter: "user_id=eq." + userId }, () => void refreshUnreadCounts())
       .subscribe();
-    return () => { void supabase?.removeChannel(channel); };
+    return () => { void client.removeChannel(channel); };
   }, [refreshUnreadCounts, userId, selected?.id]);
 
   useEffect(() => {
