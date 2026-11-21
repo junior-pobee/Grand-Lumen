@@ -131,7 +131,7 @@ export default function RecipeWorkspace() {
   }
 
   const preview = selected ? createPortal(
-    <div className="recipe-modal-backdrop" onClick={closePreview}>
+    <div className={"recipe-modal-backdrop " + (document.documentElement.dataset.theme === "light" ? "theme-light" : "theme-dark")} onClick={closePreview}>
       <section className="recipe-modal" role="dialog" aria-modal="true" aria-label={selected.strMeal + " recipe"} onClick={event => event.stopPropagation()}>
         <button className="recipe-modal-close" onClick={closePreview} aria-label="Close recipe preview"><X size={19}/></button>
         <img className="recipe-modal-image" src={selected.strMealThumb} alt={selected.strMeal}/>
