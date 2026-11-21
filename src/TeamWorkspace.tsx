@@ -348,16 +348,54 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
 
   const createProject = async () => {
     if (!supabase || !projectName.trim()) return;
+    setBusy(true);
+    setNotice("");
     const result = await supabase.from("grand_lumen_projects").insert({ user_id: userId, name: projectName.trim(), description: projectDescription.trim() }).select("*").single();
     if (result.error) setNotice(result.error.message);
-    else { setProjects(current => [result.data as Project, ...current]); setProjectName(""); setProjectDescription(""); setNotice("Cloud project created."); }
+    else {
+      setProjects(current => [result.data as Project, ...current]);
+      setProjectName("");
+      setProjectDescription("");
+      setNotice("Cloud project created.");
+    }
+    setBusy(false);
   };
 
   const shareProject = async (projectId: string) => {
     if (!supabase || !projectMember) return;
-    const result = await supabase.from("grand_lumen_project_members").insert({ project_id: projectId, owner_id: userId, member_id: projectMember, role: projectRole });
-    if (result.error) setNotice(result.error.message);
-    else { setProjectMember(""); setNotice("Project access granted."); }
+    setBusy(true);
+    setNotice("");
+    const memberIds = projectMember === "__all__"
+      ? Array.from(new Set(connections.map(connection => connection.user_low === userId ? connection.user_high : connection.user_low)))
+      : [projectMember];
+    if (!memberIds.length) {
+      setNotice("Connect with at least one member before sharing this project.");
+      setBusy(false);
+      return;
+    }
+    const rows = memberIds.map(memberId => ({ project_id: projectId, owner_id: userId, member_id: memberId, role: projectRole }));
+    const result = await supabase.from("grand_lumen_project_members").upsert(rows, { onConflict: "project_id,member_id" });
+    if (result.error) setNotice("Project sharing failed: " + result.error.message);
+    else {
+      setProjectMember("");
+      setNotice(memberIds.length === 1 ? "Project shared successfully." : "Project shared with all " + memberIds.length + " connected members.");
+      await loadTeam();
+    }
+    setBusy(false);
+  };
+
+  const deleteProject = async (project: Project) => {
+    if (!supabase || project.user_id !== userId) return;
+    if (!window.confirm("Delete “" + project.name + "”? This will remove the project and its member access.")) return;
+    setBusy(true);
+    setNotice("");
+    const result = await supabase.from("grand_lumen_projects").delete().eq("id", project.id).eq("user_id", userId);
+    if (result.error) setNotice("Project could not be deleted: " + result.error.message);
+    else {
+      setProjects(current => current.filter(item => item.id !== project.id));
+      setNotice("Project deleted.");
+    }
+    setBusy(false);
   };
 
   const openWhatsApp = () => {
@@ -365,7 +403,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     if (!entered) return;
     const phone = entered.replace(/\\D/g, "");
     if (phone.length < 8 || phone.length > 15) { setNotice("Enter a valid international phone number."); return; }
-    window.open("https://web.whatsapp.com/send?phone=" + phone, "_blank", "noopener,noreferrer");
+    window.location.assign("https://wa.me/" + phone);
   };
 
   const sendMessage = async () => {
@@ -395,7 +433,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">CONNECTION REQUESTS</span><h3>Requests awaiting your approval</h3></div><span className="team-count">{requests.length}</span></div>{requests.length ? requests.map(request => <div className="team-request" key={request.id}><div><b>{profiles[request.requester_id]?.display_name || "Grand Lumen member"}</b><small>{profiles[request.requester_id]?.email || "Connection request"}</small></div><div className="team-actions"><button className="team-secondary" disabled={busy} onClick={() => void respond(request.id, false)}>Decline</button><button className="team-primary" disabled={busy} onClick={() => void respond(request.id, true)}>Accept</button></div></div>) : <p className="team-muted">No pending requests.</p>}</section>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">SENT REQUESTS</span><h3>Awaiting their response</h3></div><span className="team-count">{sentRequests.length}</span></div>{sentRequests.length ? sentRequests.map(request => <div className="team-request" key={request.id}><div><b>{profiles[request.recipient_id]?.display_name || "Grand Lumen member"}</b><small>{profiles[request.recipient_id]?.email || "Request pending"}</small></div><span className="team-muted">Pending approval</span></div>) : <p className="team-muted">You have no outgoing requests.</p>}</section>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR NETWORK</span><h3>Connected members</h3></div><span className="team-count">{connections.length}</span></div>{connections.length ? <div className="team-contacts">{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; const profile = profiles[memberId]; return <button className="team-contact" key={connection.id} onClick={() => setSelected(connection)}><span className="team-avatar">{(profile?.display_name || profile?.email || "GL").slice(0, 1).toUpperCase()}</span><span><b>{profile?.display_name || "Grand Lumen member"}</b><small>{profile?.email || "Connected account"}</small></span></button>; })}</div> : <p className="team-muted">Your connections will appear here after they approve your requests.</p>}</section>
-    <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">SHARED WORK</span><h3>Team projects</h3></div><span className="team-count">{projects.length}</span></div><div className="team-project-create"><input value={projectName} onChange={event => setProjectName(event.target.value)} placeholder="Project name"/><input value={projectDescription} onChange={event => setProjectDescription(event.target.value)} placeholder="Short project description"/><button className="team-primary" onClick={() => void createProject()} disabled={!projectName.trim()}>Create project</button></div>{projects.map(project => <article className="team-project-row" key={project.id}><div><b>{project.name}</b><small>{project.description || "No description"} · {project.user_id === userId ? "Owner" : "Shared with you"}</small></div>{project.user_id === userId && connections.length > 0 && <div className="team-project-share"><select value={projectMember} onChange={event => setProjectMember(event.target.value)}><option value="">Choose member</option>{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; return <option key={memberId} value={memberId}>{profiles[memberId]?.display_name || profiles[memberId]?.email || memberId.slice(0, 8)}</option>; })}</select><select value={projectRole} onChange={event => setProjectRole(event.target.value as "viewer" | "editor" | "manager")}><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="manager">Manager</option></select><button className="team-secondary" onClick={() => void shareProject(project.id)} disabled={!projectMember}>Share</button></div>}</article>)}{!projects.length && <p className="team-muted">Create a cloud project, then share it with connected members.</p>}</section>
+    <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">SHARED WORK</span><h3>Team projects</h3></div><span className="team-count">{projects.length}</span></div><div className="team-project-create"><input value={projectName} onChange={event => setProjectName(event.target.value)} placeholder="Project name"/><input value={projectDescription} onChange={event => setProjectDescription(event.target.value)} placeholder="Short project description"/><button className="team-primary" onClick={() => void createProject()} disabled={!projectName.trim() || busy}>Create project</button></div>{projects.map(project => <article className="team-project-row" key={project.id}><div><b>{project.name}</b><small>{project.description || "No description"} · {project.user_id === userId ? "Owner" : "Shared with you"}</small></div>{project.user_id === userId && <div className="team-project-share">{connections.length > 0 && <><select value={projectMember} onChange={event => setProjectMember(event.target.value)}><option value="">Choose member</option><option value="__all__">All connected members</option>{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; return <option key={memberId} value={memberId}>{profiles[memberId]?.display_name || profiles[memberId]?.email || memberId.slice(0, 8)}</option>; })}</select><select value={projectRole} onChange={event => setProjectRole(event.target.value as "viewer" | "editor" | "manager")}><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="manager">Manager</option></select><button className="team-secondary" onClick={() => void shareProject(project.id)} disabled={!projectMember || busy}>Share</button></>}<button className="team-danger team-project-delete" onClick={() => void deleteProject(project)} disabled={busy}>Delete</button></div>}</article>)}{!projects.length && <p className="team-muted">Create a cloud project, then share it with connected members.</p>}</section>
     </>}
     {selected && <section className="team-card team-chat team-chat-fullscreen"><div className="team-card-heading"><div className="team-chat-title-row"><button className="team-secondary team-chat-back" onClick={() => setSelected(null)}>← Back to Team</button><div><span className="eyebrow">PRIVATE CONVERSATION</span><h3>{(() => { const memberId = selected.user_low === userId ? selected.user_high : selected.user_low; return profiles[memberId]?.display_name || "Team member"; })()}</h3></div></div><div className="team-actions"><button className="team-secondary" onClick={() => void startCall("audio")}>Voice call</button><button className="team-secondary" onClick={() => void startCall("video")}>Video call</button><button className="team-secondary" onClick={openWhatsApp}>WhatsApp</button></div></div><div className="team-message-list">{messages.map(message => <article className={message.sender_id === userId ? "team-message own" : "team-message"} key={message.id}><p>{message.body}</p><small>{new Date(message.created_at).toLocaleString()}</small></article>)}{!messages.length && <p className="team-muted">Start the conversation.</p>}</div><form className="team-compose" onSubmit={event => { event.preventDefault(); void sendMessage(); }}><input value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write a message…" maxLength={12000}/><button className="team-primary" disabled={!draft.trim()}>Send</button></form><div className="team-call-note">Messages and calls stay in this private conversation.</div>{incomingCall && <section className="team-incoming-call"><div><b>Incoming {incomingCall.media_type === "video" ? "video" : "voice"} call</b><small>A connected Team member is calling you.</small></div><div className="team-actions"><button className="team-secondary" onClick={() => void declineCall()}>Decline</button><button className="team-primary" onClick={() => void acceptCall()}>Accept</button></div></section>}{callStatus && <section className="team-call-panel"><div className="team-card-heading"><div><span className="eyebrow">LIVE {activeMediaType === "video" ? "VIDEO" : "VOICE"} CALL</span><h3>{callStatus}</h3></div><button className="team-danger team-call-end" onClick={() => void finishCall()}>End call</button></div><div className="team-call-media">{remoteStream && <video ref={remoteVideoRef} autoPlay playsInline/>}{localStream && <video ref={localVideoRef} autoPlay playsInline muted/>}{activeMediaType === "audio" && <audio ref={remoteAudioRef} autoPlay/>}</div><small>Tap End call whenever you want to stop the conversation.</small></section>}</section>}
   </div>;
