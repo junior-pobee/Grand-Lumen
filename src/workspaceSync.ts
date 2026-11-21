@@ -1,40 +1,119 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
+type ScanRecord = {
+  id: string;
+  title: string;
+  text: string;
+  createdAt: number;
+  pageCount: number;
+  kind: "document" | "object";
+  image?: string;
+  images?: string[];
+};
+
 type WorkspaceSnapshot = {
-  version: 1;
+  version: 2;
   data: Record<string, string>;
+  scanRecords: ScanRecord[];
 };
 
 const excludedKeys = new Set([
   "grandLumenLocalAccounts",
   "grandLumenLocalSession",
-  "grandLumenProfileImages",
-  "grandLumenProfileImage",
   "grandLumenCloudOwner"
 ]);
 
+const DB_NAME = "grandLumenScanDB";
+const STORE_NAME = "documents";
+const MAX_SNAPSHOT_BYTES = 12 * 1024 * 1024;
+
 export function isSyncableWorkspaceKey(key: string): boolean {
   if (excludedKeys.has(key)) return false;
-  return key.startsWith("grandLumen") || key === "lumenReminders";
+  return key.startsWith("grandLumen") || key.startsWith("lumen");
 }
 
-function readWorkspaceSnapshot(): WorkspaceSnapshot {
+function openScanDatabase(): Promise<IDBDatabase> {
+  if (typeof indexedDB === "undefined") return Promise.reject(new Error("IndexedDB is not available in this browser."));
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(STORE_NAME)) database.createObjectStore(STORE_NAME, { keyPath: "id" });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error("Scanner storage could not be opened."));
+  });
+}
+
+async function readScanRecords(): Promise<ScanRecord[]> {
+  const database = await openScanDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, "readonly");
+    const request = transaction.objectStore(STORE_NAME).getAll();
+    request.onsuccess = () => resolve(request.result as ScanRecord[]);
+    request.onerror = () => reject(request.error || new Error("Scanner documents could not be read."));
+    transaction.oncomplete = () => database.close();
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error || new Error("Scanner documents could not be read."));
+    };
+  });
+}
+
+async function replaceScanRecords(records: ScanRecord[]): Promise<void> {
+  const database = await openScanDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(STORE_NAME, "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    store.clear();
+    records.forEach(record => store.put(record));
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error || new Error("Scanner documents could not be restored."));
+    };
+    transaction.onabort = () => {
+      database.close();
+      reject(transaction.error || new Error("Scanner document restore was cancelled."));
+    };
+  });
+}
+
+function profileImagesForUser(raw: string | null, email: string): string {
+  if (!raw || !email) return "{}";
+  try {
+    const images = JSON.parse(raw) as Record<string, string>;
+    const image = images[email.trim().toLowerCase()];
+    return JSON.stringify(image ? { [email.trim().toLowerCase()]: image } : {});
+  } catch {
+    return "{}";
+  }
+}
+
+async function readWorkspaceSnapshot(email: string): Promise<WorkspaceSnapshot> {
   const data: Record<string, string> = {};
   let totalBytes = 0;
   for (let index = 0; index < localStorage.length; index += 1) {
     const key = localStorage.key(index);
     if (!key || !isSyncableWorkspaceKey(key)) continue;
-    const value = localStorage.getItem(key);
+    let value = localStorage.getItem(key);
     if (value === null) continue;
+    if (key === "grandLumenProfileImages") value = profileImagesForUser(value, email);
     totalBytes += new Blob([key, value]).size;
-    if (totalBytes > 4 * 1024 * 1024) throw new Error("Your workspace is larger than the current cloud-sync limit. Export a backup before syncing.");
+    if (totalBytes > MAX_SNAPSHOT_BYTES) throw new Error("Your workspace is larger than the 12 MB cloud-sync limit. Export a backup before syncing.");
     data[key] = value;
   }
-  return { version: 1, data };
+  const scanRecords = await readScanRecords();
+  totalBytes += new Blob([JSON.stringify(scanRecords)]).size;
+  if (totalBytes > MAX_SNAPSHOT_BYTES) throw new Error("Your workspace and scanner documents exceed the 12 MB cloud-sync limit. Export a backup before syncing.");
+  return { version: 2, data, scanRecords };
 }
 
-function applyWorkspaceSnapshot(snapshot: WorkspaceSnapshot): void {
-  if (!snapshot || snapshot.version !== 1 || !snapshot.data || typeof snapshot.data !== "object") {
+async function applyWorkspaceSnapshot(snapshot: WorkspaceSnapshot | { version: 1; data: Record<string, string> }): Promise<void> {
+  if (!snapshot || (snapshot.version !== 1 && snapshot.version !== 2) || !snapshot.data || typeof snapshot.data !== "object") {
     throw new Error("The cloud workspace format is not supported.");
   }
   const existingKeys: string[] = [];
@@ -46,6 +125,7 @@ function applyWorkspaceSnapshot(snapshot: WorkspaceSnapshot): void {
   Object.entries(snapshot.data).forEach(([key, value]) => {
     if (isSyncableWorkspaceKey(key) && typeof value === "string") localStorage.setItem(key, value);
   });
+  if (snapshot.version === 2) await replaceScanRecords(Array.isArray(snapshot.scanRecords) ? snapshot.scanRecords : []);
   window.dispatchEvent(new CustomEvent("grand-lumen-workspace-restored"));
   window.dispatchEvent(new CustomEvent("lumen-reminders-updated"));
 }
@@ -53,8 +133,10 @@ function applyWorkspaceSnapshot(snapshot: WorkspaceSnapshot): void {
 export async function startWorkspaceCloudSync(
   client: SupabaseClient,
   userId: string,
+  email: string,
   onStatus: (message: string) => void
 ): Promise<() => void> {
+  onStatus("Checking cloud workspace");
   const { data: cloudRecord, error: loadError } = await client
     .from("grand_lumen_workspaces")
     .select("workspace_data")
@@ -64,21 +146,23 @@ export async function startWorkspaceCloudSync(
   if (loadError) throw loadError;
 
   if (cloudRecord?.workspace_data) {
-    applyWorkspaceSnapshot(cloudRecord.workspace_data as WorkspaceSnapshot);
+    onStatus("Restoring workspace");
+    await applyWorkspaceSnapshot(cloudRecord.workspace_data as WorkspaceSnapshot | { version: 1; data: Record<string, string> });
     localStorage.setItem("grandLumenCloudOwner", userId);
-    onStatus("Cloud workspace restored");
+    onStatus("Workspace restored · syncing changes");
   } else {
+    onStatus("Backing up this device");
     const previousOwner = localStorage.getItem("grandLumenCloudOwner");
     const initialSnapshot = previousOwner && previousOwner !== userId
-      ? { version: 1 as const, data: {} }
-      : readWorkspaceSnapshot();
-    if (previousOwner && previousOwner !== userId) applyWorkspaceSnapshot(initialSnapshot);
+      ? { version: 2 as const, data: {}, scanRecords: [] as ScanRecord[] }
+      : await readWorkspaceSnapshot(email);
+    if (previousOwner && previousOwner !== userId) await applyWorkspaceSnapshot(initialSnapshot);
     const { error: createError } = await client
       .from("grand_lumen_workspaces")
       .upsert({ user_id: userId, workspace_data: initialSnapshot }, { onConflict: "user_id" });
     if (createError) throw createError;
     localStorage.setItem("grandLumenCloudOwner", userId);
-    onStatus("This device's workspace was backed up");
+    onStatus("First workspace backup complete");
   }
 
   let disposed = false;
@@ -87,44 +171,51 @@ export async function startWorkspaceCloudSync(
   let saveQueue = Promise.resolve();
   const originalSetItem = Storage.prototype.setItem;
   const originalRemoveItem = Storage.prototype.removeItem;
+  const originalClear = Storage.prototype.clear;
 
   const persist = () => {
     if (disposed) return;
-    let snapshot: WorkspaceSnapshot;
-    try {
-      snapshot = readWorkspaceSnapshot();
-    } catch (error) {
-      onStatus(error instanceof Error ? error.message : "Workspace is too large to sync");
-      return;
-    }
+    onStatus("Saving workspace to cloud");
     saveQueue = saveQueue.then(async () => {
       if (disposed) return;
+      const snapshot = await readWorkspaceSnapshot(email);
       const { error } = await client
         .from("grand_lumen_workspaces")
         .upsert({ user_id: userId, workspace_data: snapshot }, { onConflict: "user_id" });
       if (error) throw error;
-      onStatus("All changes saved");
+      onStatus("All changes synced");
     }).catch(error => {
-      onStatus(error instanceof Error ? error.message : "Cloud sync is temporarily unavailable");
+      onStatus(error instanceof Error ? error.message : "Cloud sync failed. Your device data remains available.");
     });
   };
 
   const schedulePersist = () => {
     if (disposed || applyingRemote) return;
     if (saveTimer !== undefined) window.clearTimeout(saveTimer);
-    saveTimer = window.setTimeout(persist, 900);
+    saveTimer = window.setTimeout(() => {
+      saveTimer = undefined;
+      persist();
+    }, 900);
   };
 
   Storage.prototype.setItem = function(key: string, value: string): void {
-    const previous = this === window.localStorage ? this.getItem(key) : null;
+    const isLocal = this === window.localStorage;
+    const previous = isLocal ? this.getItem(key) : null;
     originalSetItem.call(this, key, value);
-    if (this === window.localStorage && isSyncableWorkspaceKey(key) && previous !== value) schedulePersist();
+    if (isLocal && isSyncableWorkspaceKey(key) && previous !== value) schedulePersist();
   };
 
   Storage.prototype.removeItem = function(key: string): void {
-    const existed = this === window.localStorage && this.getItem(key) !== null;
+    const isLocal = this === window.localStorage;
+    const existed = isLocal && this.getItem(key) !== null;
     originalRemoveItem.call(this, key);
-    if (this === window.localStorage && isSyncableWorkspaceKey(key) && existed) schedulePersist();
+    if (isLocal && isSyncableWorkspaceKey(key) && existed) schedulePersist();
+  };
+
+  Storage.prototype.clear = function(): void {
+    const isLocal = this === window.localStorage;
+    originalClear.call(this);
+    if (isLocal) schedulePersist();
   };
 
   const channel = client
@@ -137,17 +228,15 @@ export async function startWorkspaceCloudSync(
     }, payload => {
       if (disposed || !payload.new?.workspace_data || saveTimer !== undefined) return;
       applyingRemote = true;
-      try {
-        applyWorkspaceSnapshot(payload.new.workspace_data as WorkspaceSnapshot);
-        window.dispatchEvent(new Event("storage"));
-        onStatus("Workspace updated from another device");
-      } catch (error) {
-        onStatus(error instanceof Error ? error.message : "A cloud update could not be applied");
-      } finally {
-        applyingRemote = false;
-      }
+      void applyWorkspaceSnapshot(payload.new.workspace_data as WorkspaceSnapshot | { version: 1; data: Record<string, string> })
+        .then(() => onStatus("Workspace updated from another device"))
+        .catch(error => onStatus(error instanceof Error ? error.message : "A cloud update could not be applied"))
+        .finally(() => {
+          applyingRemote = false;
+        });
     })
     .subscribe(status => {
+      if (status === "SUBSCRIBED") onStatus("Cloud sync connected");
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") onStatus("Live sync reconnecting");
     });
 
@@ -169,6 +258,7 @@ export async function startWorkspaceCloudSync(
     window.removeEventListener("online", persist);
     Storage.prototype.setItem = originalSetItem;
     Storage.prototype.removeItem = originalRemoveItem;
+    Storage.prototype.clear = originalClear;
     void client.removeChannel(channel);
   };
 }
