@@ -134,7 +134,7 @@ export async function startWorkspaceCloudSync(
       table: "grand_lumen_workspaces",
       filter: "user_id=eq." + userId
     }, payload => {
-      if (disposed || !payload.new?.workspace_data) return;
+      if (disposed || !payload.new?.workspace_data || saveTimer !== undefined) return;
       applyingRemote = true;
       try {
         applyWorkspaceSnapshot(payload.new.workspace_data as WorkspaceSnapshot);
@@ -159,11 +159,13 @@ export async function startWorkspaceCloudSync(
   };
 
   window.addEventListener("pagehide", flush);
+  window.addEventListener("online", persist);
 
   return () => {
     disposed = true;
     if (saveTimer !== undefined) window.clearTimeout(saveTimer);
     window.removeEventListener("pagehide", flush);
+    window.removeEventListener("online", persist);
     Storage.prototype.setItem = originalSetItem;
     Storage.prototype.removeItem = originalRemoveItem;
     void client.removeChannel(channel);
