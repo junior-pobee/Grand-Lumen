@@ -2314,3 +2314,24 @@ html[data-theme="light"] .global-team-message-alert-copy b{color:#17243a}
 html[data-theme="light"] .global-team-message-alert-copy small{color:#53657e}
 html[data-theme="light"] .global-team-message-alert button{color:#175d9d}
 html[data-theme="light"] .global-team-message-alert .global-team-message-alert-close{color:#64748b}
+
+
+.global-team-message-backdrop{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;padding:22px;background:rgba(5,12,24,.34);backdrop-filter:blur(13px) saturate(.78);-webkit-backdrop-filter:blur(13px) saturate(.78)}
+.global-team-message-alert{position:relative;top:auto;left:auto;right:auto;transform:none;display:flex;flex-direction:column;align-items:center;gap:16px;width:min(440px,100%);padding:34px 28px 26px;border:1px solid rgba(154,203,255,.48);border-radius:22px;text-align:center;background:linear-gradient(145deg,#14213a,#0c1528);color:#f4f7ff;box-shadow:0 28px 90px rgba(0,0,0,.55),0 0 0 1px rgba(154,203,255,.1);animation:global-team-message-pop .22s ease-out}
+.global-team-message-alert .global-team-message-alert-close{position:absolute;top:12px;right:14px;display:grid;place-items:center;width:34px;height:34px;padding:0;border:1px solid rgba(255,255,255,.14);border-radius:50%;background:rgba(255,255,255,.08);color:#d7e5f8;font-size:23px;line-height:1}
+.global-team-message-alert-icon{width:54px;height:54px;flex:0 0 54px;border-radius:17px;background:rgba(154,203,255,.16);color:#a8d5ff;font-size:25px}
+.global-team-message-alert-copy{display:grid;justify-items:center;gap:9px;width:100%;min-width:0}
+.global-team-message-alert-label{color:#a8d5ff;font-size:10px;font-weight:850;letter-spacing:1.5px}
+.global-team-message-alert-copy b{color:#f4f7ff;font-size:19px;overflow-wrap:anywhere}
+.global-team-message-alert-copy p{max-width:100%;margin:0;color:#c5d1e3;font-size:14px;line-height:1.55;overflow-wrap:anywhere;white-space:pre-wrap}
+.global-team-message-alert .global-team-message-alert-open{width:100%;padding:13px 18px;border:1px solid rgba(168,213,255,.42);border-radius:12px;background:#a8d5ff;color:#10213a;font-size:13px;font-weight:850}
+html[data-theme="light"] .global-team-message-backdrop{background:rgba(25,43,68,.25)}
+html[data-theme="light"] .global-team-message-alert{background:linear-gradient(145deg,#ffffff,#edf4ff);border-color:#9bb8dc;color:#17243a;box-shadow:0 28px 90px rgba(35,61,98,.3),0 0 0 1px rgba(65,111,168,.1)}
+html[data-theme="light"] .global-team-message-alert .global-team-message-alert-close{border-color:#c9d8e9;background:#f4f8fd;color:#42536b}
+html[data-theme="light"] .global-team-message-alert-icon{background:#e1efff;color:#175d9d}
+html[data-theme="light"] .global-team-message-alert-label{color:#175d9d}
+html[data-theme="light"] .global-team-message-alert-copy b{color:#17243a}
+html[data-theme="light"] .global-team-message-alert-copy p{color:#53657e}
+html[data-theme="light"] .global-team-message-alert .global-team-message-alert-open{border-color:#175d9d;background:#175d9d;color:#fff}
+@keyframes global-team-message-pop{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:640px){.global-team-message-backdrop{padding:16px}.global-team-message-alert{width:100%;padding:32px 20px 22px}}
