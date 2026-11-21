@@ -2510,7 +2510,7 @@ function App() {
     content.scrollLeft = 0;
   }, [section, session?.user.id, localProfile?.email, guestMode, authReady]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const workspaceReady = authReady && (session ? workspaceSyncReady : guestMode);
     const booting = !authReady || Boolean(session && !workspaceSyncReady);
     document.documentElement.classList.toggle("grand-lumen-workspace-ready", workspaceReady);
