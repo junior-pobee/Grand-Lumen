@@ -21,7 +21,7 @@ Deno.serve(async request => {
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const publicKey = Deno.env.get("VAPID_PUBLIC_KEY")!;
     const privateKey = Deno.env.get("VAPID_PRIVATE_KEY")!;
-    const subject = Deno.env.get("VAPID_SUBJECT") || "mailto:admin@grand-lumen.app";
+    const subject = Deno.env.get("VAPID_SUBJECT") || "https://junior-pobee.github.io/Grand-Lumen/";
 
     const authClient = createClient(url, anonKey, { global: { headers: { Authorization: authorization } } });
     const { data: authData, error: authError } = await authClient.auth.getUser(token);
@@ -47,10 +47,16 @@ Deno.serve(async request => {
     if (connectionError || !connection) throw connectionError || new Error("Connection unavailable");
 
     const recipientId = connection.user_low === authData.user.id ? connection.user_high : connection.user_low;
-    const [{ data: sender }, { data: subscriptions }] = await Promise.all([
+    const [{ data: sender }, { data: subscriptions }, { data: conversationMessages }, { data: readRows }] = await Promise.all([
       admin.from("grand_lumen_profiles").select("display_name").eq("id", authData.user.id).maybeSingle(),
-      admin.from("grand_lumen_team_push_subscriptions").select("endpoint,p256dh,auth").eq("user_id", recipientId)
+      admin.from("grand_lumen_team_push_subscriptions").select("endpoint,p256dh,auth").eq("user_id", recipientId),
+      admin.from("grand_lumen_team_messages").select("id").eq("conversation_id", message.conversation_id).eq("sender_id", authData.user.id).eq("deleted_for_everyone", false),
+      admin.from("grand_lumen_team_message_reads").select("message_id").eq("user_id", recipientId)
     ]);
+
+    const readIds = new Set((readRows || []).map(row => row.message_id));
+    const unreadCount = (conversationMessages || []).filter(row => !readIds.has(row.id)).length;
+    if (!unreadCount) return new Response(JSON.stringify({ success: true, sent: 0, reason: "Conversation already read" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     webpush.setVapidDetails(subject, publicKey, privateKey);
     const attachmentPrefix = "GLATTACH:";
@@ -62,7 +68,7 @@ Deno.serve(async request => {
       } catch { preview = "Sent an attachment"; }
     }
     const payload = JSON.stringify({
-      title: sender?.display_name || "A Team member",
+      title: unreadCount + (unreadCount === 1 ? " message from " : " messages from ") + (sender?.display_name || "A Team member"),
       body: preview.slice(0, 180),
       tag: "grand-lumen-message-" + message.conversation_id,
       url: "https://junior-pobee.github.io/Grand-Lumen/?openTeam=1"
