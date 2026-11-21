@@ -17,6 +17,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   const [connections, setConnections] = useState<Connection[]>([]);
   const [profiles, setProfiles] = useState<Record<string, Profile>>({});
   const [requests, setRequests] = useState<RequestRow[]>([]);
+  const [sentRequests, setSentRequests] = useState<RequestRow[]>([]);
   const [selected, setSelected] = useState<Connection | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
@@ -45,19 +46,28 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
 
   const loadTeam = useCallback(async () => {
     if (!supabase) return;
-    const [connectionResult, requestResult, projectResult] = await Promise.all([
+    const [connectionResult, requestResult, sentRequestResult, projectResult] = await Promise.all([
       supabase.from("grand_lumen_team_connections").select("*").order("created_at", { ascending: false }),
       supabase.from("grand_lumen_connection_requests").select("*").eq("recipient_id", userId).eq("status", "pending").order("created_at", { ascending: false }),
+      supabase.from("grand_lumen_connection_requests").select("*").eq("requester_id", userId).eq("status", "pending").order("created_at", { ascending: false }),
       supabase.from("grand_lumen_projects").select("*").order("updated_at", { ascending: false })
     ]);
     if (connectionResult.error) setNotice(connectionResult.error.message);
     if (requestResult.error) setNotice(requestResult.error.message);
+    if (sentRequestResult.error) setNotice(sentRequestResult.error.message);
     if (projectResult.error) setNotice(projectResult.error.message);
     setProjects((projectResult.data || []) as Project[]);
     const nextConnections = (connectionResult.data || []) as Connection[];
+    const incomingRequests = (requestResult.data || []) as RequestRow[];
+    const outgoingRequests = (sentRequestResult.data || []) as RequestRow[];
     setConnections(nextConnections);
-    setRequests((requestResult.data || []) as RequestRow[]);
-    const ids = Array.from(new Set(nextConnections.flatMap(item => [item.user_low, item.user_high]).filter(id => id !== userId)));
+    setRequests(incomingRequests);
+    setSentRequests(outgoingRequests);
+    const ids = Array.from(new Set([
+      ...nextConnections.flatMap(item => [item.user_low, item.user_high]),
+      ...incomingRequests.map(item => item.requester_id),
+      ...outgoingRequests.map(item => item.recipient_id)
+    ].filter(id => id !== userId)));
     if (ids.length) {
       const result = await supabase.from("grand_lumen_profiles").select("id,display_name,email,avatar_url").in("id", ids);
       if (!result.error) setProfiles(Object.fromEntries(((result.data || []) as Profile[]).map(profile => [profile.id, profile])));
@@ -71,7 +81,8 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     if (!supabase) return;
     const channel = supabase.channel("grand-lumen-team-" + userId)
       .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_team_connections" }, () => void loadTeam())
-      .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_connection_requests", filter: "recipient_id=eq." + userId }, () => void loadTeam())
+       .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_connection_requests", filter: "recipient_id=eq." + userId }, () => void loadTeam())
+      .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_connection_requests", filter: "requester_id=eq." + userId }, () => void loadTeam())
       .subscribe();
     return () => { void supabase?.removeChannel(channel); };
   }, [loadTeam, userId]);
@@ -223,19 +234,22 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     }
     const client = supabase;
     let alive = true;
+    let channel: ReturnType<typeof client.channel> | null = null;
     const loadMessages = async () => {
       const conversation = await client.from("grand_lumen_team_conversations").select("id").eq("connection_id", selected.id).single();
-      if (conversation.error) { setNotice(conversation.error.message); return; }
-      const result = await client.from("grand_lumen_team_messages").select("*").eq("conversation_id", conversation.data.id).order("created_at", { ascending: true }).limit(150);
-      if (alive && !result.error) setMessages((result.data || []) as Message[]);
+      if (conversation.error) { if (alive) setNotice(conversation.error.message); return; }
+      const conversationId = conversation.data.id as string;
+      const result = await client.from("grand_lumen_team_messages").select("*").eq("conversation_id", conversationId).order("created_at", { ascending: true }).limit(150);
+      if (!alive) return;
+      if (!result.error) setMessages((result.data || []) as Message[]);
+      channel = client.channel("grand-lumen-chat-" + conversationId)
+        .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_team_messages", filter: "conversation_id=eq." + conversationId }, payload => {
+          const message = payload.new as Message;
+          if (alive && message.conversation_id === conversationId) setMessages(current => current.some(item => item.id === message.id) ? current : [...current, message]);
+        }).subscribe();
     };
     void loadMessages();
-    const channel = client.channel("grand-lumen-chat-" + selected.id)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_team_messages" }, payload => {
-        const message = payload.new as Message;
-        if (alive) setMessages(current => current.some(item => item.id === message.id) ? current : [...current, message]);
-      }).subscribe();
-    return () => { alive = false; void supabase?.removeChannel(channel); };
+    return () => { alive = false; if (channel) void client.removeChannel(channel); };
   }, [selected]);
 
   useEffect(() => {
@@ -356,7 +370,8 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       </section>
       <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">FIND A MEMBER</span><h3>Scan or enter a code</h3></div><span className="team-icon">+</span></div><p>Scan another member's QR invitation or paste their invitation code.</p><textarea value={inviteInput} onChange={event => setInviteInput(event.target.value)} placeholder="Paste invitation token here" rows={3}/><div className="team-actions"><button className="team-secondary" onClick={() => setCameraOpen(value => !value)}>{cameraOpen ? "Close camera" : "Scan QR code"}</button><button className="team-primary" onClick={() => void connectWithToken()} disabled={busy || !inviteInput.trim()}>Send request</button></div>{cameraOpen && <video className="team-camera" ref={videoRef} muted playsInline/>}</section>
     </div>
-    <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">CONNECTION REQUESTS</span><h3>Requests awaiting your approval</h3></div><span className="team-count">{requests.length}</span></div>{requests.length ? requests.map(request => <div className="team-request" key={request.id}><div><b>Grand Lumen member</b><small>Account ID · {request.requester_id.slice(0, 8)}</small></div><div className="team-actions"><button className="team-secondary" disabled={busy} onClick={() => void respond(request.id, false)}>Decline</button><button className="team-primary" disabled={busy} onClick={() => void respond(request.id, true)}>Accept</button></div></div>) : <p className="team-muted">No pending requests.</p>}</section>
+    <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">CONNECTION REQUESTS</span><h3>Requests awaiting your approval</h3></div><span className="team-count">{requests.length}</span></div>{requests.length ? requests.map(request => <div className="team-request" key={request.id}><div><b>{profiles[request.requester_id]?.display_name || "Grand Lumen member"}</b><small>{profiles[request.requester_id]?.email || "Connection request"}</small></div><div className="team-actions"><button className="team-secondary" disabled={busy} onClick={() => void respond(request.id, false)}>Decline</button><button className="team-primary" disabled={busy} onClick={() => void respond(request.id, true)}>Accept</button></div></div>) : <p className="team-muted">No pending requests.</p>}</section>
+    <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">SENT REQUESTS</span><h3>Awaiting their response</h3></div><span className="team-count">{sentRequests.length}</span></div>{sentRequests.length ? sentRequests.map(request => <div className="team-request" key={request.id}><div><b>{profiles[request.recipient_id]?.display_name || "Grand Lumen member"}</b><small>{profiles[request.recipient_id]?.email || "Request pending"}</small></div><span className="team-muted">Pending approval</span></div>) : <p className="team-muted">You have no outgoing requests.</p>}</section>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR NETWORK</span><h3>Connected members</h3></div><span className="team-count">{connections.length}</span></div>{connections.length ? <div className="team-contacts">{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; const profile = profiles[memberId]; return <button className={selected?.id === connection.id ? "team-contact active" : "team-contact"} key={connection.id} onClick={() => setSelected(connection)}><span className="team-avatar">{(profile?.display_name || profile?.email || "GL").slice(0, 1).toUpperCase()}</span><span><b>{profile?.display_name || "Grand Lumen member"}</b><small>{profile?.email || "Connected account"}</small></span></button>; })}</div> : <p className="team-muted">Your connections will appear here after they approve your requests.</p>}</section>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">SHARED WORK</span><h3>Team projects</h3></div><span className="team-count">{projects.length}</span></div><div className="team-project-create"><input value={projectName} onChange={event => setProjectName(event.target.value)} placeholder="Project name"/><input value={projectDescription} onChange={event => setProjectDescription(event.target.value)} placeholder="Short project description"/><button className="team-primary" onClick={() => void createProject()} disabled={!projectName.trim()}>Create project</button></div>{projects.map(project => <article className="team-project-row" key={project.id}><div><b>{project.name}</b><small>{project.description || "No description"} · {project.user_id === userId ? "Owner" : "Shared with you"}</small></div>{project.user_id === userId && connections.length > 0 && <div className="team-project-share"><select value={projectMember} onChange={event => setProjectMember(event.target.value)}><option value="">Choose member</option>{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; return <option key={memberId} value={memberId}>{profiles[memberId]?.display_name || profiles[memberId]?.email || memberId.slice(0, 8)}</option>; })}</select><select value={projectRole} onChange={event => setProjectRole(event.target.value as "viewer" | "editor" | "manager")}><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="manager">Manager</option></select><button className="team-secondary" onClick={() => void shareProject(project.id)} disabled={!projectMember}>Share</button></div>}</article>)}{!projects.length && <p className="team-muted">Create a cloud project, then share it with connected members.</p>}</section>
     {selected && <section className="team-card team-chat"><div className="team-card-heading"><div><span className="eyebrow">PRIVATE CONVERSATION</span><h3>{(() => { const memberId = selected.user_low === userId ? selected.user_high : selected.user_low; return profiles[memberId]?.display_name || "Team member"; })()}</h3></div><div className="team-actions"><button className="team-secondary" onClick={() => void startCall("audio")}>Voice call</button><button className="team-secondary" onClick={() => void startCall("video")}>Video call</button><button className="team-secondary" onClick={openWhatsApp}>WhatsApp</button><button className="team-secondary" onClick={() => setSelected(null)}>Close chat</button></div></div><div className="team-message-list">{messages.map(message => <article className={message.sender_id === userId ? "team-message own" : "team-message"} key={message.id}><p>{message.body}</p><small>{new Date(message.created_at).toLocaleString()}</small></article>)}{!messages.length && <p className="team-muted">Start the conversation.</p>}</div><form className="team-compose" onSubmit={event => { event.preventDefault(); void sendMessage(); }}><input value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write a message…" maxLength={12000}/><button className="team-primary" disabled={!draft.trim()}>Send</button></form><div className="team-call-note">Voice and video calling require a configured call-signalling service. Chat and connection features are available here.</div></section>}
