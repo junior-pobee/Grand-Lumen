@@ -2200,3 +2200,5 @@ html{scroll-behavior:auto}
 .team-project-delete:hover{background:rgba(177,48,72,.28);border-color:rgba(255,112,132,.65)}
 .team-project-delete:disabled{opacity:.55;cursor:not-allowed}
 @media(max-width:760px){.team-project-delete{margin-left:auto}}
+
+.team-project-share button:disabled{opacity:.55;cursor:not-allowed}
