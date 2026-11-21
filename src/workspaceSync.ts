@@ -307,8 +307,9 @@ export async function startWorkspaceCloudSync(
       table: "grand_lumen_workspaces",
       filter: "user_id=eq." + userId
     }, payload => {
-      if (disposed || !payload.new?.workspace_data) return;
-      const remoteSnapshot = payload.new.workspace_data as WorkspaceSnapshot | { version: 1; data: Record<string, string> };
+      const changedRecord = payload.new as { workspace_data?: WorkspaceSnapshot | { version: 1; data: Record<string, string> } } | null;
+      if (disposed || !changedRecord?.workspace_data) return;
+      const remoteSnapshot = changedRecord.workspace_data;
       const localDirtyValues = new Map<string, string | null>();
       dirtyKeys.forEach(key => localDirtyValues.set(key, localStorage.getItem(key)));
       const preserveLocalScans = scanRecordsDirty;
