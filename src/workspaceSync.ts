@@ -310,7 +310,7 @@ export async function startWorkspaceCloudSync(
       if (disposed || !payload.new?.workspace_data) return;
       const remoteSnapshot = payload.new.workspace_data as WorkspaceSnapshot | { version: 1; data: Record<string, string> };
       const localDirtyValues = new Map<string, string | null>();
-      dirtyKeys.forEach(key => localDirtyValues.set(key, originalSetItem === Storage.prototype.setItem ? localStorage.getItem(key) : localStorage.getItem(key)));
+      dirtyKeys.forEach(key => localDirtyValues.set(key, localStorage.getItem(key)));
       const preserveLocalScans = scanRecordsDirty;
       applyingRemote = true;
       void applyWorkspaceSnapshot(remoteSnapshot)
@@ -321,6 +321,8 @@ export async function startWorkspaceCloudSync(
           });
           if (!preserveLocalScans) {
             scanRecordsCache = remoteSnapshot.version === 2 && Array.isArray(remoteSnapshot.scanRecords) ? remoteSnapshot.scanRecords : [];
+          } else {
+            await replaceScanRecords(scanRecordsCache);
           }
           onStatus(dirtyKeys.size || scanRecordsDirty ? "Merging changes across devices" : "Workspace updated from another device");
         })
