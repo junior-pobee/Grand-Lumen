@@ -369,12 +369,19 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     setBusy(true);
     setNotice("");
     try {
-      await loadTeam();
-      const memberIds = projectMember === "__all__"
-        ? Array.from(new Set(connections.map(connection => connection.user_low === userId ? connection.user_high : connection.user_low)))
-        : [projectMember];
+      const { data: currentConnections, error: connectionError } = await supabase.from("grand_lumen_team_connections").select("user_low,user_high");
+      if (connectionError) {
+        setNotice("Could not verify your connected members: " + connectionError.message);
+        return;
+      }
+      const connectedIds = Array.from(new Set(((currentConnections || []) as Pick<Connection, "user_low" | "user_high">[]).map(connection => connection.user_low === userId ? connection.user_high : connection.user_low)));
+      const memberIds = projectMember === "__all__" ? connectedIds : [projectMember];
       if (!memberIds.length) {
         setNotice("Connect with at least one member before sharing this project.");
+        return;
+      }
+      if (memberIds.some(memberId => !connectedIds.includes(memberId))) {
+        setNotice("That member is no longer connected. Refresh Team and choose a current connection.");
         return;
       }
       const { data, error } = await supabase.rpc("grand_lumen_share_project", {
