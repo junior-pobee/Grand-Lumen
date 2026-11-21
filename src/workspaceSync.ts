@@ -314,7 +314,7 @@ export async function startWorkspaceCloudSync(
       const preserveLocalScans = scanRecordsDirty;
       applyingRemote = true;
       void applyWorkspaceSnapshot(remoteSnapshot)
-        .then(() => {
+        .then(async () => {
           localDirtyValues.forEach((value, key) => {
             if (value === null) originalRemoveItem.call(localStorage, key);
             else originalSetItem.call(localStorage, key, value);
