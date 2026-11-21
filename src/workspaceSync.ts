@@ -93,7 +93,7 @@ function profileImagesForUser(raw: string | null, email: string): string {
   }
 }
 
-async function readWorkspaceSnapshot(email: string): Promise<WorkspaceSnapshot> {
+async function readWorkspaceSnapshot(email: string, scanRecordsOverride?: ScanRecord[]): Promise<WorkspaceSnapshot> {
   const data: Record<string, string> = {};
   let totalBytes = 0;
   for (let index = 0; index < localStorage.length; index += 1) {
@@ -106,7 +106,7 @@ async function readWorkspaceSnapshot(email: string): Promise<WorkspaceSnapshot> 
     if (totalBytes > MAX_SNAPSHOT_BYTES) throw new Error("Your workspace is larger than the 12 MB cloud-sync limit. Export a backup before syncing.");
     data[key] = value;
   }
-  const scanRecords = await readScanRecords();
+  const scanRecords = scanRecordsOverride ?? await readScanRecords();
   totalBytes += new Blob([JSON.stringify(scanRecords)]).size;
   if (totalBytes > MAX_SNAPSHOT_BYTES) throw new Error("Your workspace and scanner documents exceed the 12 MB cloud-sync limit. Export a backup before syncing.");
   return { version: 2, data, scanRecords };
@@ -133,6 +133,45 @@ async function applyWorkspaceSnapshot(snapshot: WorkspaceSnapshot | { version: 1
   window.dispatchEvent(new CustomEvent("lumen-reminders-updated"));
 }
 
+export async function clearWorkspaceData(
+  client: SupabaseClient | null,
+  userId: string,
+  email: string
+): Promise<void> {
+  const preservedKeys = new Set([
+    "grandLumenProfileImage",
+    "grandLumenProfileImages",
+    "grandLumenTheme",
+    "grandLumenFontScale",
+    "grandLumenFontScaleMobile",
+    "grandLumenInterfaceScale",
+    "grandLumenInterfaceScaleMobile",
+    "grandLumenFontFamily",
+    "grandLumenFontWeight",
+    "grandLumenLanguage",
+    "grandLumenLanguageChosen"
+  ]);
+  const keysToClear: string[] = [];
+  for (let index = 0; index < localStorage.length; index += 1) {
+    const key = localStorage.key(index);
+    if (key && isSyncableWorkspaceKey(key) && !preservedKeys.has(key) && !key.startsWith("grandLumenTourCompleted:")) {
+      keysToClear.push(key);
+    }
+  }
+  keysToClear.forEach(key => localStorage.removeItem(key));
+  await replaceScanRecords([]);
+  window.dispatchEvent(new CustomEvent("grand-lumen-workspace-restored"));
+  window.dispatchEvent(new Event("storage"));
+  window.dispatchEvent(new CustomEvent("lumen-reminders-updated"));
+  if (client && userId) {
+    const snapshot = await readWorkspaceSnapshot(email, []);
+    const { error } = await client
+      .from("grand_lumen_workspaces")
+      .upsert({ user_id: userId, workspace_data: snapshot }, { onConflict: "user_id" });
+    if (error) throw error;
+  }
+}
+
 export async function startWorkspaceCloudSync(
   client: SupabaseClient,
   userId: string,
@@ -149,12 +188,16 @@ export async function startWorkspaceCloudSync(
   if (loadError) throw loadError;
 
   let migrateLegacySnapshot = false;
+  let scanRecordsCache: ScanRecord[] = [];
   if (cloudRecord?.workspace_data) {
     onStatus("Restoring workspace");
     const previousOwner = localStorage.getItem("grandLumenCloudOwner");
     const cloudSnapshot = cloudRecord.workspace_data as WorkspaceSnapshot | { version: 1; data: Record<string, string> };
     migrateLegacySnapshot = cloudSnapshot.version === 1 && previousOwner === userId;
     await applyWorkspaceSnapshot(cloudSnapshot, migrateLegacySnapshot);
+    scanRecordsCache = cloudSnapshot.version === 2
+      ? Array.isArray(cloudSnapshot.scanRecords) ? cloudSnapshot.scanRecords : []
+      : await readScanRecords();
     localStorage.setItem("grandLumenCloudOwner", userId);
     onStatus("Workspace restored · syncing changes");
   } else {
@@ -163,6 +206,7 @@ export async function startWorkspaceCloudSync(
     const initialSnapshot = previousOwner && previousOwner !== userId
       ? { version: 2 as const, data: {}, scanRecords: [] as ScanRecord[] }
       : await readWorkspaceSnapshot(email);
+    scanRecordsCache = initialSnapshot.scanRecords;
     if (previousOwner && previousOwner !== userId) await applyWorkspaceSnapshot(initialSnapshot);
     const { error: createError } = await client
       .from("grand_lumen_workspaces")
@@ -185,7 +229,7 @@ export async function startWorkspaceCloudSync(
     onStatus("Saving workspace to cloud");
     saveQueue = saveQueue.then(async () => {
       if (disposed) return;
-      const snapshot = await readWorkspaceSnapshot(email);
+      const snapshot = await readWorkspaceSnapshot(email, scanRecordsCache);
       const { error } = await client
         .from("grand_lumen_workspaces")
         .upsert({ user_id: userId, workspace_data: snapshot }, { onConflict: "user_id" });
@@ -202,7 +246,7 @@ export async function startWorkspaceCloudSync(
     saveTimer = window.setTimeout(() => {
       saveTimer = undefined;
       persist();
-    }, 900);
+    }, 1800);
   };
 
   Storage.prototype.setItem = function(key: string, value: string): void {
@@ -237,8 +281,12 @@ export async function startWorkspaceCloudSync(
     }, payload => {
       if (disposed || !payload.new?.workspace_data || saveTimer !== undefined) return;
       applyingRemote = true;
-      void applyWorkspaceSnapshot(payload.new.workspace_data as WorkspaceSnapshot | { version: 1; data: Record<string, string> })
-        .then(() => onStatus("Workspace updated from another device"))
+      const remoteSnapshot = payload.new.workspace_data as WorkspaceSnapshot | { version: 1; data: Record<string, string> };
+      void applyWorkspaceSnapshot(remoteSnapshot)
+        .then(() => {
+          scanRecordsCache = remoteSnapshot.version === 2 && Array.isArray(remoteSnapshot.scanRecords) ? remoteSnapshot.scanRecords : [];
+          onStatus("Workspace updated from another device");
+        })
         .catch(error => onStatus(error instanceof Error ? error.message : "A cloud update could not be applied"))
         .finally(() => {
           applyingRemote = false;
@@ -257,7 +305,14 @@ export async function startWorkspaceCloudSync(
     }
   };
 
-  const handleScanRecordsUpdated = () => schedulePersist();
+  const handleScanRecordsUpdated = () => {
+    void readScanRecords().then(records => {
+      scanRecordsCache = records;
+      schedulePersist();
+    }).catch(error => {
+      onStatus(error instanceof Error ? error.message : "Scanner documents could not be prepared for cloud sync.");
+    });
+  };
   window.addEventListener("pagehide", flush);
   window.addEventListener("online", persist);
   window.addEventListener("grand-lumen-scan-records-updated", handleScanRecordsUpdated);
