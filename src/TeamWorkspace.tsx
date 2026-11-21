@@ -6,7 +6,9 @@ import { supabase } from "./auth";
 type Profile = { id: string; display_name: string | null; email: string | null; avatar_url: string | null };
 type Connection = { id: string; user_low: string; user_high: string };
 type RequestRow = { id: string; requester_id: string; recipient_id: string; status: string; created_at: string };
-type Message = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; deleted_for_everyone?: boolean };\ntype ReadReceipt = { message_id: string; user_id: string; read_at: string };\nconst TEAM_PUSH_PUBLIC_KEY = "BCIv4zjQlQ9SNsUiMS8qTC7BQZlr2kmCYqg5Dn8CJqmGHRrDhEPAf1MffEyK6a/K6KIFXGcu9YTprAJ/cA9oIvE=";
+type Message = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; deleted_for_everyone?: boolean };
+type ReadReceipt = { message_id: string; user_id: string; read_at: string };
+const TEAM_PUSH_PUBLIC_KEY = "BCIv4zjQlQ9SNsUiMS8qTC7BQZlr2kmCYqg5Dn8CJqmGHRrDhEPAf1MffEyK6a/K6KIFXGcu9YTprAJ/cA9oIvE=";
 type MessageAttachment = { name: string; path: string; mime: string; size: number; kind: "image" | "video" | "audio" | "file" };
 type Project = { id: string; user_id: string; name: string; description: string; status: string };
 type CallInvite = { id: string; connection_id: string; caller_id: string; recipient_id: string; peer_id: string; media_type: "audio" | "video"; status: string; expires_at: string };
@@ -27,7 +29,9 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [sentRequests, setSentRequests] = useState<RequestRow[]>([]);
   const [selected, setSelected] = useState<Connection | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);\n  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});\n  const [notificationReady, setNotificationReady] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [notificationReady, setNotificationReady] = useState(false);
   const [hiddenMessageIds, setHiddenMessageIds] = useState<string[]>([]);
   const [messageMenu, setMessageMenu] = useState<Message | null>(null);
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
@@ -373,12 +377,13 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       if (!alive) return;
       if (result.error) { setNotice(result.error.message); return; }
       if (hiddenResult.error) { setNotice(hiddenResult.error.message); return; }
-      setMessages((result.data || []) as Message[]);\n      void markConversationRead(conversationId, (result.data || []) as Message[]);
+      setMessages((result.data || []) as Message[]);
+      void markConversationRead(conversationId, (result.data || []) as Message[]);
       setHiddenMessageIds((hiddenResult.data || []).map(item => String(item.message_id)));
       channel = client.channel("grand-lumen-chat-" + conversationId)
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_team_messages", filter: "conversation_id=eq." + conversationId }, payload => {
           const message = payload.new as Message;
-          if (alive && message.conversation_id === conversationId) { setMessages(current => current.some(item => item.id === message.id) ? current : [...current, message]); if (message.sender_id !== userId) void notifyIncomingMessage(message); }
+          if (alive && message.conversation_id === conversationId) { setMessages(current => current.some(item => item.id === message.id) ? current : [...current, message]); if (message.sender_id !== userId) void markConversationRead(conversationId, [message]); }
         })
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "grand_lumen_team_messages", filter: "conversation_id=eq." + conversationId }, payload => {
           const message = payload.new as Message;
@@ -588,6 +593,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       const result = await supabase.from("grand_lumen_team_messages").insert({ conversation_id: conversationId, sender_id: userId, body }).select("*").single();
       if (result.error) throw result.error;
       setMessages(current => current.some(item => item.id === result.data.id) ? current : [...current, result.data as Message]);
+      void supabase.functions.invoke("team-message-push", { body: { messageId: result.data.id } });
     } catch (reason) {
       setNotice(reason instanceof Error ? reason.message : "Your message could not be sent.");
     }
@@ -615,6 +621,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       const signed = await supabase.storage.from("grand-lumen-team-attachments").createSignedUrl(path, 60 * 60);
       if (signed.data?.signedUrl) setAttachmentUrls(current => ({ ...current, [result.data.id]: signed.data.signedUrl }));
       setMessages(current => current.some(item => item.id === result.data.id) ? current : [...current, result.data as Message]);
+      void supabase.functions.invoke("team-message-push", { body: { messageId: result.data.id } });
       setNotice("Attachment sent.");
     } catch (reason) {
       setNotice(reason instanceof Error ? reason.message : "The attachment could not be uploaded.");
