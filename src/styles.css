@@ -2301,3 +2301,16 @@ html[data-theme="light"] .team-workspace .team-empty{border-color:#d4dfec;color:
 .global-team-message-alert button{border:0;background:transparent;color:var(--accent);font-size:11px;font-weight:800;white-space:nowrap;cursor:pointer}
 .global-team-message-alert .global-team-message-alert-close{padding:2px 4px;color:var(--muted);font-size:20px}
 @media(max-width:640px){.global-team-message-alert{top:50%;left:50%;right:auto;transform:translate(-50%,-50%);width:calc(100vw - 28px);gap:8px;padding:11px}}
+
+.global-team-message-alert{background:linear-gradient(145deg,#14213a,#0c1528);border-color:rgba(154,203,255,.42);color:#f4f7ff;box-shadow:0 22px 65px rgba(0,0,0,.48),0 0 0 1px rgba(154,203,255,.08)}
+.global-team-message-alert-icon{background:rgba(154,203,255,.16);color:#a8d5ff}
+.global-team-message-alert-copy b{color:#f4f7ff}
+.global-team-message-alert-copy small{color:#b5c2d8}
+.global-team-message-alert button{color:#a8d5ff}
+.global-team-message-alert .global-team-message-alert-close{color:#b5c2d8}
+html[data-theme="light"] .global-team-message-alert{background:linear-gradient(145deg,#ffffff,#edf4ff);border-color:#9bb8dc;color:#17243a;box-shadow:0 22px 65px rgba(35,61,98,.24),0 0 0 1px rgba(65,111,168,.08)}
+html[data-theme="light"] .global-team-message-alert-icon{background:#e1efff;color:#175d9d}
+html[data-theme="light"] .global-team-message-alert-copy b{color:#17243a}
+html[data-theme="light"] .global-team-message-alert-copy small{color:#53657e}
+html[data-theme="light"] .global-team-message-alert button{color:#175d9d}
+html[data-theme="light"] .global-team-message-alert .global-team-message-alert-close{color:#64748b}
