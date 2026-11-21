@@ -2371,7 +2371,7 @@ function App() {
   const handleLogout = async () => {
     if (welcomeTourOpen) completeWelcomeTour();
     if (session && supabase) {
-      const { error: signOutError } = await supabase.auth.signOut();
+      const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
       if (signOutError) { alert(signOutError.message); return; }
     } else {
       localStorage.removeItem("grandLumenLocalSession");
