@@ -118,7 +118,8 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
         if (sessionError) throw sessionError;
         if (sessionData.session?.user.id !== userId) throw new Error("Your signed-in account changed. Reload Team after your account finishes loading.");
         const metadata = sessionData.session.user.user_metadata || {};
-        const displayName = String(metadata.full_name || metadata.name || "").trim();
+        const profileResult = await client.from("grand_lumen_profiles").select("display_name").eq("id", userId).maybeSingle();
+        const displayName = String(profileResult.data?.display_name || metadata.full_name || metadata.name || "").trim();
         if (active) setAccountName(displayName || email || "Grand Lumen member");
         const bytes = crypto.getRandomValues(new Uint8Array(32));
         const token = Array.from(bytes).map(value => value.toString(16).padStart(2, "0")).join("");
