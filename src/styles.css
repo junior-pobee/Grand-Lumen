@@ -1143,7 +1143,6 @@ body {
 .gl-scan-preview-list,
 .lh-vault-preview-body,
 .lh-document-workspace-content,
-.team-message-list,
 .sheets-tabs,
 .sheets-grid-wrap,
 .sheets-library,
@@ -1164,7 +1163,6 @@ body {
 .tool-workspace,
 .lh-vault-preview-body,
 .lh-document-workspace-content,
-.team-message-list,
 .sheets-library,
 .activity-digest-preview,
 .activity-digest-timeline,
@@ -1196,7 +1194,6 @@ body {
   .gl-scan-preview-list,
   .lh-vault-preview-body,
   .lh-document-workspace-content,
-  .team-message-list,
   .sheets-tabs,
   .sheets-grid-wrap,
   .sheets-library,
@@ -2186,7 +2183,7 @@ html{scroll-behavior:auto}
 .team-chat-title-row>div{min-width:0}
 .team-chat-back{flex:0 0 auto;white-space:nowrap}
 .team-chat-fullscreen .team-actions{justify-content:flex-end;margin:0}
-.team-chat-fullscreen .team-message-list{flex:1 1 auto;width:100%;max-height:none;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:clamp(12px,2vw,22px);gap:12px}
+.team-chat-fullscreen .team-message-list{flex:1 1 auto;width:100%;max-height:none;min-height:0;overflow-y:auto;overscroll-behavior-y:auto;padding:clamp(12px,2vw,22px);gap:12px}
 .team-chat-fullscreen .team-message{max-width:min(78%,680px);padding:11px 15px;border-radius:16px}
 .team-chat-fullscreen .team-message p{font-size:14px}
 .team-chat-fullscreen .team-message small{font-size:10px}
@@ -2196,3 +2193,5 @@ html{scroll-behavior:auto}
 .team-chat-fullscreen .team-call-note{flex:0 0 auto}
 @keyframes team-chat-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:700px){.team-chat-fullscreen{gap:10px;padding:12px}.team-chat-fullscreen .team-card-heading{align-items:flex-start;flex-direction:column;gap:10px}.team-chat-title-row{width:100%;gap:10px}.team-chat-title-row h3{font-size:15px}.team-chat-fullscreen .team-actions{width:100%;justify-content:flex-start;gap:6px}.team-chat-fullscreen .team-actions button{min-height:34px;padding:7px 9px;font-size:10px}.team-chat-fullscreen .team-message{max-width:88%}.team-chat-fullscreen .team-message p{font-size:13px}.team-chat-fullscreen .team-compose{gap:6px}.team-chat-fullscreen .team-compose input{min-width:0}.team-chat-fullscreen .team-call-note{font-size:9px}}
+
+.team-chat-fullscreen .team-call-panel{flex:0 0 auto;max-height:38vh;overflow:auto}.team-chat-fullscreen .team-call-panel .team-call-media{max-height:22vh;overflow:auto}.team-call-end{border:1px solid rgba(255,100,120,.5);background:rgba(180,40,65,.18);color:#ffb8c2;border-radius:10px;padding:9px 14px;font-weight:700}
