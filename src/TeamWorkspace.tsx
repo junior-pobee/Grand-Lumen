@@ -102,20 +102,26 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   }, [userId]);
 
   useEffect(() => {
-    if (!supabase) {
+    if (!supabase || !userId) {
+      setInvite("");
       setInviteLoading(false);
       return;
     }
     const client = supabase;
     let active = true;
+    setInvite("");
     const loadPersonalInvite = async () => {
       setInviteLoading(true);
       try {
+        const { data: sessionData, error: sessionError } = await client.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (sessionData.session?.user.id !== userId) throw new Error("Your signed-in account changed. Reload Team after your account finishes loading.");
         const bytes = crypto.getRandomValues(new Uint8Array(32));
         const token = Array.from(bytes).map(value => value.toString(16).padStart(2, "0")).join("");
         const result = await client.rpc("grand_lumen_get_or_create_personal_team_invite", { invite_token: token });
         if (result.error) throw result.error;
-        if (active) setInvite(String(result.data || token));
+        if (!result.data) throw new Error("The personal invitation service returned an empty code.");
+        if (active) setInvite(String(result.data));
       } catch (reason) {
         if (active) setNotice(reason instanceof Error ? reason.message : "Could not load your personal QR invitation.");
       } finally {
@@ -124,7 +130,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     };
     void loadPersonalInvite();
     return () => { active = false; };
-  }, []);
+  }, [userId]);
 
   useEffect(() => () => {
     streamRef.current?.getTracks().forEach(track => track.stop());
@@ -316,13 +322,23 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   };
 
   const respond = async (requestId: string, accept: boolean) => {
-    if (!supabase) return;
+    if (!supabase || !userId) return;
     setBusy(true);
-    const result = await supabase.rpc("grand_lumen_respond_connection_request", { request_id: requestId, accept_request: accept });
-    if (result.error) setNotice(result.error.message);
-    else setNotice(accept ? "Connection accepted." : "Request declined.");
-    await loadTeam();
-    setBusy(false);
+    setNotice("");
+    try {
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) throw sessionError;
+      if (sessionData.session?.user.id !== userId) throw new Error("The active sign-in does not match this Team account. Reload Team and try again.");
+      const result = await supabase.rpc("grand_lumen_handle_connection_request", { p_request_id: requestId, p_accept: accept });
+      if (result.error) throw result.error;
+      if (accept && !result.data) throw new Error("The request was processed, but no connection was returned. Refresh Team and check the connection list.");
+      await loadTeam();
+      setNotice(accept ? "Connection accepted. The member should now appear in your network and private chat." : "Request declined.");
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : "The connection request could not be processed.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const createProject = async () => {
@@ -366,7 +382,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     {incomingCall && <section className="team-incoming-call"><div><b>Incoming {incomingCall.media_type === "video" ? "video" : "voice"} call</b><small>Another connected Team member is calling you.</small></div><div className="team-actions"><button className="team-secondary" onClick={() => void declineCall()}>Decline</button><button className="team-primary" onClick={() => void acceptCall()}>Accept</button></div></section>}
     {callStatus && <section className="team-call-panel"><div className="team-card-heading"><div><span className="eyebrow">LIVE CALL</span><h3>{callStatus}</h3></div><button className="team-secondary" onClick={() => void finishCall()}>End call</button></div><div className="team-call-media">{remoteStream && <video ref={remoteVideoRef} autoPlay playsInline/>}{localStream && <video ref={localVideoRef} autoPlay playsInline muted/>}{activeMediaType === "audio" && <audio ref={remoteAudioRef} autoPlay/>}</div><small>Calls connect directly between devices. Browser camera and microphone permissions are required.</small></section>}
     <div className="team-grid">
-      <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR IDENTITY</span><h3>Personal QR invitation</h3></div><span className="team-icon">QR</span></div><p>Your personal QR invitation stays available here. Other members can scan it repeatedly to send you a connection request.</p><div className="team-qr">{invite ? <><QRCodeSVG value={JSON.stringify({ type: "grand-lumen-team-invite", token: invite })} size={190} level="M"/><b>Permanent invitation · Reusable</b><button onClick={() => { void navigator.clipboard?.writeText(invite); setNotice("Invitation code copied."); }}>Copy invitation code</button></> : <p>{inviteLoading ? "Loading your permanent QR invitation…" : "Your QR invitation could not load. Check the message above and reload the Team section."}</p>}</div>
+      <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR IDENTITY</span><h3>Personal QR invitation</h3></div><span className="team-icon">QR</span></div><p>Your personal QR invitation stays available here. Other members can scan it repeatedly to send you a connection request.</p><div className="team-qr">{invite ? <><QRCodeSVG value={JSON.stringify({ type: "grand-lumen-team-invite", version: 1, accountId: userId, token: invite })} size={190} level="M"/><b>Personal QR · Bound to this account</b><span>{email || "Signed-in account"}</span><small>Account ID: {userId.slice(0, 8)}…{userId.slice(-6)}</small><button onClick={() => { void navigator.clipboard?.writeText(invite).then(() => setNotice("Personal invitation code copied.")).catch(() => setNotice("Clipboard access is unavailable on this device.")); }}>Copy invitation code</button></> : <p>{inviteLoading ? "Loading the QR identity for this signed-in account…" : "Your account-specific QR invitation could not load. Check the message above and reload Team."}</p>}</div>
       </section>
       <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">FIND A MEMBER</span><h3>Scan or enter a code</h3></div><span className="team-icon">+</span></div><p>Scan another member's QR invitation or paste their invitation code.</p><textarea value={inviteInput} onChange={event => setInviteInput(event.target.value)} placeholder="Paste invitation token here" rows={3}/><div className="team-actions"><button className="team-secondary" onClick={() => setCameraOpen(value => !value)}>{cameraOpen ? "Close camera" : "Scan QR code"}</button><button className="team-primary" onClick={() => void connectWithToken()} disabled={busy || !inviteInput.trim()}>Send request</button></div>{cameraOpen && <video className="team-camera" ref={videoRef} muted playsInline/>}</section>
     </div>
