@@ -4,18 +4,44 @@ import App from "./App";
 import "./styles.css";
 
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
-  window.addEventListener("load", () => {
+  const installUpdateHandling = () => {
+    let hasControlledPage = Boolean(navigator.serviceWorker.controller);
+
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!hasControlledPage) {
+        hasControlledPage = true;
+        return;
+      }
+      window.location.reload();
+    });
+
     const appBase = new URL(import.meta.env.BASE_URL, window.location.origin);
     const workerUrl = new URL("service-worker.js", appBase);
+
     navigator.serviceWorker.register(workerUrl.href, {
       scope: appBase.pathname,
       updateViaCache: "none"
     }).then(registration => {
-      registration.update().catch(error => console.warn("Grand-Lumen service worker update failed:", error));
+      const checkForUpdates = () => {
+        if (document.visibilityState === "visible") {
+          registration.update().catch(error => console.warn("Grand-Lumen service worker update failed:", error));
+        }
+      };
+
+      checkForUpdates();
+      window.setInterval(checkForUpdates, 60 * 1000);
+      document.addEventListener("visibilitychange", checkForUpdates);
+      window.addEventListener("focus", checkForUpdates);
     }).catch(error => {
       console.error("Grand-Lumen service worker registration failed:", error);
     });
-  });
+  };
+
+  if (document.readyState === "complete") {
+    installUpdateHandling();
+  } else {
+    window.addEventListener("load", installUpdateHandling, { once: true });
+  }
 }
 
 class StartupBoundary extends React.Component<{ children: React.ReactNode }, { failed: boolean; message: string }> {
