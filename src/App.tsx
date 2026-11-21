@@ -2554,7 +2554,7 @@ function App() {
     Settings: "Shape your workspace."
   };
 
-  if (!authReady || (Boolean(session) && !workspaceSyncReady)) return <div className="auth-boot"><div className="portal-brand-mark"><img src={`${import.meta.env.BASE_URL}icons/grand-lumen-icon.svg`} alt="Grand-Lumen" /></div><span>SECURING YOUR WORKSPACE DATA</span></div>;
+  if (!authReady || (Boolean(session) && !workspaceSyncReady)) return <div className="auth-boot" role="status" aria-live="polite"><div className="portal-brand-mark"><img src={`${import.meta.env.BASE_URL}icons/grand-lumen-icon.svg`} alt="Grand-Lumen" /></div><span>{workspaceSyncStatus || "Preparing your workspace"}</span><div className="auth-boot-progress" aria-hidden="true"><i /></div></div>;
   if (!session && !guestMode) return <PublicPortal onGuest={(profile) => { if (profile) { setLocalProfile(profile); setWelcomeTourOpen(profile.onboardingPending === true); } setGuestMode(true); }} />;
 
   return (
