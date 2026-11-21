@@ -9,6 +9,7 @@ create table if not exists public.grand_lumen_project_members (
   check (owner_id <> member_id)
 );
 
+create unique index if not exists grand_lumen_project_members_project_member_uidx on public.grand_lumen_project_members(project_id, member_id);
 create index if not exists grand_lumen_project_members_member_idx on public.grand_lumen_project_members(member_id);
 create index if not exists grand_lumen_project_members_owner_idx on public.grand_lumen_project_members(owner_id);
 
