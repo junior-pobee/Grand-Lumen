@@ -7,8 +7,8 @@ type Profile = { id: string; display_name: string | null; email: string | null; 
 type Connection = { id: string; user_low: string; user_high: string };
 type RequestRow = { id: string; requester_id: string; recipient_id: string; status: string; created_at: string };
 type Message = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; deleted_for_everyone?: boolean };
+type MessageAlert = { id: string; connectionId: string; senderName: string; preview: string };
 type ReadReceipt = { message_id: string; user_id: string; read_at: string };
-const TEAM_PUSH_PUBLIC_KEY = "BHQzkfa4VfpVxJ0565h-VRbIjdpcw4w7cOfAzSGxB6sGwG4TSi1MQhkx2kLdE9MvPKoZeLnUHbpoTkvS6sMblmQ";
 type MessageAttachment = { name: string; path: string; mime: string; size: number; kind: "image" | "video" | "audio" | "file" };
 type Project = { id: string; user_id: string; name: string; description: string; status: string };
 type CallInvite = { id: string; connection_id: string; caller_id: string; recipient_id: string; peer_id: string; media_type: "audio" | "video"; status: string; expires_at: string };
@@ -31,7 +31,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   const [selected, setSelected] = useState<Connection | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
-  const [notificationReady, setNotificationReady] = useState(false);
+  const [messageAlert, setMessageAlert] = useState<MessageAlert | null>(null);
   const [hiddenMessageIds, setHiddenMessageIds] = useState<string[]>([]);
   const [messageMenu, setMessageMenu] = useState<Message | null>(null);
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
@@ -93,43 +93,6 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     }
     setUnreadCounts(counts);
   }, [userId, connections]);
-
-  const enableMessageNotifications = async () => {
-    if (!("Notification" in window) || !("serviceWorker" in navigator)) {
-      setNotice("Phone notifications are not supported by this browser.");
-      return;
-    }
-    try {
-      const permission = await Notification.requestPermission();
-      if (permission !== "granted") {
-        setNotice("Notifications are blocked. Enable them in your phone's browser or app settings.");
-        return;
-      }
-      const registration = await navigator.serviceWorker.ready;
-      if (!registration.pushManager) {
-        setNotice("This browser does not support background push notifications.");
-        return;
-      }
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: Uint8Array.from(atob(TEAM_PUSH_PUBLIC_KEY.replace(/-/g, "+").replace(/_/g, "/")), char => char.charCodeAt(0))
-      });
-      const value = subscription.toJSON();
-      const keys = value.keys || {};
-      const saved = await supabase?.from("grand_lumen_team_push_subscriptions").upsert({
-        user_id: userId,
-        endpoint: value.endpoint,
-        p256dh: keys.p256dh,
-        auth: keys.auth,
-        updated_at: new Date().toISOString()
-      }, { onConflict: "endpoint" });
-      if (saved?.error) throw saved.error;
-      setNotificationReady(true);
-      setNotice("Phone notifications are enabled for Team messages.");
-    } catch (reason) {
-      setNotice(reason instanceof Error ? reason.message : "Could not enable phone notifications.");
-    }
-  };
 
   const markConversationRead = async (conversationId: string, rows: Message[]) => {
     if (!supabase) return;
@@ -193,20 +156,24 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     void refreshUnreadCounts();
     if (!supabase) return;
     const channel = supabase.channel("grand-lumen-message-counts-" + userId)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_team_messages" }, () => void refreshUnreadCounts())
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_team_messages" }, payload => {
+        void refreshUnreadCounts();
+        const incoming = payload.new as Message;
+        if (incoming.sender_id === userId) return;
+        void (async () => {
+          const conversation = await supabase.from("grand_lumen_team_conversations").select("connection_id").eq("id", incoming.conversation_id).maybeSingle();
+          const connectionId = String(conversation.data?.connection_id || "");
+          if (!connectionId || selected?.id === connectionId) return;
+          const profile = await supabase.from("grand_lumen_profiles").select("display_name,email").eq("id", incoming.sender_id).maybeSingle();
+          const attachment = readAttachment(incoming.body);
+          const preview = attachment ? (attachment.kind === "audio" ? "Sent an audio message" : "Sent " + attachment.kind) : incoming.body;
+          setMessageAlert({ id: incoming.id, connectionId, senderName: profile.data?.display_name || profile.data?.email || "A Team member", preview: preview.slice(0, 110) });
+        })();
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_team_message_reads", filter: "user_id=eq." + userId }, () => void refreshUnreadCounts())
       .subscribe();
     return () => { void supabase?.removeChannel(channel); };
-  }, [refreshUnreadCounts, userId]);
-
-  useEffect(() => {
-    if (!("serviceWorker" in navigator)) return;
-    let active = true;
-    void navigator.serviceWorker.ready.then(registration => registration.pushManager.getSubscription()).then(subscription => {
-      if (active) setNotificationReady(Boolean(subscription));
-    }).catch(() => {});
-    return () => { active = false; };
-  }, []);
+  }, [refreshUnreadCounts, userId, selected?.id]);
 
   useEffect(() => {
     if (!supabase) return;
@@ -594,7 +561,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       const result = await supabase.from("grand_lumen_team_messages").insert({ conversation_id: conversationId, sender_id: userId, body }).select("*").single();
       if (result.error) throw result.error;
       setMessages(current => current.some(item => item.id === result.data.id) ? current : [...current, result.data as Message]);
-      void supabase.functions.invoke("team-message-push", { body: { messageId: result.data.id } });
+
     } catch (reason) {
       setNotice(reason instanceof Error ? reason.message : "Your message could not be sent.");
     }
@@ -622,7 +589,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       const signed = await supabase.storage.from("grand-lumen-team-attachments").createSignedUrl(path, 60 * 60);
       if (signed.data?.signedUrl) setAttachmentUrls(current => ({ ...current, [result.data.id]: signed.data.signedUrl }));
       setMessages(current => current.some(item => item.id === result.data.id) ? current : [...current, result.data as Message]);
-      void supabase.functions.invoke("team-message-push", { body: { messageId: result.data.id } });
+
       setNotice("Attachment sent.");
     } catch (reason) {
       setNotice(reason instanceof Error ? reason.message : "The attachment could not be uploaded.");
@@ -696,8 +663,9 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   if (!supabase) return <div className="team-workspace"><div className="team-empty"><h3>Cloud account required</h3><p>Sign in with a Grand Lumen cloud account to connect with other people across devices. Local browser accounts cannot use Team.</p></div></div>;
 
   return <div className="team-workspace">
+    {messageAlert && <button className="team-message-alert" onClick={() => { const connection = connections.find(item => item.id === messageAlert.connectionId); if (connection) setSelected(connection); setMessageAlert(null); }}><span className="team-message-alert-icon">✉</span><span><b>{messageAlert.senderName}</b><small>{messageAlert.preview || "You have a new message."}</small></span><strong>Open</strong><span className="team-message-alert-close" onClick={event => { event.stopPropagation(); setMessageAlert(null); }}>×</span></button>}
     {!selected && <>
-    <header className="team-hero"><div className="team-hero-copy"><span className="team-kicker"><i/> GRAND-LUMEN COLLABORATION</span><h2>Your people.<br/><span>Your next big idea.</span></h2><p>Bring your network together, exchange ideas, build shared projects and keep every conversation connected.</p><div className="team-hero-meta"><span><i/> Private by design</span><span><i/> Cloud-connected</span><span><i/> Built for teamwork</span></div></div><div className="team-hero-side"><div className="team-hero-orbit"><div className="team-orbit-ring team-orbit-ring-one"/><div className="team-orbit-ring team-orbit-ring-two"/><div className="team-orbit-core">GL</div><span className="team-orbit-dot team-orbit-dot-one"/><span className="team-orbit-dot team-orbit-dot-two"/><span className="team-orbit-dot team-orbit-dot-three"/></div><div className="team-account"><small>SIGNED IN AS</small><b>{email}</b><span>PERSONAL WORKSPACE REMAINS PRIVATE</span></div></div></header><section className="team-overview"><div className="team-overview-heading"><div><span className="team-kicker">YOUR NETWORK AT A GLANCE</span><h3>Team overview</h3></div><button className="team-secondary team-notification-enable" onClick={() => void enableMessageNotifications()}>{notificationReady ? "Notifications enabled" : "Enable phone notifications"}</button><span className="team-overview-live"><i/> LIVE WORKSPACE</span></div><div className="team-stat-grid"><article className="team-stat"><span className="team-stat-icon">◎</span><div><strong>{connections.length}</strong><small>Connected members</small></div><span className="team-stat-foot">YOUR NETWORK</span></article><article className="team-stat"><span className="team-stat-icon">↗</span><div><strong>{requests.length}</strong><small>Incoming requests</small></div><span className="team-stat-foot">NEEDS REVIEW</span></article><article className="team-stat"><span className="team-stat-icon">↗</span><div><strong>{sentRequests.length}</strong><small>Sent requests</small></div><span className="team-stat-foot">AWAITING REPLY</span></article><article className="team-stat"><span className="team-stat-icon">▦</span><div><strong>{projects.length}</strong><small>Team projects</small></div><span className="team-stat-foot">SHARED WORK</span></article></div></section>
+    <header className="team-hero"><div className="team-hero-copy"><span className="team-kicker"><i/> GRAND-LUMEN COLLABORATION</span><h2>Your people.<br/><span>Your next big idea.</span></h2><p>Bring your network together, exchange ideas, build shared projects and keep every conversation connected.</p><div className="team-hero-meta"><span><i/> Private by design</span><span><i/> Cloud-connected</span><span><i/> Built for teamwork</span></div></div><div className="team-hero-side"><div className="team-hero-orbit"><div className="team-orbit-ring team-orbit-ring-one"/><div className="team-orbit-ring team-orbit-ring-two"/><div className="team-orbit-core">GL</div><span className="team-orbit-dot team-orbit-dot-one"/><span className="team-orbit-dot team-orbit-dot-two"/><span className="team-orbit-dot team-orbit-dot-three"/></div><div className="team-account"><small>SIGNED IN AS</small><b>{email}</b><span>PERSONAL WORKSPACE REMAINS PRIVATE</span></div></div></header><section className="team-overview"><div className="team-overview-heading"><div><span className="team-kicker">YOUR NETWORK AT A GLANCE</span><h3>Team overview</h3></div><span className="team-total-unread">{Object.values(unreadCounts).reduce((total, count) => total + count, 0)} unread messages</span><span className="team-overview-live"><i/> LIVE WORKSPACE</span></div><div className="team-stat-grid"><article className="team-stat"><span className="team-stat-icon">◎</span><div><strong>{connections.length}</strong><small>Connected members</small></div><span className="team-stat-foot">YOUR NETWORK</span></article><article className="team-stat"><span className="team-stat-icon">↗</span><div><strong>{requests.length}</strong><small>Incoming requests</small></div><span className="team-stat-foot">NEEDS REVIEW</span></article><article className="team-stat"><span className="team-stat-icon">↗</span><div><strong>{sentRequests.length}</strong><small>Sent requests</small></div><span className="team-stat-foot">AWAITING REPLY</span></article><article className="team-stat"><span className="team-stat-icon">▦</span><div><strong>{projects.length}</strong><small>Team projects</small></div><span className="team-stat-foot">SHARED WORK</span></article></div></section>
     {notice && <div className="team-notice" role="status">{notice}</div>}
     {incomingCall && <section className="team-incoming-call"><div><b>Incoming {incomingCall.media_type === "video" ? "video" : "voice"} call</b><small>Another connected Team member is calling you.</small></div><div className="team-actions"><button className="team-secondary" onClick={() => void declineCall()}>Decline</button><button className="team-primary" onClick={() => void acceptCall()}>Accept</button></div></section>}
     
