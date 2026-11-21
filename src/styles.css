@@ -2049,3 +2049,12 @@ html.grand-lumen-workspace-ready body{position:fixed;inset:0}
 .studio-expanded .studio-code-layer{height:100%;min-height:0;overflow:hidden}
 .studio-expanded .studio-code-input{height:100%;min-height:0;overflow:auto}
 @media(max-width:650px){.studio-expanded .studio-main{height:0;min-height:0;flex:1 1 auto;overflow:auto}.studio-expanded .studio-editor-area{flex:1 1 55%;min-height:0}.studio-expanded .studio-editor-wrap{min-height:0;flex:1 1 auto}.studio-expanded .studio-code-layer{min-height:0;height:100%}.studio-expanded .studio-code-input{min-height:0;height:100%}}
+
+.studio-expanded .studio-main{display:flex;flex:1 1 auto;width:100%;height:0;min-height:0;overflow:hidden}
+.studio-expanded .studio-explorer,.studio-expanded .studio-preview{display:none!important}
+.studio-expanded .studio-editor-area{display:flex;flex:1 1 100%;width:100%;height:100%;min-width:0;min-height:0;overflow:hidden}
+.studio-expanded .studio-editor-wrap{display:flex;flex:1 1 auto;width:100%;height:0;min-height:0;overflow:hidden}
+.studio-expanded .studio-line-numbers{flex-basis:52px}
+.studio-expanded .studio-code-layer{flex:1 1 auto;width:0;min-width:0;height:100%;min-height:0;overflow:hidden}
+.studio-expanded .studio-code-input{width:100%;height:100%;min-height:0;max-width:none;max-height:none;overflow:auto}
+@media(max-width:650px){.studio-expanded .studio-main{display:flex;flex:1 1 auto;height:0;min-height:0;overflow:hidden}.studio-expanded .studio-editor-area{flex:1 1 100%;width:100%;min-height:0}.studio-expanded .studio-editor-wrap{flex:1 1 auto;height:0;min-height:0}.studio-expanded .studio-code-layer{flex:1 1 auto;width:0;height:100%;min-height:0}.studio-expanded .studio-code-input{height:100%;min-height:0}}
