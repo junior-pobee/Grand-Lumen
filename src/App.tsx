@@ -2231,6 +2231,7 @@ function App() {
       }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+      setWorkspaceSyncReady(false);
       setSession(nextSession);
       setWelcomeTourOpen(Boolean(nextSession && nextSession.user.user_metadata?.grand_lumen_onboarding_pending && localStorage.getItem("grandLumenTourCompleted:" + nextSession.user.id) !== "true"));
       setAuthReady(true);
