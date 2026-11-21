@@ -130,7 +130,8 @@ export default function LumenSheets({ userId }: { userId: string }) {
   const [importing, setImporting] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
-  const [scrollTop, setScrollTop] = useState(0);\n  const [scrollLeft, setScrollLeft] = useState(0);
+  const [scrollTop, setScrollTop] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
   const gridRef = useRef<HTMLDivElement>(null);
   const importExcelRef = useRef<HTMLInputElement>(null);
   const importCsvRef = useRef<HTMLInputElement>(null);
