@@ -6,6 +6,9 @@ create table if not exists public.grand_lumen_workspaces (
 
 alter table public.grand_lumen_workspaces enable row level security;
 
+revoke all on table public.grand_lumen_workspaces from public, anon;
+grant select, insert, update on table public.grand_lumen_workspaces to authenticated;
+
 drop policy if exists "Users can read their own Grand-Lumen workspace" on public.grand_lumen_workspaces;
 create policy "Users can read their own Grand-Lumen workspace"
 on public.grand_lumen_workspaces
