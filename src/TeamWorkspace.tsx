@@ -7,8 +7,15 @@ type Profile = { id: string; display_name: string | null; email: string | null; 
 type Connection = { id: string; user_low: string; user_high: string };
 type RequestRow = { id: string; requester_id: string; recipient_id: string; status: string; created_at: string };
 type Message = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; deleted_for_everyone?: boolean };
+type MessageAttachment = { name: string; path: string; mime: string; size: number; kind: "image" | "video" | "audio" | "file" };
 type Project = { id: string; user_id: string; name: string; description: string; status: string };
 type CallInvite = { id: string; connection_id: string; caller_id: string; recipient_id: string; peer_id: string; media_type: "audio" | "video"; status: string; expires_at: string };
+
+const attachmentPrefix = "GLATTACH:";
+const readAttachment = (body: string): MessageAttachment | null => {
+  if (!body.startsWith(attachmentPrefix)) return null;
+  try { return JSON.parse(body.slice(attachmentPrefix.length)) as MessageAttachment; } catch { return null; }
+};
 
 export default function TeamWorkspace({ userId, email }: { userId: string; email: string }) {
   const [invite, setInvite] = useState("");
@@ -23,6 +30,13 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   const [messages, setMessages] = useState<Message[]>([]);
   const [hiddenMessageIds, setHiddenMessageIds] = useState<string[]>([]);
   const [messageMenu, setMessageMenu] = useState<Message | null>(null);
+  const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
+  const [uploading, setUploading] = useState(false);
+  const [recording, setRecording] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const recordingStreamRef = useRef<MediaStream | null>(null);
+  const recordingChunksRef = useRef<Blob[]>([]);
   const messagePressTimer = useRef<number | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectName, setProjectName] = useState("");
@@ -145,6 +159,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
 
   useEffect(() => () => {
     streamRef.current?.getTracks().forEach(track => track.stop());
+    recordingStreamRef.current?.getTracks().forEach(track => track.stop());
     localStreamRef.current?.getTracks().forEach(track => track.stop());
     peerRef.current?.destroy();
   }, []);
@@ -278,6 +293,27 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     void loadMessages();
     return () => { alive = false; if (channel) void client.removeChannel(channel); };
   }, [selected]);
+
+  useEffect(() => {
+    if (!supabase) return;
+    let active = true;
+    const pending = messages.filter(message => !message.deleted_for_everyone && readAttachment(message.body) && !attachmentUrls[message.id]);
+    if (!pending.length) return;
+    void Promise.all(pending.map(async message => {
+      const attachment = readAttachment(message.body);
+      if (!attachment) return null;
+      const result = await supabase.storage.from("grand-lumen-team-attachments").createSignedUrl(attachment.path, 60 * 60);
+      return result.data?.signedUrl ? [message.id, result.data.signedUrl] as const : null;
+    })).then(results => {
+      if (!active) return;
+      setAttachmentUrls(current => {
+        const next = { ...current };
+        for (const item of results) if (item) next[item[0]] = item[1];
+        return next;
+      });
+    });
+    return () => { active = false; };
+  }, [messages, attachmentUrls]);
 
   useEffect(() => {
     if (!cameraOpen) {
@@ -439,19 +475,93 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     window.location.assign("https://wa.me/" + phone);
   };
 
+  const getConversationId = async () => {
+    if (!supabase || !selected) throw new Error("Open a conversation before sending.");
+    const result = await supabase.from("grand_lumen_team_conversations").select("id").eq("connection_id", selected.id).single();
+    if (result.error) throw result.error;
+    return String(result.data.id);
+  };
+
   const sendMessage = async () => {
     if (!supabase || !selected || !draft.trim()) return;
-    const conversation = await supabase.from("grand_lumen_team_conversations").select("id").eq("connection_id", selected.id).single();
-    if (conversation.error) { setNotice(conversation.error.message); return; }
-    const body = draft.trim();
-    setDraft("");
-    const result = await supabase.from("grand_lumen_team_messages").insert({ conversation_id: conversation.data.id, sender_id: userId, body }).select("*").single();
-    if (result.error) { setDraft(body); setNotice(result.error.message); }
-    else setMessages(current => current.some(item => item.id === result.data.id) ? current : [...current, result.data as Message]);
+    try {
+      const conversationId = await getConversationId();
+      const body = draft.trim();
+      setDraft("");
+      const result = await supabase.from("grand_lumen_team_messages").insert({ conversation_id: conversationId, sender_id: userId, body }).select("*").single();
+      if (result.error) throw result.error;
+      setMessages(current => current.some(item => item.id === result.data.id) ? current : [...current, result.data as Message]);
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : "Your message could not be sent.");
+    }
+  };
+
+  const uploadAttachment = async (file: File, forcedKind?: MessageAttachment["kind"]) => {
+    if (!supabase || !selected || uploading) return;
+    if (file.size > 50 * 1024 * 1024) { setNotice("Each attachment must be 50 MB or smaller."); return; }
+    const mime = file.type || "application/octet-stream";
+    const kind = forcedKind || (mime.startsWith("image/") ? "image" : mime.startsWith("video/") ? "video" : mime.startsWith("audio/") ? "audio" : "file");
+    setUploading(true);
+    setNotice("Uploading " + file.name + "…");
+    try {
+      const conversationId = await getConversationId();
+      const safeName = file.name.normalize("NFKD").replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-100) || "attachment";
+      const path = conversationId + "/" + userId + "/" + crypto.randomUUID() + "-" + safeName;
+      const uploaded = await supabase.storage.from("grand-lumen-team-attachments").upload(path, file, { contentType: mime, upsert: false });
+      if (uploaded.error) throw uploaded.error;
+      const attachment: MessageAttachment = { name: file.name, path, mime, size: file.size, kind };
+      const result = await supabase.from("grand_lumen_team_messages").insert({ conversation_id: conversationId, sender_id: userId, body: attachmentPrefix + JSON.stringify(attachment) }).select("*").single();
+      if (result.error) {
+        await supabase.storage.from("grand-lumen-team-attachments").remove([path]);
+        throw result.error;
+      }
+      const signed = await supabase.storage.from("grand-lumen-team-attachments").createSignedUrl(path, 60 * 60);
+      if (signed.data?.signedUrl) setAttachmentUrls(current => ({ ...current, [result.data.id]: signed.data.signedUrl }));
+      setMessages(current => current.some(item => item.id === result.data.id) ? current : [...current, result.data as Message]);
+      setNotice("Attachment sent.");
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : "The attachment could not be uploaded.");
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const startAudioRecording = async () => {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+      setNotice("Audio recording is not supported by this browser.");
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordingStreamRef.current = stream;
+      recordingChunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      recorderRef.current = recorder;
+      recorder.ondataavailable = event => { if (event.data.size) recordingChunksRef.current.push(event.data); };
+      recorder.onerror = () => setNotice("Audio recording failed. Please try again.");
+      recorder.onstop = () => {
+        const blob = new Blob(recordingChunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        stream.getTracks().forEach(track => track.stop());
+        recordingStreamRef.current = null;
+        recorderRef.current = null;
+        setRecording(false);
+        if (blob.size) void uploadAttachment(new File([blob], "voice-message-" + Date.now() + ".webm", { type: blob.type }), "audio");
+      };
+      recorder.start();
+      setRecording(true);
+      setNotice("Recording audio message… tap Stop recording when finished.");
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : "Microphone permission was not granted.");
+    }
+  };
+
+  const stopAudioRecording = () => {
+    if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
   };
 
   const deleteMessageForMe = async (message: Message) => {
-    if (!supabase) return;
+    if (!supabase || message.sender_id !== userId) return;
     const result = await supabase.rpc("grand_lumen_hide_team_message", { p_message_id: message.id });
     if (result.error) { setNotice(result.error.message); return; }
     setHiddenMessageIds(current => current.includes(message.id) ? current : [...current, message.id]);
@@ -463,6 +573,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     const result = await supabase.rpc("grand_lumen_delete_team_message_for_everyone", { p_message_id: message.id });
     if (result.error) { setNotice(result.error.message); return; }
     setMessages(current => current.map(item => item.id === message.id ? { ...item, body: "This message was deleted", deleted_for_everyone: true } : item));
+    setAttachmentUrls(current => { const next = { ...current }; delete next[message.id]; return next; });
     setMessageMenu(null);
   };
 
@@ -495,6 +606,20 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR NETWORK</span><h3>Connected members</h3></div><span className="team-count">{connections.length}</span></div>{connections.length ? <div className="team-contacts">{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; const profile = profiles[memberId]; return <button className="team-contact" key={connection.id} onClick={() => setSelected(connection)}><span className="team-avatar">{(profile?.display_name || profile?.email || "GL").slice(0, 1).toUpperCase()}</span><span><b>{profile?.display_name || "Grand Lumen member"}</b><small>{profile?.email || "Connected account"}</small></span></button>; })}</div> : <p className="team-muted">Your connections will appear here after they approve your requests.</p>}</section>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">SHARED WORK</span><h3>Team projects</h3></div><span className="team-count">{projects.length}</span></div><div className="team-project-create"><input value={projectName} onChange={event => setProjectName(event.target.value)} placeholder="Project name"/><input value={projectDescription} onChange={event => setProjectDescription(event.target.value)} placeholder="Short project description"/><button className="team-primary" onClick={() => void createProject()} disabled={!projectName.trim() || busy}>Create project</button></div>{projects.map(project => <article className="team-project-row" key={project.id}><div><b>{project.name}</b><small>{project.description || "No description"} · {project.user_id === userId ? "Owner" : "Shared with you"}</small></div>{project.user_id === userId && <div className="team-project-share">{connections.length > 0 && <><select value={projectMember} onChange={event => setProjectMember(event.target.value)}><option value="">Choose member</option><option value="__all__">All connected members</option>{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; return <option key={memberId} value={memberId}>{profiles[memberId]?.display_name || profiles[memberId]?.email || memberId.slice(0, 8)}</option>; })}</select><select value={projectRole} onChange={event => setProjectRole(event.target.value as "viewer" | "editor" | "manager")}><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="manager">Manager</option></select><button className="team-secondary" onClick={() => void shareProject(project.id)} disabled={!projectMember || busy}>Share</button></>}<button className="team-danger team-project-delete" onClick={() => void deleteProject(project)} disabled={busy}>Delete</button></div>}</article>)}{!projects.length && <p className="team-muted">Create a cloud project, then share it with connected members.</p>}</section>
     </>}
-    {selected && <section className="team-card team-chat team-chat-fullscreen"><div className="team-card-heading"><div className="team-chat-title-row"><button className="team-secondary team-chat-back" onClick={() => setSelected(null)}>← Back to Team</button><div><span className="eyebrow">PRIVATE CONVERSATION</span><h3>{(() => { const memberId = selected.user_low === userId ? selected.user_high : selected.user_low; return profiles[memberId]?.display_name || "Team member"; })()}</h3></div></div><div className="team-actions"><button className="team-secondary" onClick={() => void startCall("audio")}>Voice call</button><button className="team-secondary" onClick={() => void startCall("video")}>Video call</button><button className="team-secondary" onClick={openWhatsApp}>WhatsApp</button></div></div><div className="team-message-list">{messages.filter(message => !hiddenMessageIds.includes(message.id)).map(message => <article className={(message.sender_id === userId ? "team-message own" : "team-message") + (message.deleted_for_everyone ? " deleted" : "")} key={message.id} onContextMenu={event => { event.preventDefault(); setMessageMenu(message.deleted_for_everyone ? null : message); }} onTouchStart={() => beginMessagePress(message)} onTouchEnd={cancelMessagePress} onTouchMove={cancelMessagePress} onTouchCancel={cancelMessagePress}><p>{message.deleted_for_everyone ? "This message was deleted" : message.body}</p><small>{new Date(message.created_at).toLocaleString()}</small></article>)}{!messages.filter(message => !hiddenMessageIds.includes(message.id)).length && <p className="team-muted">Start the conversation.</p>}</div>{messageMenu && <div className="team-message-menu-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setMessageMenu(null); }}><section className="team-message-menu" role="dialog" aria-modal="true" aria-label="Message options"><span>MESSAGE OPTIONS</span><button type="button" onClick={() => void deleteMessageForMe(messageMenu)}>Delete for me</button>{messageMenu.sender_id === userId && <button type="button" className="delete-everyone" onClick={() => void deleteMessageForEveryone(messageMenu)}>Delete for everyone</button>}<button type="button" className="cancel" onClick={() => setMessageMenu(null)}>Cancel</button></section></div>}<form className="team-compose" onSubmit={event => { event.preventDefault(); void sendMessage(); }}><input value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write a message…" maxLength={12000}/><button className="team-primary" disabled={!draft.trim()}>Send</button></form><div className="team-call-note">Messages and calls stay in this private conversation.</div>{incomingCall && <section className="team-incoming-call"><div><b>Incoming {incomingCall.media_type === "video" ? "video" : "voice"} call</b><small>A connected Team member is calling you.</small></div><div className="team-actions"><button className="team-secondary" onClick={() => void declineCall()}>Decline</button><button className="team-primary" onClick={() => void acceptCall()}>Accept</button></div></section>}{callStatus && <section className="team-call-panel"><div className="team-card-heading"><div><span className="eyebrow">LIVE {activeMediaType === "video" ? "VIDEO" : "VOICE"} CALL</span><h3>{callStatus}</h3></div><button className="team-danger team-call-end" onClick={() => void finishCall()}>End call</button></div><div className="team-call-media">{remoteStream && <video ref={remoteVideoRef} autoPlay playsInline/>}{localStream && <video ref={localVideoRef} autoPlay playsInline muted/>}{activeMediaType === "audio" && <audio ref={remoteAudioRef} autoPlay/>}</div><small>Tap End call whenever you want to stop the conversation.</small></section>}</section>}
+    {selected && <section className="team-card team-chat team-chat-fullscreen"><div className="team-card-heading"><div className="team-chat-title-row"><button className="team-secondary team-chat-back" onClick={() => setSelected(null)}>← Back to Team</button><div><span className="eyebrow">PRIVATE CONVERSATION</span><h3>{(() => { const memberId = selected.user_low === userId ? selected.user_high : selected.user_low; return profiles[memberId]?.display_name || "Team member"; })()}</h3></div></div><div className="team-actions"><button className="team-secondary" onClick={() => void startCall("audio")}>Voice call</button><button className="team-secondary" onClick={() => void startCall("video")}>Video call</button><button className="team-secondary" onClick={openWhatsApp}>WhatsApp</button></div></div><div className="team-message-list">{messages.filter(message => !hiddenMessageIds.includes(message.id)).map(message => {
+      const attachment = readAttachment(message.body);
+      const url = attachmentUrls[message.id];
+      const own = message.sender_id === userId;
+      return <article className={("team-message" + (own ? " own" : "") + (message.deleted_for_everyone ? " deleted" : "") + (attachment ? " has-attachment" : ""))} key={message.id} onContextMenu={event => { event.preventDefault(); if (own && !message.deleted_for_everyone) setMessageMenu(message); }} onTouchStart={() => { if (own) beginMessagePress(message); }} onTouchEnd={cancelMessagePress} onTouchMove={cancelMessagePress} onTouchCancel={cancelMessagePress}>
+        {message.deleted_for_everyone ? <p>This message was deleted</p> : attachment ? <div className="team-attachment">
+          {attachment.kind === "image" && (url ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={attachment.name}/></a> : <span>Loading image…</span>)}
+          {attachment.kind === "video" && (url ? <video src={url} controls preload="metadata"/> : <span>Loading video…</span>)}
+          {attachment.kind === "audio" && (url ? <audio src={url} controls preload="metadata"/> : <span>Loading audio…</span>)}
+          {attachment.kind === "file" && <div className="team-attachment-file"><span>FILE</span><div><b>{attachment.name}</b><small>{(attachment.size / 1024 / 1024).toFixed(2)} MB</small></div>{url ? <a href={url} target="_blank" rel="noreferrer" download={attachment.name}>Open / download</a> : <span>Preparing…</span>}</div>}
+          <small>{attachment.name}</small>
+        </div> : <p>{message.body}</p>}
+        <small>{new Date(message.created_at).toLocaleString()}</small>
+      </article>;
+    })}{!messages.filter(message => !hiddenMessageIds.includes(message.id)).length && <p className="team-muted">Start the conversation.</p>}</div>{messageMenu && messageMenu.sender_id === userId && <div className="team-message-menu-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setMessageMenu(null); }}><section className="team-message-menu" role="dialog" aria-modal="true" aria-label="Message options"><span>YOUR MESSAGE</span><button type="button" onClick={() => void deleteMessageForMe(messageMenu)}>Delete for me</button><button type="button" className="delete-everyone" onClick={() => void deleteMessageForEveryone(messageMenu)}>Delete for everyone</button><button type="button" className="cancel" onClick={() => setMessageMenu(null)}>Cancel</button></section></div>}<form className="team-compose" onSubmit={event => { event.preventDefault(); void sendMessage(); }}><input value={draft} onChange={event => setDraft(event.target.value)} placeholder="Write a message…" maxLength={12000}/><button className="team-primary" disabled={!draft.trim() || uploading}>Send</button><input ref={fileInputRef} className="team-file-input" type="file" accept="image/*,video/*,audio/*,.pdf,.txt,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip" onChange={event => { const file = event.target.files?.[0]; if (file) void uploadAttachment(file); }} /><button type="button" className="team-secondary team-attach-button" onClick={() => fileInputRef.current?.click()} disabled={uploading}>{uploading ? "Uploading…" : "Attach"}</button><button type="button" className="team-secondary team-audio-button" onClick={() => recording ? stopAudioRecording() : void startAudioRecording()} disabled={uploading}>{recording ? "Stop recording" : "Record audio"}</button></form>{notice && <div className="team-notice team-chat-notice" role="status">{notice}</div>}<div className="team-call-note">Messages, files and calls stay in this private conversation. Attachments up to 50 MB.</div>{incomingCall && <section className="team-incoming-call"><div><b>Incoming {incomingCall.media_type === "video" ? "video" : "voice"} call</b><small>A connected Team member is calling you.</small></div><div className="team-actions"><button className="team-secondary" onClick={() => void declineCall()}>Decline</button><button className="team-primary" onClick={() => void acceptCall()}>Accept</button></div></section>}{callStatus && <section className="team-call-panel"><div className="team-card-heading"><div><span className="eyebrow">LIVE {activeMediaType === "video" ? "VIDEO" : "VOICE"} CALL</span><h3>{callStatus}</h3></div><button className="team-danger team-call-end" onClick={() => void finishCall()}>End call</button></div><div className="team-call-media">{remoteStream && <video ref={remoteVideoRef} autoPlay playsInline/>}{localStream && <video ref={localVideoRef} autoPlay playsInline muted/>}{activeMediaType === "audio" && <audio ref={remoteAudioRef} autoPlay/>}</div><small>Tap End call whenever you want to stop the conversation.</small></section>}</section>}
   </div>;
 }
