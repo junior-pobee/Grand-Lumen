@@ -474,7 +474,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     setBusy(true);
     setNotice("");
     try {
-      const { data: currentConnections, error: connectionError } = await supabase.from("grand_lumen_team_connections").select("user_low,user_high");
+      const { data: currentConnections, error: connectionError } = await supabase.from("grand_lumen_team_connections").select("id,user_low,user_high");
       if (connectionError) {
         setNotice("Could not verify your connected members: " + connectionError.message);
         return;
@@ -499,8 +499,29 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
         return;
       }
       const sharedCount = Number(data || 0);
+      const projectNameValue = projects.find(project => project.id === projectId)?.name || "a project";
+      const senderName = accountName.trim() || email || "A Team member";
+      const connectionRows = (currentConnections || []) as (Pick<Connection, "user_low" | "user_high"> & { id: string })[];
+      const selectedConnections = memberIds.map(memberId => connectionRows.find(connection => connection.user_low === memberId || connection.user_high === memberId)).filter((connection): connection is typeof connectionRows[number] => Boolean(connection));
+      const conversationResult = await supabase.from("grand_lumen_team_conversations").select("id,connection_id").in("connection_id", selectedConnections.map(connection => connection.id));
+      if (conversationResult.error) throw new Error("The project was shared, but its Team message could not be prepared: " + conversationResult.error.message);
+      const conversationByConnection = new Map((conversationResult.data || []).map(conversation => [conversation.connection_id, conversation.id]));
+      const shareMessages = selectedConnections.flatMap(connection => {
+        const conversationId = conversationByConnection.get(connection.id);
+        if (!conversationId) return [];
+        const recipientId = connection.user_low === userId ? connection.user_high : connection.user_low;
+        if (!memberIds.includes(recipientId)) return [];
+        return [{
+          conversation_id: conversationId,
+          sender_id: userId,
+          body: senderName + " shared the project “" + projectNameValue + "” with you. Your access level: " + projectRole + "."
+        }];
+      });
+      if (shareMessages.length !== memberIds.length) throw new Error("The project was shared, but one or more Team conversations could not be found for the sharing message.");
+      const messageResult = await supabase.from("grand_lumen_team_messages").insert(shareMessages);
+      if (messageResult.error) throw new Error("The project was shared, but the Team message could not be sent: " + messageResult.error.message);
       setProjectMember("");
-      setNotice(sharedCount === 1 ? "Project shared successfully. The member can now see it in Team Projects." : "Project shared with " + sharedCount + " connected members.");
+      setNotice(sharedCount === 1 ? "Project shared and a message sent to the member." : "Project shared with " + sharedCount + " connected members. A message was sent to each recipient.");
       await loadTeam();
     } catch (error) {
       setNotice("Project sharing failed: " + (error instanceof Error ? error.message : String(error)));
