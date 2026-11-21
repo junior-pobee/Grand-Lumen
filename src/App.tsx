@@ -2080,16 +2080,12 @@ function App() {
           detectSessionInUrl: false
         }
       });
-      try {
-        const { error: authError } = await verifier.auth.signInWithPassword({ email: session.user.email, password });
-        if (authError) {
-          if (authError.status === 0 || authError.name === "AuthRetryableFetchError" || /network|fetch failed|failed to fetch|load failed|connection|timeout/i.test(authError.message)) throw authError;
-          return false;
-        }
-        return true;
-      } finally {
-        await verifier.auth.signOut();
+      const { error: authError } = await verifier.auth.signInWithPassword({ email: session.user.email, password });
+      if (authError) {
+        if (authError.status === 0 || authError.name === "AuthRetryableFetchError" || /network|fetch failed|failed to fetch|load failed|connection|timeout/i.test(authError.message)) throw authError;
+        return false;
       }
+      return true;
     }
     const email = (localProfile?.email || "").trim().toLowerCase();
     if (!email) return false;
