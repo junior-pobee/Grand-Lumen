@@ -6,7 +6,7 @@ import { supabase } from "./auth";
 type Profile = { id: string; display_name: string | null; email: string | null; avatar_url: string | null };
 type Connection = { id: string; user_low: string; user_high: string };
 type RequestRow = { id: string; requester_id: string; recipient_id: string; status: string; created_at: string };
-type Message = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; deleted_for_everyone?: boolean };
+type Message = { id: string; conversation_id: string; sender_id: string; body: string; created_at: string; deleted_for_everyone?: boolean };\ntype ReadReceipt = { message_id: string; user_id: string; read_at: string };\nconst TEAM_PUSH_PUBLIC_KEY = "BCIv4zjQlQ9SNsUiMS8qTC7BQZlr2kmCYqg5Dn8CJqmGHRrDhEPAf1MffEyK6a/K6KIFXGcu9YTprAJ/cA9oIvE=";
 type MessageAttachment = { name: string; path: string; mime: string; size: number; kind: "image" | "video" | "audio" | "file" };
 type Project = { id: string; user_id: string; name: string; description: string; status: string };
 type CallInvite = { id: string; connection_id: string; caller_id: string; recipient_id: string; peer_id: string; media_type: "audio" | "video"; status: string; expires_at: string };
@@ -27,7 +27,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   const [requests, setRequests] = useState<RequestRow[]>([]);
   const [sentRequests, setSentRequests] = useState<RequestRow[]>([]);
   const [selected, setSelected] = useState<Connection | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);\n  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});\n  const [notificationReady, setNotificationReady] = useState(false);
   const [hiddenMessageIds, setHiddenMessageIds] = useState<string[]>([]);
   const [messageMenu, setMessageMenu] = useState<Message | null>(null);
   const [attachmentUrls, setAttachmentUrls] = useState<Record<string, string>>({});
@@ -61,6 +61,101 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   const [cameraOpen, setCameraOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  const refreshUnreadCounts = useCallback(async () => {
+    if (!supabase || !userId || !connections.length) {
+      setUnreadCounts({});
+      return;
+    }
+    const connectionIds = connections.map(item => item.id);
+    const conversations = await supabase.from("grand_lumen_team_conversations").select("id,connection_id").in("connection_id", connectionIds);
+    if (conversations.error || !conversations.data?.length) {
+      setUnreadCounts({});
+      return;
+    }
+    const conversationIds = conversations.data.map(item => item.id);
+    const [messageResult, receiptResult] = await Promise.all([
+      supabase.from("grand_lumen_team_messages").select("id,conversation_id,sender_id").in("conversation_id", conversationIds).neq("sender_id", userId).eq("deleted_for_everyone", false),
+      supabase.from("grand_lumen_team_message_reads").select("message_id").eq("user_id", userId)
+    ]);
+    if (messageResult.error || receiptResult.error) return;
+    const readIds = new Set((receiptResult.data || []).map(item => item.message_id));
+    const conversationById = new Map(conversations.data.map(item => [item.id, item.connection_id]));
+    const counts: Record<string, number> = {};
+    for (const message of messageResult.data || []) {
+      if (readIds.has(message.id)) continue;
+      const connectionId = conversationById.get(message.conversation_id);
+      if (connectionId) counts[connectionId] = (counts[connectionId] || 0) + 1;
+    }
+    setUnreadCounts(counts);
+  }, [userId, connections]);
+
+  const notifyIncomingMessage = async (message: Message) => {
+    if (message.sender_id === userId || Notification.permission !== "granted") return;
+    const senderName = profiles[message.sender_id]?.display_name || "A Team member";
+    const attachment = readAttachment(message.body);
+    const preview = attachment ? (attachment.kind === "image" ? "Sent a photo" : attachment.kind === "video" ? "Sent a video" : attachment.kind === "audio" ? "Sent an audio message" : "Sent a file: " + attachment.name) : message.body;
+    try {
+      const registration = await navigator.serviceWorker.ready;
+      await registration.showNotification(senderName, {
+        body: preview,
+        icon: new URL("icons/grand-lumen-192.png", import.meta.env.BASE_URL).href,
+        badge: new URL("icons/grand-lumen-192.png", import.meta.env.BASE_URL).href,
+        tag: "grand-lumen-message-" + message.conversation_id,
+        renotify: true,
+        data: { url: new URL("?openTeam=1", window.location.href).href }
+      });
+    } catch {}
+  };
+
+  const enableMessageNotifications = async () => {
+    if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+      setNotice("Phone notifications are not supported by this browser.");
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        setNotice("Notifications are blocked. Enable them in your phone's browser or app settings.");
+        return;
+      }
+      const registration = await navigator.serviceWorker.ready;
+      if (!registration.pushManager) {
+        setNotice("This browser does not support background push notifications.");
+        return;
+      }
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: Uint8Array.from(atob(TEAM_PUSH_PUBLIC_KEY.replace(/-/g, "+").replace(/_/g, "/")), char => char.charCodeAt(0))
+      });
+      const value = subscription.toJSON();
+      const keys = value.keys || {};
+      const saved = await supabase?.from("grand_lumen_team_push_subscriptions").upsert({
+        user_id: userId,
+        endpoint: value.endpoint,
+        p256dh: keys.p256dh,
+        auth: keys.auth,
+        updated_at: new Date().toISOString()
+      }, { onConflict: "endpoint" });
+      if (saved?.error) throw saved.error;
+      setNotificationReady(true);
+      setNotice("Phone notifications are enabled for Team messages.");
+    } catch (reason) {
+      setNotice(reason instanceof Error ? reason.message : "Could not enable phone notifications.");
+    }
+  };
+
+  const markConversationRead = async (conversationId: string, rows: Message[]) => {
+    if (!supabase) return;
+    const unread = rows.filter(message => message.sender_id !== userId && !message.deleted_for_everyone);
+    if (!unread.length) return;
+    const result = await supabase.from("grand_lumen_team_message_reads").upsert(
+      unread.map(message => ({ message_id: message.id, user_id: userId })),
+      { onConflict: "message_id,user_id", ignoreDuplicates: true }
+    );
+    if (result.error) setNotice(result.error.message);
+    else void refreshUnreadCounts();
+  };
 
   const loadTeam = useCallback(async () => {
     if (!supabase) return;
@@ -278,12 +373,12 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       if (!alive) return;
       if (result.error) { setNotice(result.error.message); return; }
       if (hiddenResult.error) { setNotice(hiddenResult.error.message); return; }
-      setMessages((result.data || []) as Message[]);
+      setMessages((result.data || []) as Message[]);\n      void markConversationRead(conversationId, (result.data || []) as Message[]);
       setHiddenMessageIds((hiddenResult.data || []).map(item => String(item.message_id)));
       channel = client.channel("grand-lumen-chat-" + conversationId)
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_team_messages", filter: "conversation_id=eq." + conversationId }, payload => {
           const message = payload.new as Message;
-          if (alive && message.conversation_id === conversationId) setMessages(current => current.some(item => item.id === message.id) ? current : [...current, message]);
+          if (alive && message.conversation_id === conversationId) { setMessages(current => current.some(item => item.id === message.id) ? current : [...current, message]); if (message.sender_id !== userId) void notifyIncomingMessage(message); }
         })
         .on("postgres_changes", { event: "UPDATE", schema: "public", table: "grand_lumen_team_messages", filter: "conversation_id=eq." + conversationId }, payload => {
           const message = payload.new as Message;
@@ -594,7 +689,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
 
   return <div className="team-workspace">
     {!selected && <>
-    <header className="team-hero"><div className="team-hero-copy"><span className="team-kicker"><i/> GRAND-LUMEN COLLABORATION</span><h2>Your people.<br/><span>Your next big idea.</span></h2><p>Bring your network together, exchange ideas, build shared projects and keep every conversation connected.</p><div className="team-hero-meta"><span><i/> Private by design</span><span><i/> Cloud-connected</span><span><i/> Built for teamwork</span></div></div><div className="team-hero-side"><div className="team-hero-orbit"><div className="team-orbit-ring team-orbit-ring-one"/><div className="team-orbit-ring team-orbit-ring-two"/><div className="team-orbit-core">GL</div><span className="team-orbit-dot team-orbit-dot-one"/><span className="team-orbit-dot team-orbit-dot-two"/><span className="team-orbit-dot team-orbit-dot-three"/></div><div className="team-account"><small>SIGNED IN AS</small><b>{email}</b><span>PERSONAL WORKSPACE REMAINS PRIVATE</span></div></div></header><section className="team-overview"><div className="team-overview-heading"><div><span className="team-kicker">YOUR NETWORK AT A GLANCE</span><h3>Team overview</h3></div><span className="team-overview-live"><i/> LIVE WORKSPACE</span></div><div className="team-stat-grid"><article className="team-stat"><span className="team-stat-icon">◎</span><div><strong>{connections.length}</strong><small>Connected members</small></div><span className="team-stat-foot">YOUR NETWORK</span></article><article className="team-stat"><span className="team-stat-icon">↗</span><div><strong>{requests.length}</strong><small>Incoming requests</small></div><span className="team-stat-foot">NEEDS REVIEW</span></article><article className="team-stat"><span className="team-stat-icon">↗</span><div><strong>{sentRequests.length}</strong><small>Sent requests</small></div><span className="team-stat-foot">AWAITING REPLY</span></article><article className="team-stat"><span className="team-stat-icon">▦</span><div><strong>{projects.length}</strong><small>Team projects</small></div><span className="team-stat-foot">SHARED WORK</span></article></div></section>
+    <header className="team-hero"><div className="team-hero-copy"><span className="team-kicker"><i/> GRAND-LUMEN COLLABORATION</span><h2>Your people.<br/><span>Your next big idea.</span></h2><p>Bring your network together, exchange ideas, build shared projects and keep every conversation connected.</p><div className="team-hero-meta"><span><i/> Private by design</span><span><i/> Cloud-connected</span><span><i/> Built for teamwork</span></div></div><div className="team-hero-side"><div className="team-hero-orbit"><div className="team-orbit-ring team-orbit-ring-one"/><div className="team-orbit-ring team-orbit-ring-two"/><div className="team-orbit-core">GL</div><span className="team-orbit-dot team-orbit-dot-one"/><span className="team-orbit-dot team-orbit-dot-two"/><span className="team-orbit-dot team-orbit-dot-three"/></div><div className="team-account"><small>SIGNED IN AS</small><b>{email}</b><span>PERSONAL WORKSPACE REMAINS PRIVATE</span></div></div></header><section className="team-overview"><div className="team-overview-heading"><div><span className="team-kicker">YOUR NETWORK AT A GLANCE</span><h3>Team overview</h3></div><button className="team-secondary team-notification-enable" onClick={() => void enableMessageNotifications()}>{notificationReady ? "Notifications enabled" : "Enable phone notifications"}</button><span className="team-overview-live"><i/> LIVE WORKSPACE</span></div><div className="team-stat-grid"><article className="team-stat"><span className="team-stat-icon">◎</span><div><strong>{connections.length}</strong><small>Connected members</small></div><span className="team-stat-foot">YOUR NETWORK</span></article><article className="team-stat"><span className="team-stat-icon">↗</span><div><strong>{requests.length}</strong><small>Incoming requests</small></div><span className="team-stat-foot">NEEDS REVIEW</span></article><article className="team-stat"><span className="team-stat-icon">↗</span><div><strong>{sentRequests.length}</strong><small>Sent requests</small></div><span className="team-stat-foot">AWAITING REPLY</span></article><article className="team-stat"><span className="team-stat-icon">▦</span><div><strong>{projects.length}</strong><small>Team projects</small></div><span className="team-stat-foot">SHARED WORK</span></article></div></section>
     {notice && <div className="team-notice" role="status">{notice}</div>}
     {incomingCall && <section className="team-incoming-call"><div><b>Incoming {incomingCall.media_type === "video" ? "video" : "voice"} call</b><small>Another connected Team member is calling you.</small></div><div className="team-actions"><button className="team-secondary" onClick={() => void declineCall()}>Decline</button><button className="team-primary" onClick={() => void acceptCall()}>Accept</button></div></section>}
     
@@ -605,10 +700,10 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     </div>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">CONNECTION REQUESTS</span><h3>Requests awaiting your approval</h3></div><span className="team-count">{requests.length}</span></div>{requests.length ? requests.map(request => <div className="team-request" key={request.id}><div><b>{profiles[request.requester_id]?.display_name || "Grand Lumen member"}</b><small>{profiles[request.requester_id]?.email || "Connection request"}</small></div><div className="team-actions"><button className="team-secondary" disabled={busy} onClick={() => void respond(request.id, false)}>Decline</button><button className="team-primary" disabled={busy} onClick={() => void respond(request.id, true)}>Accept</button></div></div>) : <p className="team-muted">No pending requests.</p>}</section>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">SENT REQUESTS</span><h3>Awaiting their response</h3></div><span className="team-count">{sentRequests.length}</span></div>{sentRequests.length ? sentRequests.map(request => <div className="team-request" key={request.id}><div><b>{profiles[request.recipient_id]?.display_name || "Grand Lumen member"}</b><small>{profiles[request.recipient_id]?.email || "Request pending"}</small></div><span className="team-muted">Pending approval</span></div>) : <p className="team-muted">You have no outgoing requests.</p>}</section>
-    <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR NETWORK</span><h3>Connected members</h3></div><span className="team-count">{connections.length}</span></div>{connections.length ? <div className="team-contacts">{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; const profile = profiles[memberId]; return <button className="team-contact" key={connection.id} onClick={() => setSelected(connection)}><span className="team-avatar">{(profile?.display_name || profile?.email || "GL").slice(0, 1).toUpperCase()}</span><span><b>{profile?.display_name || "Grand Lumen member"}</b><small>{profile?.email || "Connected account"}</small></span></button>; })}</div> : <p className="team-muted">Your connections will appear here after they approve your requests.</p>}</section>
+    <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR NETWORK</span><h3>Connected members</h3></div><span className="team-count">{connections.length}</span></div>{connections.length ? <div className="team-contacts">{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; const profile = profiles[memberId]; return <button className="team-contact" key={connection.id} onClick={() => setSelected(connection)}><span className="team-avatar">{(profile?.display_name || profile?.email || "GL").slice(0, 1).toUpperCase()}</span><span><b>{profile?.display_name || "Grand Lumen member"}</b><small>{profile?.email || "Connected account"}</small></span>{Boolean(unreadCounts[connection.id]) && <span className="team-unread-badge">{unreadCounts[connection.id]}</span>}</button>; })}</div> : <p className="team-muted">Your connections will appear here after they approve your requests.</p>}</section>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">SHARED WORK</span><h3>Team projects</h3></div><span className="team-count">{projects.length}</span></div><div className="team-project-create"><input value={projectName} onChange={event => setProjectName(event.target.value)} placeholder="Project name"/><input value={projectDescription} onChange={event => setProjectDescription(event.target.value)} placeholder="Short project description"/><button className="team-primary" onClick={() => void createProject()} disabled={!projectName.trim() || busy}>Create project</button></div>{projects.map(project => <article className="team-project-row" key={project.id}><div><b>{project.name}</b><small>{project.description || "No description"} · {project.user_id === userId ? "Owner" : "Shared with you"}</small></div>{project.user_id === userId && <div className="team-project-share">{connections.length > 0 && <><select value={projectMember} onChange={event => setProjectMember(event.target.value)}><option value="">Choose member</option><option value="__all__">All connected members</option>{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; return <option key={memberId} value={memberId}>{profiles[memberId]?.display_name || profiles[memberId]?.email || memberId.slice(0, 8)}</option>; })}</select><select value={projectRole} onChange={event => setProjectRole(event.target.value as "viewer" | "editor" | "manager")}><option value="viewer">Viewer</option><option value="editor">Editor</option><option value="manager">Manager</option></select><button className="team-secondary" onClick={() => void shareProject(project.id)} disabled={!projectMember || busy}>Share</button></>}<button className="team-danger team-project-delete" onClick={() => void deleteProject(project)} disabled={busy}>Delete</button></div>}</article>)}{!projects.length && <p className="team-muted">Create a cloud project, then share it with connected members.</p>}</section>
     </>}
-    {selected && <section className="team-card team-chat team-chat-fullscreen"><div className="team-card-heading"><div className="team-chat-title-row"><button className="team-secondary team-chat-back" onClick={() => setSelected(null)}>← Back to Team</button><div><span className="eyebrow">PRIVATE CONVERSATION</span><h3>{(() => { const memberId = selected.user_low === userId ? selected.user_high : selected.user_low; return profiles[memberId]?.display_name || "Team member"; })()}</h3></div></div><div className="team-actions"><button className="team-secondary" onClick={() => void startCall("audio")}>Voice call</button><button className="team-secondary" onClick={() => void startCall("video")}>Video call</button><button className="team-secondary" onClick={openWhatsApp}>WhatsApp</button></div></div><div className="team-message-list">{messages.filter(message => !hiddenMessageIds.includes(message.id)).map(message => {
+    {selected && <section className="team-card team-chat team-chat-fullscreen"><div className="team-card-heading"><div className="team-chat-title-row"><button className="team-secondary team-chat-back" onClick={() => setSelected(null)}>← Back to Team</button><div><span className="eyebrow">PRIVATE CONVERSATION{unreadCounts[selected.id] ? " · " + unreadCounts[selected.id] + " UNREAD" : ""}</span><h3>{(() => { const memberId = selected.user_low === userId ? selected.user_high : selected.user_low; return profiles[memberId]?.display_name || "Team member"; })()}</h3></div></div><div className="team-actions"><button className="team-secondary" onClick={() => void startCall("audio")}>Voice call</button><button className="team-secondary" onClick={() => void startCall("video")}>Video call</button><button className="team-secondary" onClick={openWhatsApp}>WhatsApp</button></div></div><div className="team-message-list">{messages.filter(message => !hiddenMessageIds.includes(message.id)).map(message => {
       const attachment = readAttachment(message.body);
       const url = attachmentUrls[message.id];
       const own = message.sender_id === userId;
