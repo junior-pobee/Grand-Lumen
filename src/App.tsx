@@ -2572,10 +2572,8 @@ function App() {
               return <button key={item.name} className={section === item.name ? "nav-item active" : "nav-item"} onClick={() => selectSection(item.name)}><span className="nav-icon-wrap" aria-hidden="true"><Icon className="nav-icon-base" size={18} strokeWidth={2.8} /><Icon className="nav-icon-edge" size={18} strokeWidth={2.8} /></span><span>{item.name}</span>{item.name === "Saved" && saved.length > 0 && <i>{saved.length}</i>}</button>;
             })}
             <div className="sidebar-clock" aria-live="off">
-              <div className="sidebar-clock-heading"><Clock size={12}/><span>LOCAL DATE &amp; TIME</span></div>
               <time className="sidebar-clock-time">{clockNow.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time>
               <div className="sidebar-clock-date">{clockNow.toLocaleDateString(undefined, { weekday: "short", year: "numeric", month: "short", day: "numeric" })}</div>
-              <div className="sidebar-clock-zone">{Intl.DateTimeFormat().resolvedOptions().timeZone || "Device local time"}</div>
             </div>
           </nav>
           <div className="sidebar-bottom"><div className="creator-chip">{(session?.user.user_metadata?.avatar_url || localProfile?.profileImage || profilePicture) ? <img className="creator-avatar" src={session?.user.user_metadata?.avatar_url || localProfile?.profileImage || profilePicture} alt="Profile"/> : <span>{(session?.user.email || localProfile?.email || "GL").slice(0,2).toUpperCase()}</span>}<div><b>{session?.user.user_metadata?.full_name || localProfile?.fullName || "Grand-Lumen member"}</b><small>{session?.user.email || localProfile?.email || "Local browser session"}</small></div></div><span className="version">FOUNDATION 1.0</span></div>
