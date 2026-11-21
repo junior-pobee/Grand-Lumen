@@ -281,8 +281,8 @@ export default function LumenSheets({ userId }: { userId: string }) {
       const active = sheet && nextSheets.find(item => item.id === sheet.id) ? sheet : nextSheets[0];
       setSheet(active);
       setCells(active ? nextCells[active.id] || {} : {});
-      const maxRow = Math.max(30, ...Object.values(nextCells[active?.id || ""] || {}).map(cell => Number(cell.cell_ref.match(/[0-9]+/)?.[0] || 1)));
-      const maxCol = Math.max(12, ...Object.values(nextCells[active?.id || ""] || {}).map(cell => columnIndex(cell.cell_ref) + 1));
+      const maxRow = Math.min(10000, Math.max(30, ...Object.values(nextCells[active?.id || ""] || {}).map(cell => Number(cell.cell_ref.match(/[0-9]+/)?.[0] || 1))));
+      const maxCol = Math.min(500, Math.max(12, ...Object.values(nextCells[active?.id || ""] || {}).map(cell => columnIndex(cell.cell_ref) + 1)));
       setRowCount(maxRow); setRowDraft(String(maxRow)); setColumnCount(maxCol); setColumnDraft(String(maxCol));
       setNotice("Imported " + imported.worksheets.length + " worksheet(s), including all populated rows and columns.");
     } catch (error) {
@@ -346,8 +346,8 @@ export default function LumenSheets({ userId }: { userId: string }) {
       }));
       setCells(next);
       persistCurrent(next);
-      const maxRow = Math.max(30, matrix.length);
-      const maxCol = Math.max(12, ...matrix.map(line => line.length));
+      const maxRow = Math.min(10000, Math.max(30, matrix.length));
+      const maxCol = Math.min(500, Math.max(12, ...matrix.map(line => line.length)));
       setRowCount(maxRow); setRowDraft(String(maxRow)); setColumnCount(maxCol); setColumnDraft(String(maxCol));
       setNotice("CSV imported successfully with " + matrix.length + " row(s).");
     } catch (error) {
