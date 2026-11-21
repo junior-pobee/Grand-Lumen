@@ -13,6 +13,7 @@ import PreviousActivityPopup from "./PreviousActivityPopup";
 import WelcomeTour from "./WelcomeTour";
 import LumenScan from "./LumenScan";
 import RecipeWorkspace from "./RecipeWorkspace";
+import { createClient } from "@supabase/supabase-js";
 import { supabase, supabaseConfigured } from "./auth";
 import { clearWorkspaceData as clearCloudWorkspaceData, startWorkspaceCloudSync } from "./workspaceSync";
 import { getCurrency, getDictionary, getHoliday, getPokemon, getWeather, researchTopic, searchArchiveVideos, searchCommonsImages, searchHackerNews, searchWikipedia, searchGlobalNews, type SearchItem, type NewsItem, connectionAwareMessage } from "./api";
@@ -2072,12 +2073,23 @@ function App() {
   const verifyActivityPassword = async (password: string): Promise<boolean> => {
     if (!password) return false;
     if (session && supabase && session.user.email) {
-      const { error: authError } = await supabase.auth.signInWithPassword({ email: session.user.email, password });
-      if (authError) {
-        if (authError.status === 0 || authError.name === "AuthRetryableFetchError" || /network|fetch failed|failed to fetch|load failed|connection|timeout/i.test(authError.message)) throw authError;
-        return false;
+      const verifier = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+          detectSessionInUrl: false
+        }
+      });
+      try {
+        const { error: authError } = await verifier.auth.signInWithPassword({ email: session.user.email, password });
+        if (authError) {
+          if (authError.status === 0 || authError.name === "AuthRetryableFetchError" || /network|fetch failed|failed to fetch|load failed|connection|timeout/i.test(authError.message)) throw authError;
+          return false;
+        }
+        return true;
+      } finally {
+        await verifier.auth.signOut();
       }
-      return true;
     }
     const email = (localProfile?.email || "").trim().toLowerCase();
     if (!email) return false;
