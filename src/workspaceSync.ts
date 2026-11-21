@@ -112,16 +112,18 @@ async function readWorkspaceSnapshot(email: string): Promise<WorkspaceSnapshot> 
   return { version: 2, data, scanRecords };
 }
 
-async function applyWorkspaceSnapshot(snapshot: WorkspaceSnapshot | { version: 1; data: Record<string, string> }): Promise<void> {
+async function applyWorkspaceSnapshot(snapshot: WorkspaceSnapshot | { version: 1; data: Record<string, string> }, preserveLocalData = false): Promise<void> {
   if (!snapshot || (snapshot.version !== 1 && snapshot.version !== 2) || !snapshot.data || typeof snapshot.data !== "object") {
     throw new Error("The cloud workspace format is not supported.");
   }
-  const existingKeys: string[] = [];
-  for (let index = 0; index < localStorage.length; index += 1) {
-    const key = localStorage.key(index);
-    if (key && isSyncableWorkspaceKey(key)) existingKeys.push(key);
+  if (!preserveLocalData || snapshot.version === 2) {
+    const existingKeys: string[] = [];
+    for (let index = 0; index < localStorage.length; index += 1) {
+      const key = localStorage.key(index);
+      if (key && isSyncableWorkspaceKey(key)) existingKeys.push(key);
+    }
+    existingKeys.forEach(key => localStorage.removeItem(key));
   }
-  existingKeys.forEach(key => localStorage.removeItem(key));
   Object.entries(snapshot.data).forEach(([key, value]) => {
     if (isSyncableWorkspaceKey(key) && typeof value === "string") localStorage.setItem(key, value);
   });
@@ -145,9 +147,13 @@ export async function startWorkspaceCloudSync(
 
   if (loadError) throw loadError;
 
+  let migrateLegacySnapshot = false;
   if (cloudRecord?.workspace_data) {
     onStatus("Restoring workspace");
-    await applyWorkspaceSnapshot(cloudRecord.workspace_data as WorkspaceSnapshot | { version: 1; data: Record<string, string> });
+    const previousOwner = localStorage.getItem("grandLumenCloudOwner");
+    const cloudSnapshot = cloudRecord.workspace_data as WorkspaceSnapshot | { version: 1; data: Record<string, string> };
+    migrateLegacySnapshot = cloudSnapshot.version === 1 && previousOwner === userId;
+    await applyWorkspaceSnapshot(cloudSnapshot, migrateLegacySnapshot);
     localStorage.setItem("grandLumenCloudOwner", userId);
     onStatus("Workspace restored · syncing changes");
   } else {
@@ -217,6 +223,8 @@ export async function startWorkspaceCloudSync(
     originalClear.call(this);
     if (isLocal) schedulePersist();
   };
+
+  if (migrateLegacySnapshot) schedulePersist();
 
   const channel = client
     .channel("grand-lumen-workspace-" + userId)
