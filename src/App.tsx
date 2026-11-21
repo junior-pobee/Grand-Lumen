@@ -2073,7 +2073,7 @@ function App() {
   const verifyActivityPassword = async (password: string): Promise<boolean> => {
     if (!password) return false;
     if (session && supabase && session.user.email) {
-      const verifier = createClient(import.meta.env.VITE_SUPABASE_URL, import.meta.env.VITE_SUPABASE_ANON_KEY, {
+      const verifier = createClient(import.meta.env.VITE_SUPABASE_URL || "", import.meta.env.VITE_SUPABASE_ANON_KEY || "", {
         auth: {
           persistSession: false,
           autoRefreshToken: false,
