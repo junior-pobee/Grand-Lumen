@@ -2212,3 +2212,76 @@ html{scroll-behavior:auto}
 .team-message-menu button{min-height:46px;padding:11px 13px;border:1px solid var(--border-color,rgba(255,255,255,.12));border-radius:11px;background:var(--card-bg,rgba(255,255,255,.045));color:var(--text,#f8fafc);font:inherit;text-align:left;font-weight:700}
 .team-message-menu button.delete-everyone{border-color:rgba(248,90,110,.32);background:rgba(190,45,65,.13);color:#ff9eae}
 .team-message-menu button.cancel{background:transparent;color:var(--muted,#94a3b8);text-align:center}
+
+
+.team-compose{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.team-compose>input:not(.team-file-input){flex:1 1 180px;min-width:0}
+.team-file-input{display:none!important}
+.team-attach-button,.team-audio-button{flex:0 0 auto;min-height:44px;padding:10px 13px;border-radius:11px;font-weight:750}
+.team-attachment{display:grid;gap:8px;min-width:0}
+.team-attachment> a,.team-attachment>a img{display:block}
+.team-attachment img{width:min(100%,360px);max-height:320px;object-fit:contain;border-radius:12px}
+.team-attachment video{display:block;width:min(100%,420px);max-height:320px;border-radius:12px;background:#000}
+.team-attachment audio{display:block;width:min(100%,360px);max-width:100%}
+.team-attachment>small{overflow-wrap:anywhere}
+.team-attachment-file{display:flex;align-items:center;gap:10px;min-width:0;padding:11px;border:1px solid var(--team-line);border-radius:12px;background:var(--surface-2,rgba(255,255,255,.04))}
+.team-attachment-file>span:first-child{display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;border-radius:10px;background:rgba(94,166,230,.16);color:var(--accent-strong,#55a6ff);font-size:9px;font-weight:900}
+.team-attachment-file>div{display:grid;gap:4px;min-width:0;flex:1}
+.team-attachment-file b{overflow-wrap:anywhere;font-size:12px}
+.team-attachment-file small{color:var(--team-muted);font-size:10px}
+.team-attachment-file a{color:var(--accent-strong,#55a6ff);font-size:10px;font-weight:800;white-space:nowrap}
+.team-chat-notice{flex:0 0 auto;max-height:75px;overflow:auto}
+.team-message.has-attachment{min-width:min(68%,260px)}
+.team-message.has-attachment>small{display:block;margin-top:8px}
+.team-chat-fullscreen .team-compose input:not(.team-file-input){min-height:46px}
+.team-chat-fullscreen .team-compose button{min-height:44px}
+@media(max-width:700px){
+  .team-compose{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:6px}
+  .team-compose>input:not(.team-file-input){grid-column:1/-1;width:100%;min-height:44px}
+  .team-compose .team-primary{grid-column:1}
+  .team-compose .team-attach-button,.team-compose .team-audio-button{grid-row:2}
+  .team-attachment-file{flex-wrap:wrap}
+  .team-attachment-file a{white-space:normal}
+}
+html[data-theme="light"] .team-workspace{
+  --team-ink:#17243a;
+  --team-muted:#5c6c83;
+  --team-line:rgba(49,75,112,.16);
+  color:#17243a;
+  border-color:rgba(72,104,150,.2);
+  background:radial-gradient(ellipse at 8% 0%,rgba(88,155,225,.15),transparent 42%),radial-gradient(ellipse at 95% 12%,rgba(154,125,218,.12),transparent 36%),linear-gradient(145deg,#f7faff,#edf3fb 52%,#f8faff);
+  box-shadow:0 22px 60px rgba(43,68,105,.1);
+}
+html[data-theme="light"] .team-workspace:before{opacity:.35;background-image:linear-gradient(rgba(60,91,132,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(60,91,132,.07) 1px,transparent 1px)}
+html[data-theme="light"] .team-workspace .eyebrow,html[data-theme="light"] .team-workspace .team-kicker{color:#286ba9}
+html[data-theme="light"] .team-hero{border-color:#cbd9eb;background:linear-gradient(115deg,rgba(224,239,255,.96),rgba(235,237,255,.94) 60%,rgba(245,235,255,.9));box-shadow:inset 0 1px #fff,0 16px 40px rgba(42,70,110,.08)}
+html[data-theme="light"] .team-hero h2,html[data-theme="light"] .team-hero-copy>p,html[data-theme="light"] .team-hero-meta span,html[data-theme="light"] .team-account b,html[data-theme="light"] .team-overview-heading h3,html[data-theme="light"] .team-stat strong,html[data-theme="light"] .team-workspace .team-card-heading h3{color:#17243a}
+html[data-theme="light"] .team-hero h2 span{color:#286ba9}
+html[data-theme="light"] .team-account small,html[data-theme="light"] .team-account span{color:#64758d}
+html[data-theme="light"] .team-overview{border-color:#d3deeb;background:linear-gradient(135deg,#fff,#f3f7fd)}
+html[data-theme="light"] .team-overview-live,html[data-theme="light"] .team-stat small,html[data-theme="light"] .team-stat-foot{color:#60728a}
+html[data-theme="light"] .team-stat{border-color:#d9e3ef;background:linear-gradient(145deg,#fff,#f3f7fd)}
+html[data-theme="light"] .team-workspace .team-card,html[data-theme="light"] .team-workspace .team-call-panel,html[data-theme="light"] .team-workspace .team-incoming-call{border-color:#d4dfec;background:linear-gradient(145deg,#fff,#f4f7fc);color:#17243a;box-shadow:0 10px 28px rgba(42,65,99,.07)}
+html[data-theme="light"] .team-workspace .team-card>p,html[data-theme="light"] .team-workspace .team-muted,html[data-theme="light"] .team-workspace .team-call-note{color:#60718a}
+html[data-theme="light"] .team-workspace .team-secondary,html[data-theme="light"] .team-workspace .team-qr button{border-color:#c8d6e7;background:#edf4fc;color:#244363}
+html[data-theme="light"] .team-workspace .team-card textarea,html[data-theme="light"] .team-workspace .team-compose input:not(.team-file-input),html[data-theme="light"] .team-workspace .team-project-create input,html[data-theme="light"] .team-workspace .team-project-share select{border-color:#c5d3e4;background:#fff;color:#17243a}
+html[data-theme="light"] .team-workspace input::placeholder,html[data-theme="light"] .team-workspace textarea::placeholder{color:#77869a}
+html[data-theme="light"] .team-workspace .team-request,html[data-theme="light"] .team-workspace .team-project-row{border-color:#d7e1ed}
+html[data-theme="light"] .team-workspace .team-contact{border-color:#d4dfec;background:#f4f8fd;color:#24364e}
+html[data-theme="light"] .team-workspace .team-contact.active{border-color:#5a9bd8;background:#e4f1ff}
+html[data-theme="light"] .team-workspace .team-contact small,html[data-theme="light"] .team-workspace .team-request small,html[data-theme="light"] .team-project-row small{color:#687991}
+html[data-theme="light"] .team-workspace .team-message-list{border-color:#d4dfec;background:#edf3fa}
+html[data-theme="light"] .team-workspace .team-message{border-color:#d4dfec;background:#fff;color:#17243a;box-shadow:0 3px 12px rgba(37,61,94,.05)}
+html[data-theme="light"] .team-workspace .team-message.own{border-color:#b7d6f3;background:linear-gradient(135deg,#e3f2ff,#eeeaff);color:#17243a}
+html[data-theme="light"] .team-workspace .team-message small{color:#65758b}
+html[data-theme="light"] .team-workspace .team-chat{background:linear-gradient(145deg,#f8fbff,#edf3fa)}
+html[data-theme="light"] .team-workspace .team-notice{border-color:#b7d8e8;background:#eaf7fc;color:#24536a}
+html[data-theme="light"] .team-message-menu{border-color:#d0dbea;background:#fff;color:#17243a}
+html[data-theme="light"] .team-message-menu>span{color:#60718a}
+html[data-theme="light"] .team-message-menu button{border-color:#d5dfeb;background:#f4f7fb;color:#24364e}
+html[data-theme="light"] .team-message-menu button.delete-everyone{border-color:#efc3ca;background:#fff0f1;color:#a92e43}
+html[data-theme="light"] .team-message-menu button.cancel{background:transparent;color:#64748b}
+html[data-theme="light"] .team-attachment-file{border-color:#d4dfec;background:#f5f8fc}
+html[data-theme="light"] .team-attachment-file small{color:#64748b}
+html[data-theme="light"] .team-attachment-file a{color:#175d9d}
+html[data-theme="light"] .team-workspace .team-empty{border-color:#d4dfec;color:#24364e}
