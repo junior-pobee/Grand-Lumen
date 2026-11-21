@@ -103,13 +103,15 @@ export async function startWorkspaceCloudSync(
   };
 
   Storage.prototype.setItem = function(key: string, value: string): void {
+    const previous = this === window.localStorage ? this.getItem(key) : null;
     originalSetItem.call(this, key, value);
-    if (this === window.localStorage && isSyncableWorkspaceKey(key)) schedulePersist();
+    if (this === window.localStorage && isSyncableWorkspaceKey(key) && previous !== value) schedulePersist();
   };
 
   Storage.prototype.removeItem = function(key: string): void {
+    const existed = this === window.localStorage && this.getItem(key) !== null;
     originalRemoveItem.call(this, key);
-    if (this === window.localStorage && isSyncableWorkspaceKey(key)) schedulePersist();
+    if (this === window.localStorage && isSyncableWorkspaceKey(key) && existed) schedulePersist();
   };
 
   const channel = client
