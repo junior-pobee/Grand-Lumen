@@ -1885,6 +1885,45 @@ function ReminderToolsWorkspace() {
   </div>;
 }
 
+function TeamMessageAlert({ userId, onOpen }: { userId: string; onOpen: () => void }) {
+  const [alert, setAlert] = useState<{ sender: string; preview: string } | null>(null);
+
+  useEffect(() => {
+    if (!supabase || !userId) return;
+    const client = supabase;
+    const channel = client.channel("grand-lumen-app-message-alerts-" + userId)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_team_messages" }, payload => {
+        const message = payload.new as { sender_id: string; conversation_id: string; body: string };
+        if (message.sender_id === userId) return;
+        void (async () => {
+          const conversation = await client.from("grand_lumen_team_conversations").select("connection_id").eq("id", message.conversation_id).maybeSingle();
+          if (!conversation.data?.connection_id) return;
+          const profile = await client.from("grand_lumen_profiles").select("display_name,email").eq("id", message.sender_id).maybeSingle();
+          let preview = message.body || "You have a new message.";
+          if (preview.startsWith("GLATTACH:")) {
+            try {
+              const attachment = JSON.parse(preview.slice(9));
+              preview = attachment.kind === "audio" ? "Sent an audio message" : "Sent " + (attachment.kind || "an attachment");
+            } catch {
+              preview = "Sent an attachment";
+            }
+          }
+          setAlert({ sender: profile.data?.display_name || profile.data?.email || "A Team member", preview: preview.slice(0, 110) });
+        })();
+      })
+      .subscribe();
+    return () => { void client.removeChannel(channel); };
+  }, [userId]);
+
+  if (!alert) return null;
+  return <div className="global-team-message-alert" role="status">
+    <span className="global-team-message-alert-icon">✉</span>
+    <span className="global-team-message-alert-copy"><b>{alert.sender}</b><small>{alert.preview}</small></span>
+    <button type="button" onClick={() => { onOpen(); setAlert(null); }}>Open Team</button>
+    <button type="button" className="global-team-message-alert-close" aria-label="Dismiss notification" onClick={() => setAlert(null)}>×</button>
+  </div>;
+}
+
 function App() {
   const contentRef = useRef<HTMLDivElement>(null);
   const [section, setSection] = useState<Section>("Home");
@@ -2575,6 +2614,7 @@ function App() {
   return (
     <>
       <GlobalReminderMonitor />
+      {session && <TeamMessageAlert userId={session.user.id} onOpen={() => setSection("Team")} />}
       <LumenScan />
       <div className={theme === "light" ? "app-shell theme-light" : "app-shell theme-dark"} style={{ "--gl-font-scale": fontScale, "--gl-interface-scale": interfaceScale, "--gl-font-family": fontFamily, "--gl-font-weight": fontWeight } as React.CSSProperties}>
         {appLanguage !== "en" && <button className="language-default-fab" onClick={resetToEnglish} aria-label="Switch back to English"><Globe2 size={15} /><span>English</span><ArrowRight size={13} /></button>}
