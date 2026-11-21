@@ -72,35 +72,3 @@ self.addEventListener("fetch", event => {
   })());
 });
 
-self.addEventListener("push", event => {
-  event.waitUntil((async () => {
-    let payload = {};
-    try { payload = event.data ? event.data.json() : {}; } catch { payload = { body: event.data ? event.data.text() : "You have a new Team message." }; }
-    const title = payload.title || "New Team message";
-    const options = {
-      body: payload.body || "You have a new message.",
-      icon: new URL("icons/grand-lumen-192.png", self.registration.scope).href,
-      badge: new URL("icons/grand-lumen-192.png", self.registration.scope).href,
-      tag: payload.tag || "grand-lumen-team-message",
-      renotify: true,
-      data: { url: payload.url || self.registration.scope + "?openTeam=1" }
-    };
-    await self.registration.showNotification(title, options);
-  })());
-});
-
-self.addEventListener("notificationclick", event => {
-  event.notification.close();
-  const target = event.notification.data && event.notification.data.url ? event.notification.data.url : self.registration.scope;
-  event.waitUntil((async () => {
-    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    for (const client of windows) {
-      if ("focus" in client) {
-        await client.focus();
-        if ("navigate" in client) await client.navigate(target);
-        return;
-      }
-    }
-    await self.clients.openWindow(target);
-  })());
-});
