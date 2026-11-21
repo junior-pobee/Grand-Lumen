@@ -51,8 +51,15 @@ async function writeScanRecord(record: ScanRecord): Promise<void> {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, "readwrite");
     transaction.objectStore(STORE_NAME).put(record);
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
+    transaction.oncomplete = () => {
+      database.close();
+      window.dispatchEvent(new CustomEvent("grand-lumen-scan-records-updated"));
+      resolve();
+    };
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error);
+    };
   });
 }
 
@@ -61,8 +68,15 @@ async function deleteScanRecord(id: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const transaction = database.transaction(STORE_NAME, "readwrite");
     transaction.objectStore(STORE_NAME).delete(id);
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
+    transaction.oncomplete = () => {
+      database.close();
+      window.dispatchEvent(new CustomEvent("grand-lumen-scan-records-updated"));
+      resolve();
+    };
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error);
+    };
   });
 }
 
