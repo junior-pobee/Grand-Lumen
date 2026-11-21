@@ -64,13 +64,19 @@ export async function startWorkspaceCloudSync(
 
   if (cloudRecord?.workspace_data) {
     applyWorkspaceSnapshot(cloudRecord.workspace_data as WorkspaceSnapshot);
+    localStorage.setItem("grandLumenCloudOwner", userId);
     onStatus("Cloud workspace restored");
   } else {
-    const initialSnapshot = readWorkspaceSnapshot();
+    const previousOwner = localStorage.getItem("grandLumenCloudOwner");
+    const initialSnapshot = previousOwner && previousOwner !== userId
+      ? { version: 1 as const, data: {} }
+      : readWorkspaceSnapshot();
+    if (previousOwner && previousOwner !== userId) applyWorkspaceSnapshot(initialSnapshot);
     const { error: createError } = await client
       .from("grand_lumen_workspaces")
       .upsert({ user_id: userId, workspace_data: initialSnapshot }, { onConflict: "user_id" });
     if (createError) throw createError;
+    localStorage.setItem("grandLumenCloudOwner", userId);
     onStatus("This device's workspace was backed up");
   }
 
