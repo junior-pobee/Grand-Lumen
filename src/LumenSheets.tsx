@@ -84,6 +84,7 @@ function evaluateFormula(source: string, cells: Record<string, Cell>, stack = ne
 }
 
 function parseCsv(source: string): string[][] {
+  const delimiter = source.split(/\r?\n/, 1)[0]?.includes("\t") ? "\t" : ",";
   const rows: string[][] = [];
   let row: string[] = [];
   let value = "";
@@ -374,8 +375,8 @@ export default function LumenSheets({ userId }: { userId: string }) {
     let active = true;
     void supabase.rpc("get_lumen_sheet_share", { share_token: token }).then(({ data, error }) => {
       if (!active) return;
-      if (error || !data?.workbook_data) { setNotice("This shared workbook link is invalid or unavailable."); return; }
-      const shared = data.workbook_data as StoredBook;
+      if (error || !data) { setNotice("This shared workbook link is invalid or unavailable."); return; }
+      const shared = data as StoredBook;
       const copy: StoredBook = { ...shared, workbook: { ...shared.workbook, id: crypto.randomUUID(), owner_id: userId, name: shared.workbook.name + " (shared copy)", updated_at: new Date().toISOString() }, sheets: shared.sheets.map((item, index) => ({ ...item, id: crypto.randomUUID(), workbook_id: "" + userId, position: index })) };
       copy.sheets = copy.sheets.map(item => ({ ...item, workbook_id: copy.workbook.id }));
       const remapped: Record<string, Record<string, Cell>> = {};
