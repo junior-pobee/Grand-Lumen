@@ -14,6 +14,7 @@ import WelcomeTour from "./WelcomeTour";
 import LumenScan from "./LumenScan";
 import RecipeWorkspace from "./RecipeWorkspace";
 import { supabase, supabaseConfigured } from "./auth";
+import { startWorkspaceCloudSync } from "./workspaceSync";
 import { getCurrency, getDictionary, getHoliday, getPokemon, getWeather, researchTopic, searchArchiveVideos, searchCommonsImages, searchHackerNews, searchWikipedia, searchGlobalNews, type SearchItem, type NewsItem, connectionAwareMessage } from "./api";
 
 function escapeCode(value: string): string {
@@ -1891,6 +1892,8 @@ function App() {
   const [verificationBusy, setVerificationBusy] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState("");
   const [authReady, setAuthReady] = useState(false);
+  const [workspaceSyncReady, setWorkspaceSyncReady] = useState(false);
+  const [workspaceSyncStatus, setWorkspaceSyncStatus] = useState("Preparing cloud workspace");
   const [guestMode, setGuestMode] = useState(false);
   const [localProfile, setLocalProfile] = useState<{ fullName: string; email: string; profileImage?: string; onboardingPending?: boolean } | null>(null);
   const [welcomeTourOpen, setWelcomeTourOpen] = useState(false);
@@ -2239,6 +2242,52 @@ function App() {
   }, []);
 
   useEffect(() => {
+    if (!authReady) return;
+    if (!session || !supabase) {
+      setWorkspaceSyncReady(true);
+      setWorkspaceSyncStatus("Local workspace");
+      return;
+    }
+    let active = true;
+    let stopSync: (() => void) | undefined;
+    setWorkspaceSyncReady(false);
+    setWorkspaceSyncStatus("Connecting cloud");
+    startWorkspaceCloudSync(supabase, session.user.id, setWorkspaceSyncStatus).then(stop => {
+      if (!active) {
+        stop();
+        return;
+      }
+      stopSync = stop;
+      setSaved(readWorkspaceData("grandLumenSaved", []));
+      setProjects(readWorkspaceData("grandLumenProjects", []));
+      setResearchNotes(localStorage.getItem("grandLumenResearchNotes") || "");
+      setFrequentSections(readWorkspaceData("grandLumenFrequentSections", []));
+      setWorkspaceSyncReady(true);
+    }).catch(reason => {
+      if (!active) return;
+      setWorkspaceSyncStatus(reason instanceof Error ? "Sync setup needed" : "Cloud sync unavailable");
+      setWorkspaceSyncReady(true);
+      setError(reason instanceof Error ? reason.message : "Cloud workspace could not be loaded. Your local data is still available.");
+    });
+    return () => {
+      active = false;
+      stopSync?.();
+    };
+  }, [authReady, session?.user.id]);
+
+  useEffect(() => {
+    const refreshWorkspace = () => {
+      setSaved(readWorkspaceData("grandLumenSaved", []));
+      setProjects(readWorkspaceData("grandLumenProjects", []));
+      setResearchNotes(localStorage.getItem("grandLumenResearchNotes") || "");
+      setFrequentSections(readWorkspaceData("grandLumenFrequentSections", []));
+      setActivityEntries(readWorkspaceData(activityStorageKey, []));
+    };
+    window.addEventListener("grand-lumen-workspace-restored", refreshWorkspace);
+    return () => window.removeEventListener("grand-lumen-workspace-restored", refreshWorkspace);
+  }, [activityStorageKey]);
+
+  useEffect(() => {
     localStorage.setItem("grandLumenSaved", JSON.stringify(saved));
   }, [saved]);
   useEffect(() => {
@@ -2498,7 +2547,7 @@ function App() {
     Settings: "Shape your workspace."
   };
 
-  if (!authReady) return <div className="auth-boot"><div className="portal-brand-mark"><img src={`${import.meta.env.BASE_URL}icons/grand-lumen-icon.svg`} alt="Grand-Lumen" /></div><span>SECURING YOUR WORKSPACE DATA</span></div>;
+  if (!authReady || (Boolean(session) && !workspaceSyncReady)) return <div className="auth-boot"><div className="portal-brand-mark"><img src={`${import.meta.env.BASE_URL}icons/grand-lumen-icon.svg`} alt="Grand-Lumen" /></div><span>SECURING YOUR WORKSPACE DATA</span></div>;
   if (!session && !guestMode) return <PublicPortal onGuest={(profile) => { if (profile) { setLocalProfile(profile); setWelcomeTourOpen(profile.onboardingPending === true); } setGuestMode(true); }} />;
 
   return (
@@ -2528,7 +2577,7 @@ function App() {
           <header className="topbar">
             <button className="icon-button mobile-only" onClick={() => setMobileMenu(!mobileMenu)} aria-label="Toggle navigation"><Menu size={19} /></button>
             <div className="breadcrumb"><span>GRAND-LUMEN</span><ArrowRight size={13} /><b>{section.toUpperCase()}</b></div>
-            <div className="top-actions"><span className="system-status"><i /> SYSTEM READY</span><div className="desktop-alert-center"><AlertCenter /></div><span className="signed-in-email">{session?.user.email || localProfile?.email || "LOCAL WORKSPACE"}</span><button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => void handleLogout()} aria-label="Sign out"><LogOut size={16} /></button></div>
+            <div className="top-actions"><span className="system-status"><i /> {session ? workspaceSyncStatus.toUpperCase() : "SYSTEM READY"}</span><div className="desktop-alert-center"><AlertCenter /></div><span className="signed-in-email">{session?.user.email || localProfile?.email || "LOCAL WORKSPACE"}</span><button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => void handleLogout()} aria-label="Sign out"><LogOut size={16} /></button></div>
           </header>
           <div className="content-wrap" ref={contentRef}>
             {section === "Lumen Hub" && <section><PageTitle eyebrow="GLOBAL DIGITAL UTILITY PLATFORM" title={heading["Lumen Hub"]} description="Connected knowledge, everyday utilities, productivity, learning and accessibility tools. AI is intentionally excluded from this release."/><ExpansionHub language={appLanguage} userId={session?.user.id || ""} onOpenScanner={() => selectSection("Scanner")}/></section>}
