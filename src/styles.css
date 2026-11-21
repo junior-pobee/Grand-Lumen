@@ -2179,3 +2179,20 @@ html{scroll-behavior:auto}
 .team-workspace .team-chat{background:linear-gradient(145deg,rgba(18,35,65,.98),rgba(12,24,47,.98))}
 @media(max-width:760px){.team-workspace{padding:10px;border-radius:19px}.team-hero{grid-template-columns:1fr;min-height:0;padding:23px}.team-hero-side{grid-row:1;grid-template-columns:100px 1fr;justify-items:start;align-items:center}.team-hero-orbit{width:96px;height:88px;transform:scale(.58);transform-origin:left center;margin-right:-62px}.team-account{text-align:left}.team-hero h2{font-size:clamp(32px,9vw,45px)}.team-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.team-workspace .team-card{padding:15px}.team-overview{padding:15px}.team-grid{grid-template-columns:1fr}.team-request{align-items:flex-start;flex-direction:column}.team-compose{align-items:stretch}.team-compose input{min-width:0}.team-overview-live{font-size:7px}}
 @media(max-width:390px){.team-stat{padding:11px;gap:8px}.team-stat-icon{width:32px;height:32px}.team-stat strong{font-size:21px}.team-stat small{font-size:9px}.team-hero-meta{gap:9px}.team-hero-meta span{font-size:9px}}
+
+.team-chat-fullscreen{position:fixed;inset:0;z-index:9000;display:flex;flex-direction:column;gap:16px;width:100%;height:100vh;height:100dvh;max-height:100dvh;min-height:0;margin:0;padding:clamp(14px,3vw,30px);overflow:hidden;border:0;border-radius:0;background:var(--bg);box-shadow:none;animation:team-chat-enter .22s ease-out}
+.team-chat-fullscreen .team-card-heading{flex:0 0 auto;align-items:center;margin:0;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.team-chat-title-row{display:flex;align-items:center;gap:14px;min-width:0}
+.team-chat-title-row>div{min-width:0}
+.team-chat-back{flex:0 0 auto;white-space:nowrap}
+.team-chat-fullscreen .team-actions{justify-content:flex-end;margin:0}
+.team-chat-fullscreen .team-message-list{flex:1 1 auto;width:100%;max-height:none;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding:clamp(12px,2vw,22px);gap:12px}
+.team-chat-fullscreen .team-message{max-width:min(78%,680px);padding:11px 15px;border-radius:16px}
+.team-chat-fullscreen .team-message p{font-size:14px}
+.team-chat-fullscreen .team-message small{font-size:10px}
+.team-chat-fullscreen .team-compose{flex:0 0 auto;width:100%;padding-top:4px}
+.team-chat-fullscreen .team-compose input{min-height:48px;font-size:14px}
+.team-chat-fullscreen .team-compose button{min-width:88px;min-height:48px}
+.team-chat-fullscreen .team-call-note{flex:0 0 auto}
+@keyframes team-chat-enter{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:700px){.team-chat-fullscreen{gap:10px;padding:12px}.team-chat-fullscreen .team-card-heading{align-items:flex-start;flex-direction:column;gap:10px}.team-chat-title-row{width:100%;gap:10px}.team-chat-title-row h3{font-size:15px}.team-chat-fullscreen .team-actions{width:100%;justify-content:flex-start;gap:6px}.team-chat-fullscreen .team-actions button{min-height:34px;padding:7px 9px;font-size:10px}.team-chat-fullscreen .team-message{max-width:88%}.team-chat-fullscreen .team-message p{font-size:13px}.team-chat-fullscreen .team-compose{gap:6px}.team-chat-fullscreen .team-compose input{min-width:0}.team-chat-fullscreen .team-call-note{font-size:9px}}
