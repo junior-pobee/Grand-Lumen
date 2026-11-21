@@ -189,10 +189,14 @@ export async function startWorkspaceCloudSync(
 
   let migrateLegacySnapshot = false;
   let scanRecordsCache: ScanRecord[] = [];
+  let lastRemoteData: Record<string, string> = {};
+  let lastRemoteScans: ScanRecord[] = [];
   if (cloudRecord?.workspace_data) {
     onStatus("Restoring workspace");
     const previousOwner = localStorage.getItem("grandLumenCloudOwner");
     const cloudSnapshot = cloudRecord.workspace_data as WorkspaceSnapshot | { version: 1; data: Record<string, string> };
+    lastRemoteData = { ...cloudSnapshot.data };
+    lastRemoteScans = cloudSnapshot.version === 2 && Array.isArray(cloudSnapshot.scanRecords) ? cloudSnapshot.scanRecords : [];
     migrateLegacySnapshot = cloudSnapshot.version === 1 && previousOwner === userId;
     await applyWorkspaceSnapshot(cloudSnapshot, migrateLegacySnapshot);
     scanRecordsCache = cloudSnapshot.version === 2
@@ -207,6 +211,8 @@ export async function startWorkspaceCloudSync(
       ? { version: 2 as const, data: {}, scanRecords: [] as ScanRecord[] }
       : await readWorkspaceSnapshot(email);
     scanRecordsCache = initialSnapshot.scanRecords;
+    lastRemoteData = { ...initialSnapshot.data };
+    lastRemoteScans = [...initialSnapshot.scanRecords];
     if (previousOwner && previousOwner !== userId) await applyWorkspaceSnapshot(initialSnapshot);
     const { error: createError } = await client
       .from("grand_lumen_workspaces")
@@ -240,6 +246,8 @@ export async function startWorkspaceCloudSync(
         .from("grand_lumen_workspaces")
         .upsert({ user_id: userId, workspace_data: snapshot }, { onConflict: "user_id" });
       if (error) throw error;
+      lastRemoteData = { ...snapshot.data };
+      lastRemoteScans = [...snapshot.scanRecords];
       versionsAtStart.forEach((version, key) => {
         if (keyVersions.get(key) === version) dirtyKeys.delete(key);
       });
@@ -310,23 +318,37 @@ export async function startWorkspaceCloudSync(
       const changedRecord = payload.new as { workspace_data?: WorkspaceSnapshot | { version: 1; data: Record<string, string> } } | null;
       if (disposed || !changedRecord?.workspace_data) return;
       const remoteSnapshot = changedRecord.workspace_data;
-      const localDirtyValues = new Map<string, string | null>();
-      dirtyKeys.forEach(key => localDirtyValues.set(key, localStorage.getItem(key)));
-      const preserveLocalScans = scanRecordsDirty;
+      const incomingData = remoteSnapshot.data || {};
+      const changedKeys = new Set([
+        ...Object.keys(lastRemoteData),
+        ...Object.keys(incomingData)
+      ]);
+      const keysToApply = Array.from(changedKeys).filter(key => lastRemoteData[key] !== incomingData[key]);
+      const incomingScans = remoteSnapshot.version === 2 && Array.isArray(remoteSnapshot.scanRecords) ? remoteSnapshot.scanRecords : [];
+      const scansChanged = JSON.stringify(lastRemoteScans) !== JSON.stringify(incomingScans);
+      const hasApplicableChanges = keysToApply.some(key => !dirtyKeys.has(key)) || (scansChanged && !scanRecordsDirty);
+      lastRemoteData = { ...incomingData };
+      lastRemoteScans = [...incomingScans];
+      if (!hasApplicableChanges) return;
       applyingRemote = true;
-      void applyWorkspaceSnapshot(remoteSnapshot)
-        .then(async () => {
-          localDirtyValues.forEach((value, key) => {
-            if (value === null) originalRemoveItem.call(localStorage, key);
-            else originalSetItem.call(localStorage, key, value);
-          });
-          if (!preserveLocalScans) {
-            scanRecordsCache = remoteSnapshot.version === 2 && Array.isArray(remoteSnapshot.scanRecords) ? remoteSnapshot.scanRecords : [];
-          } else {
-            await replaceScanRecords(scanRecordsCache);
+      void (async () => {
+        keysToApply.forEach(key => {
+          if (dirtyKeys.has(key)) return;
+          if (Object.prototype.hasOwnProperty.call(incomingData, key) && isSyncableWorkspaceKey(key)) {
+            originalSetItem.call(localStorage, key, incomingData[key]);
+          } else if (isSyncableWorkspaceKey(key)) {
+            originalRemoveItem.call(localStorage, key);
           }
-          onStatus(dirtyKeys.size || scanRecordsDirty ? "Merging changes across devices" : "Workspace updated from another device");
-        })
+        });
+        if (scansChanged && !scanRecordsDirty) {
+          scanRecordsCache = incomingScans;
+          await replaceScanRecords(incomingScans);
+        }
+        window.dispatchEvent(new CustomEvent("grand-lumen-workspace-restored"));
+        window.dispatchEvent(new Event("storage"));
+        window.dispatchEvent(new CustomEvent("lumen-reminders-updated"));
+        onStatus(dirtyKeys.size || scanRecordsDirty ? "Merging changes across devices" : "Workspace updated from another device");
+      })()
         .catch(error => onStatus(error instanceof Error ? error.message : "A cloud update could not be applied"))
         .finally(() => {
           applyingRemote = false;
