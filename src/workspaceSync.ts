@@ -256,14 +256,17 @@ export async function startWorkspaceCloudSync(
     }
   };
 
+  const handleScanRecordsUpdated = () => schedulePersist();
   window.addEventListener("pagehide", flush);
   window.addEventListener("online", persist);
+  window.addEventListener("grand-lumen-scan-records-updated", handleScanRecordsUpdated);
 
   return () => {
     disposed = true;
     if (saveTimer !== undefined) window.clearTimeout(saveTimer);
     window.removeEventListener("pagehide", flush);
     window.removeEventListener("online", persist);
+    window.removeEventListener("grand-lumen-scan-records-updated", handleScanRecordsUpdated);
     Storage.prototype.setItem = originalSetItem;
     Storage.prototype.removeItem = originalRemoveItem;
     Storage.prototype.clear = originalClear;
