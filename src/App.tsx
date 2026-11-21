@@ -2075,7 +2075,7 @@ function App() {
       const authUrl = import.meta.env.VITE_SUPABASE_URL;
       const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       if (!authUrl || !anonKey) throw new Error("Account password verification is not configured. Refresh the app and try again.");
-      const response = await fetch(authUrl.replace(/\\/$/, "") + "/auth/v1/token?grant_type=password", {
+      const response = await fetch(authUrl.replace(/\/$/, "") + "/auth/v1/token?grant_type=password", {
         method: "POST",
         headers: {
           apikey: anonKey,
