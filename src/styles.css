@@ -2287,3 +2287,14 @@ html[data-theme="light"] .team-attachment-file a{color:#175d9d}
 html[data-theme="light"] .team-workspace .team-empty{border-color:#d4dfec;color:#24364e}
 
 .team-unread-badge{display:grid!important;place-items:center;min-width:22px;height:22px;margin-left:auto;padding:0 6px;border-radius:999px;background:#d92d50;color:#fff;font-size:10px;font-weight:850;line-height:1;flex:0 0 auto}.team-notification-enable{white-space:nowrap}.team-overview-heading{flex-wrap:wrap}
+
+
+.team-message-alert{position:sticky;top:10px;z-index:40;display:flex;align-items:center;gap:12px;width:min(100%,560px);margin:0 auto 14px;padding:13px 15px;border:1px solid color-mix(in srgb,var(--accent) 42%,var(--line));border-radius:14px;background:var(--surface-strong);color:var(--text);box-shadow:0 14px 36px rgba(0,0,0,.18);text-align:left;cursor:pointer}
+.team-message-alert-icon{display:grid;place-items:center;width:38px;height:38px;flex:0 0 38px;border-radius:12px;background:color-mix(in srgb,var(--accent) 15%,var(--surface));color:var(--accent);font-size:19px}
+.team-message-alert>span:nth-child(2){display:grid;gap:4px;min-width:0;flex:1}
+.team-message-alert b{font-size:12px}
+.team-message-alert small{overflow:hidden;color:var(--muted);font-size:11px;text-overflow:ellipsis;white-space:nowrap}
+.team-message-alert strong{color:var(--accent);font-size:11px}
+.team-message-alert-close{padding:2px 5px;color:var(--muted);font-size:20px;line-height:1}
+.team-total-unread{display:inline-flex;align-items:center;justify-content:center;padding:8px 12px;border:1px solid rgba(169,196,220,.25);border-radius:999px;background:rgba(255,255,255,.08);color:#d9eaff;font-size:10px;font-weight:800;white-space:nowrap}
+@media(max-width:640px){.team-message-alert{top:6px;width:100%;padding:11px}.team-total-unread{font-size:9px}.team-overview-heading{align-items:flex-start}}
