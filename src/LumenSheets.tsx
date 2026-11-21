@@ -138,6 +138,9 @@ export default function LumenSheets({ userId }: { userId: string }) {
   const columns = useMemo(() => Array.from({ length: columnCount }, (_, index) => columnName(index)), [columnCount]);
   const firstVisibleRow = Math.max(1, Math.floor(scrollTop / 32) + 1);
   const visibleRowCount = 70;
+  const firstVisibleColumn = Math.max(0, Math.floor(scrollLeft / 120));
+  const visibleColumnCount = 40;
+  const visibleColumns = columns.slice(firstVisibleColumn, Math.min(columnCount, firstVisibleColumn + visibleColumnCount));
   const visibleRows = Math.min(rowCount, firstVisibleRow + visibleRowCount - 1);
   const rows = useMemo(() => Array.from({ length: Math.max(0, visibleRows - firstVisibleRow + 1) }, (_, index) => firstVisibleRow + index), [firstVisibleRow, visibleRows]);
 
