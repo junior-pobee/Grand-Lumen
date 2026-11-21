@@ -82,8 +82,14 @@ export default function ActivityDigest({ entries, storageKey, onEntriesChange, v
     return lines.join("\n");
   }, [filteredEntries, range]);
   const persistSaved = (next: SavedDigest[]) => {
-    setSavedDigests(next);
     localStorage.setItem(storageKey + "_saved", JSON.stringify(next));
+    setSavedDigests(next);
+  };
+  const persistEntries = (next: ActivityEntry[]) => {
+    localStorage.setItem(storageKey, JSON.stringify(next));
+    const saved = localStorage.getItem(storageKey);
+    if (!saved || JSON.stringify(JSON.parse(saved)) !== JSON.stringify(next)) throw new Error("The activity records could not be confirmed as saved.");
+    onEntriesChange(next);
   };
   const requestDelete = (target: { kind: "entry" | "saved" | "all"; id?: string }) => {
     setDeleteTarget(target);
@@ -103,12 +109,21 @@ export default function ActivityDigest({ entries, storageKey, onEntriesChange, v
         setDeleteError("Password verification failed. Nothing was deleted.");
         return;
       }
-      if (deleteTarget.kind === "all") {
-        onEntriesChange([]);
-      } else if (deleteTarget.kind === "entry") {
-        onEntriesChange(entries.filter(entry => entry.id !== deleteTarget.id));
-      } else {
-        persistSaved(savedDigests.filter(item => item.id !== deleteTarget.id));
+      try {
+        if (deleteTarget.kind === "all") {
+          persistEntries([]);
+        } else if (deleteTarget.kind === "entry") {
+          const nextEntries = entries.filter(entry => entry.id !== deleteTarget.id);
+          if (nextEntries.length === entries.length) throw new Error("This activity record is no longer available. Refresh the page and try again.");
+          persistEntries(nextEntries);
+        } else {
+          const nextSaved = savedDigests.filter(item => item.id !== deleteTarget.id);
+          if (nextSaved.length === savedDigests.length) throw new Error("This saved summary is no longer available. Refresh the page and try again.");
+          persistSaved(nextSaved);
+        }
+      } catch (error) {
+        setDeleteError(error instanceof Error ? error.message : "The selected record could not be deleted. Nothing was changed.");
+        return;
       }
       setNotice(deleteTarget.kind === "all" ? "All activity records cleared." : "The selected record was deleted.");
       setDeleteTarget(null);
@@ -178,14 +193,14 @@ export default function ActivityDigest({ entries, storageKey, onEntriesChange, v
       {notice && <p className="activity-digest-notice" role="status">{notice}</p>}
     </div>
     <div className="activity-digest-panel">
-      <div className="activity-digest-heading"><div><span className="eyebrow">RECENT WORKSPACE EVENTS</span><h3>Activity timeline</h3></div><div className="activity-digest-heading-actions"><span className="activity-digest-count">{filteredEntries.length} events</span><button className="activity-digest-delete-all" onClick={() => requestDelete({ kind: "all" })} disabled={!entries.length}><Trash2 size={14}/> Clear all</button></div></div>
-      {filteredEntries.length ? <div className="activity-digest-timeline">{filteredEntries.slice(0, 100).map(entry => <article key={entry.id}><span className="activity-digest-dot"/><div><b>{entry.action}</b><small>{entry.section} · {new Date(entry.timestamp).toLocaleString()}</small></div><button className="activity-digest-record-delete" aria-label="Delete activity record" title="Delete activity record" onClick={() => requestDelete({ kind: "entry", id: entry.id })}><Trash2 size={14}/></button></article>)}</div> : <div className="activity-digest-empty">Your activities will appear here as you use Grand Lumen.</div>}
+      <div className="activity-digest-heading"><div><span className="eyebrow">RECENT WORKSPACE EVENTS</span><h3>Activity timeline</h3></div><div className="activity-digest-heading-actions"><span className="activity-digest-count">{filteredEntries.length} events</span><button type="button" className="activity-digest-delete-all" onClick={() => requestDelete({ kind: "all" })} disabled={!entries.length}><Trash2 size={14}/> Clear all</button></div></div>
+      {filteredEntries.length ? <div className="activity-digest-timeline">{filteredEntries.slice(0, 100).map(entry => <article key={entry.id}><span className="activity-digest-dot"/><div><b>{entry.action}</b><small>{entry.section} · {new Date(entry.timestamp).toLocaleString()}</small></div><button type="button" className="activity-digest-record-delete" aria-label="Delete activity record" title="Delete activity record" onClick={() => requestDelete({ kind: "entry", id: entry.id })}><Trash2 size={14}/></button></article>)}</div> : <div className="activity-digest-empty">Your activities will appear here as you use Grand Lumen.</div>}
     </div>
     <div className="activity-digest-panel">
       <div className="activity-digest-heading"><div><span className="eyebrow">YOUR ARCHIVE</span><h3>Saved summaries</h3></div><FileText size={20}/></div>
-      {savedDigests.length ? <div className="activity-digest-saved">{savedDigests.map(item => <article key={item.id}><div><b>{item.title}</b><small>{new Date(item.createdAt).toLocaleString()}</small></div><div className="activity-digest-saved-actions"><button aria-label="Copy saved summary" onClick={() => void copyText(item.content)}><Copy size={14}/></button><button aria-label="Download saved summary" onClick={() => downloadText("grand-lumen-saved-summary.txt", item.content)}><Download size={14}/></button><button aria-label="Delete saved summary" title="Delete saved summary" onClick={() => requestDelete({ kind: "saved", id: item.id })}><Trash2 size={14}/></button></div></article>)}</div> : <div className="activity-digest-empty">Summaries you save will be kept here on this device.</div>}
+      {savedDigests.length ? <div className="activity-digest-saved">{savedDigests.map(item => <article key={item.id}><div><b>{item.title}</b><small>{new Date(item.createdAt).toLocaleString()}</small></div><div className="activity-digest-saved-actions"><button aria-label="Copy saved summary" onClick={() => void copyText(item.content)}><Copy size={14}/></button><button aria-label="Download saved summary" onClick={() => downloadText("grand-lumen-saved-summary.txt", item.content)}><Download size={14}/></button><button type="button" aria-label="Delete saved summary" title="Delete saved summary" onClick={() => requestDelete({ kind: "saved", id: item.id })}><Trash2 size={14}/></button></div></article>)}</div> : <div className="activity-digest-empty">Summaries you save will be kept here on this device.</div>}
     </div>
-    {deleteTarget && <div className="activity-digest-security-backdrop" role="presentation"><section className="activity-digest-security-dialog" role="dialog" aria-modal="true" aria-labelledby="activity-digest-security-title"><span className="eyebrow">OWNER CONSENT REQUIRED</span><h3 id="activity-digest-security-title">{deleteTarget.kind === "all" ? "Clear all activity records?" : deleteTarget.kind === "entry" ? "Delete this activity record?" : "Delete this saved summary?"}</h3><p>{deleteTarget.kind === "all" ? "This permanently removes all recorded activity from this browser for the current account. Saved summaries will remain." : "This action permanently removes the selected item from this browser."} Verify your account password to confirm that you authorize this change.</p><label htmlFor="activity-digest-delete-password">Account password</label><input id="activity-digest-delete-password" type="password" autoComplete="current-password" value={deletePassword} onChange={event => setDeletePassword(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void confirmDelete(); }} placeholder="Enter your password"/>{deleteError && <p className="activity-digest-security-error" role="alert">{deleteError}</p>}<div className="activity-digest-security-actions"><button className="quiet-button" onClick={() => setDeleteTarget(null)} disabled={deleteBusy}>Cancel</button><button className="solid-button" onClick={() => void confirmDelete()} disabled={deleteBusy || !deletePassword}>{deleteBusy ? "Verifying…" : "Verify & delete"}</button></div></section></div>}
+    {deleteTarget && <div className="activity-digest-security-backdrop" role="presentation"><section className="activity-digest-security-dialog" role="dialog" aria-modal="true" aria-labelledby="activity-digest-security-title"><span className="eyebrow">OWNER CONSENT REQUIRED</span><h3 id="activity-digest-security-title">{deleteTarget.kind === "all" ? "Clear all activity records?" : deleteTarget.kind === "entry" ? "Delete this activity record?" : "Delete this saved summary?"}</h3><p>{deleteTarget.kind === "all" ? "This permanently removes all recorded activity from this browser for the current account. Saved summaries will remain." : "This action permanently removes the selected item from this browser."} Verify your account password to confirm that you authorize this change.</p><label htmlFor="activity-digest-delete-password">Account password</label><input id="activity-digest-delete-password" type="password" autoComplete="current-password" value={deletePassword} onChange={event => setDeletePassword(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void confirmDelete(); }} placeholder="Enter your password"/>{deleteError && <p className="activity-digest-security-error" role="alert">{deleteError}</p>}<div className="activity-digest-security-actions"><button type="button" className="quiet-button" onClick={() => setDeleteTarget(null)} disabled={deleteBusy}>Cancel</button><button type="button" className="solid-button" onClick={() => void confirmDelete()} disabled={deleteBusy || !deletePassword}>{deleteBusy ? "Verifying…" : "Verify & delete"}</button></div></section></div>}
     <p className="activity-digest-privacy"><Check size={14}/> Activity records and saved summaries are stored locally in this browser. They are not uploaded to Grand Lumen's servers. Destructive actions require account-password verification.</p>
   </div>;
 }
