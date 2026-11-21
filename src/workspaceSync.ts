@@ -132,7 +132,7 @@ export async function startWorkspaceCloudSync(
       applyingRemote = true;
       try {
         applyWorkspaceSnapshot(payload.new.workspace_data as WorkspaceSnapshot);
-        window.dispatchEvent(new StorageEvent("storage", { key: null, storageArea: localStorage }));
+        window.dispatchEvent(new Event("storage"));
         onStatus("Workspace updated from another device");
       } catch (error) {
         onStatus(error instanceof Error ? error.message : "A cloud update could not be applied");
