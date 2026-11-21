@@ -2076,3 +2076,42 @@ html.grand-lumen-workspace-ready body{position:fixed;inset:0}
 .sheets-workspace-expanded .sheets-grid-wrap{height:calc(100dvh - 330px);max-height:none;min-height:260px}
 .sheets-workspace-expanded .sheets-editor{min-height:0}
 @media(max-width:760px){.sheets-grid-wrap{height:58vh;min-height:280px}.sheets-share-link{align-items:stretch;flex-direction:column}.sheets-workspace-expanded .sheets-grid-wrap{height:calc(100dvh - 390px);min-height:220px}}
+
+
+.sidebar{display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;min-height:0;height:100vh;height:100dvh;padding-top:clamp(14px,2.8vh,27px);padding-bottom:max(12px,env(safe-area-inset-bottom))}
+.sidebar .brand{min-width:0;padding-bottom:clamp(14px,3vh,34px)}
+.sidebar .brand>div{min-width:0}
+.sidebar .brand strong,.sidebar .brand small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar .workspace-label{min-height:28px}
+.sidebar .side-nav{min-height:0;height:100%;max-height:100%;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
+.sidebar .nav-item{flex:0 0 auto;min-height:42px}
+.sidebar .sidebar-clock{flex:0 0 auto}
+.sidebar .sidebar-bottom{min-width:0;min-height:0;margin-top:0;padding-top:7px;background:inherit}
+.sidebar .creator-chip{min-width:0;padding:9px 5px 7px}
+.sidebar .creator-chip>div{min-width:0;flex:1;overflow:hidden}
+.sidebar .creator-chip b,.sidebar .creator-chip small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sidebar .creator-avatar{width:32px;height:32px;flex:0 0 32px;object-fit:cover;border-radius:50%}
+.sidebar .version{display:block;padding:0 5px 2px}
+.auth-boot{gap:18px}
+.auth-boot .portal-brand-mark{animation:auth-mark-breathe 1.8s ease-in-out infinite;will-change:transform,filter}
+.auth-boot>span{max-width:min(90vw,420px);line-height:1.7;animation:auth-status-pulse 1.8s ease-in-out infinite}
+.auth-boot-progress{width:min(210px,58vw);height:3px;overflow:hidden;border-radius:99px;background:rgba(157,185,219,.16)}
+.auth-boot-progress i{display:block;width:42%;height:100%;border-radius:inherit;background:linear-gradient(90deg,transparent,#9acbff,transparent);animation:auth-progress-sweep 1.35s ease-in-out infinite;will-change:transform}
+@keyframes auth-mark-breathe{0%,100%{transform:scale(1);filter:drop-shadow(0 0 4px rgba(115,174,255,.2))}50%{transform:scale(1.045);filter:drop-shadow(0 0 15px rgba(115,174,255,.55))}}
+@keyframes auth-status-pulse{0%,100%{opacity:.68}50%{opacity:1}}
+@keyframes auth-progress-sweep{0%{transform:translateX(-120%)}100%{transform:translateX(260%)}}
+.content-wrap,.side-nav,.main-area,.tool-workspace,.results-list,.media-grid,.api-grid,.project-grid,.learning-grid,.research-grid{scroll-behavior:auto!important}
+html{scroll-behavior:auto}
+@media(max-height:760px) and (min-width:761px){
+  .sidebar{padding-top:12px;padding-bottom:10px}
+  .sidebar .brand{padding-bottom:12px}
+  .sidebar .nav-item{min-height:36px;padding-top:8px;padding-bottom:8px}
+  .sidebar .sidebar-clock{margin-top:5px;margin-bottom:6px;padding-top:4px}
+  .sidebar .sidebar-clock-time{font-size:15px}
+  .sidebar .sidebar-clock-date{font-size:9px}
+  .sidebar .sidebar-clock-zone{display:none}
+  .sidebar .creator-chip{padding-top:6px;padding-bottom:5px}
+}
+@media(prefers-reduced-motion:reduce){
+  .auth-boot .portal-brand-mark,.auth-boot>span,.auth-boot-progress i{animation:none!important}
+}
