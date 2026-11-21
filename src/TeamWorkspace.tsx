@@ -23,7 +23,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   const [messages, setMessages] = useState<Message[]>([]);
   const [hiddenMessageIds, setHiddenMessageIds] = useState<string[]>([]);
   const [messageMenu, setMessageMenu] = useState<Message | null>(null);
-  const messagePressTimer = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const messagePressTimer = useRef<number | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectName, setProjectName] = useState("");
   const [projectDescription, setProjectDescription] = useState("");
