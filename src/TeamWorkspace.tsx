@@ -94,24 +94,6 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     setUnreadCounts(counts);
   }, [userId, connections]);
 
-  const notifyIncomingMessage = async (message: Message) => {
-    if (message.sender_id === userId || Notification.permission !== "granted") return;
-    const senderName = profiles[message.sender_id]?.display_name || "A Team member";
-    const attachment = readAttachment(message.body);
-    const preview = attachment ? (attachment.kind === "image" ? "Sent a photo" : attachment.kind === "video" ? "Sent a video" : attachment.kind === "audio" ? "Sent an audio message" : "Sent a file: " + attachment.name) : message.body;
-    try {
-      const registration = await navigator.serviceWorker.ready;
-      await registration.showNotification(senderName, {
-        body: preview,
-        icon: new URL("icons/grand-lumen-192.png", import.meta.env.BASE_URL).href,
-        badge: new URL("icons/grand-lumen-192.png", import.meta.env.BASE_URL).href,
-        tag: "grand-lumen-message-" + message.conversation_id,
-        renotify: true,
-        data: { url: new URL("?openTeam=1", window.location.href).href }
-      });
-    } catch {}
-  };
-
   const enableMessageNotifications = async () => {
     if (!("Notification" in window) || !("serviceWorker" in navigator)) {
       setNotice("Phone notifications are not supported by this browser.");
