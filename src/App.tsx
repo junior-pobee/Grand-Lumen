@@ -1916,11 +1916,13 @@ function TeamMessageAlert({ userId, onOpen }: { userId: string; onOpen: () => vo
   }, [userId]);
 
   if (!alert) return null;
-  return <div className="global-team-message-alert" role="status">
-    <span className="global-team-message-alert-icon">✉</span>
-    <span className="global-team-message-alert-copy"><b>{alert.sender}</b><small>{alert.preview}</small></span>
-    <button type="button" onClick={() => { onOpen(); setAlert(null); }}>Open Team</button>
-    <button type="button" className="global-team-message-alert-close" aria-label="Dismiss notification" onClick={() => setAlert(null)}>×</button>
+  return <div className="global-team-message-backdrop">
+    <section className="global-team-message-alert" role="dialog" aria-modal="true" aria-label="New Team message">
+      <button type="button" className="global-team-message-alert-close" aria-label="Dismiss notification" onClick={() => setAlert(null)}>×</button>
+      <span className="global-team-message-alert-icon">✉</span>
+      <div className="global-team-message-alert-copy"><span className="global-team-message-alert-label">NEW TEAM MESSAGE</span><b>{alert.sender}</b><p>{alert.preview}</p></div>
+      <button type="button" className="global-team-message-alert-open" onClick={() => { onOpen(); setAlert(null); }}>Open Team</button>
+    </section>
   </div>;
 }
 
