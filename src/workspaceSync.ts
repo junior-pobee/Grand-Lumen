@@ -9,7 +9,8 @@ const excludedKeys = new Set([
   "grandLumenLocalAccounts",
   "grandLumenLocalSession",
   "grandLumenProfileImages",
-  "grandLumenProfileImage"
+  "grandLumenProfileImage",
+  "grandLumenCloudOwner"
 ]);
 
 export function isSyncableWorkspaceKey(key: string): boolean {
