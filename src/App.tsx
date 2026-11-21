@@ -14,7 +14,7 @@ import WelcomeTour from "./WelcomeTour";
 import LumenScan from "./LumenScan";
 import RecipeWorkspace from "./RecipeWorkspace";
 import { supabase, supabaseConfigured } from "./auth";
-import { startWorkspaceCloudSync } from "./workspaceSync";
+import { clearWorkspaceData as clearCloudWorkspaceData, startWorkspaceCloudSync } from "./workspaceSync";
 import { getCurrency, getDictionary, getHoliday, getPokemon, getWeather, researchTopic, searchArchiveVideos, searchCommonsImages, searchHackerNews, searchWikipedia, searchGlobalNews, type SearchItem, type NewsItem, connectionAwareMessage } from "./api";
 
 function escapeCode(value: string): string {
@@ -2067,6 +2067,7 @@ function App() {
   const [installPrompt, setInstallPrompt] = useState<any>(null);
   const [installHelp, setInstallHelp] = useState("");
   const [isInstalled, setIsInstalled] = useState(() => window.matchMedia("(display-mode: standalone)").matches || Boolean((navigator as any).standalone));
+  const authUserIdRef = useRef<string | null>(null);
   const activityStorageKey = "grandLumenActivity_" + encodeURIComponent(session?.user.id || localProfile?.email || "guest");
   const verifyActivityPassword = async (password: string): Promise<boolean> => {
     if (!password) return false;
@@ -2095,22 +2096,10 @@ function App() {
         setClearDataError("The password is incorrect. Your workspace data has not been changed.");
         return;
       }
-      const workspaceKeys = Object.keys(localStorage).filter(key =>
-        key === "grandLumenSaved" ||
-        key === "grandLumenProjects" ||
-        key === "grandLumenResearchNotes" ||
-        key === "grandLumenStudioFiles" ||
-        key === "grandLumenStudioActive" ||
-        key.startsWith("grandLumenActivity_")
-      );
-      workspaceKeys.forEach(key => localStorage.removeItem(key));
-      setSaved([]);
-      setProjects([]);
-      setResearchNotes("");
-      setActivityEntries([]);
+      await clearCloudWorkspaceData(supabase && session ? supabase : null, session?.user.id || "", session?.user.email || localProfile?.email || "");
       setClearDataPassword("");
       setClearDataOpen(false);
-      setSection("Settings");
+      window.location.reload();
     } catch (reason) {
       setClearDataError(reason instanceof Error ? reason.message : "Workspace data could not be cleared. Please try again.");
     } finally {
@@ -2225,13 +2214,16 @@ function App() {
     supabase.auth.getSession().then(({ data }) => {
       if (active) {
         const activeSession = data.session;
+        authUserIdRef.current = activeSession?.user.id || null;
         setSession(activeSession);
         setWelcomeTourOpen(Boolean(activeSession && activeSession.user.user_metadata?.grand_lumen_onboarding_pending && localStorage.getItem("grandLumenTourCompleted:" + activeSession.user.id) !== "true"));
         setAuthReady(true);
       }
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      setWorkspaceSyncReady(false);
+      const nextUserId = nextSession?.user.id || null;
+      if (authUserIdRef.current !== nextUserId) setWorkspaceSyncReady(false);
+      authUserIdRef.current = nextUserId;
       setSession(nextSession);
       setWelcomeTourOpen(Boolean(nextSession && nextSession.user.user_metadata?.grand_lumen_onboarding_pending && localStorage.getItem("grandLumenTourCompleted:" + nextSession.user.id) !== "true"));
       setAuthReady(true);
@@ -2519,10 +2511,15 @@ function App() {
   }, [section, session?.user.id, localProfile?.email, guestMode, authReady]);
 
   useEffect(() => {
-    const workspaceReady = authReady && Boolean(session || guestMode);
+    const workspaceReady = authReady && (session ? workspaceSyncReady : guestMode);
+    const booting = !authReady || Boolean(session && !workspaceSyncReady);
     document.documentElement.classList.toggle("grand-lumen-workspace-ready", workspaceReady);
-    return () => document.documentElement.classList.remove("grand-lumen-workspace-ready");
-  }, [authReady, session?.user.id, guestMode]);
+    document.documentElement.classList.toggle("grand-lumen-booting", booting);
+    return () => {
+      document.documentElement.classList.remove("grand-lumen-workspace-ready");
+      document.documentElement.classList.remove("grand-lumen-booting");
+    };
+  }, [authReady, session?.user.id, workspaceSyncReady, guestMode]);
 
   function selectSection(value: Section) {
     setSection(value);
