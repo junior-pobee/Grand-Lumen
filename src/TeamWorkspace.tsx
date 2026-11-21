@@ -75,7 +75,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     } else {
       setProfiles({});
     }
-  }, [userId]);
+  }, [userId, email]);
 
   useEffect(() => {
     void loadTeam();
