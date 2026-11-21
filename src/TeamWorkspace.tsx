@@ -82,8 +82,11 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     if (!supabase) return;
     const channel = supabase.channel("grand-lumen-team-" + userId)
       .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_team_connections" }, () => void loadTeam())
-       .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_connection_requests", filter: "recipient_id=eq." + userId }, () => void loadTeam())
+      .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_connection_requests", filter: "recipient_id=eq." + userId }, () => void loadTeam())
       .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_connection_requests", filter: "requester_id=eq." + userId }, () => void loadTeam())
+      .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_projects" }, () => void loadTeam())
+      .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_project_members", filter: "member_id=eq." + userId }, () => void loadTeam())
+      .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_project_members", filter: "owner_id=eq." + userId }, () => void loadTeam())
       .subscribe();
     return () => { void supabase?.removeChannel(channel); };
   }, [loadTeam, userId]);
@@ -362,26 +365,36 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
   };
 
   const shareProject = async (projectId: string) => {
-    if (!supabase || !projectMember) return;
+    if (!supabase || !projectMember || busy) return;
     setBusy(true);
     setNotice("");
-    const memberIds = projectMember === "__all__"
-      ? Array.from(new Set(connections.map(connection => connection.user_low === userId ? connection.user_high : connection.user_low)))
-      : [projectMember];
-    if (!memberIds.length) {
-      setNotice("Connect with at least one member before sharing this project.");
-      setBusy(false);
-      return;
-    }
-    const rows = memberIds.map(memberId => ({ project_id: projectId, owner_id: userId, member_id: memberId, role: projectRole }));
-    const result = await supabase.from("grand_lumen_project_members").upsert(rows, { onConflict: "project_id,member_id" });
-    if (result.error) setNotice("Project sharing failed: " + result.error.message);
-    else {
-      setProjectMember("");
-      setNotice(memberIds.length === 1 ? "Project shared successfully." : "Project shared with all " + memberIds.length + " connected members.");
+    try {
       await loadTeam();
+      const memberIds = projectMember === "__all__"
+        ? Array.from(new Set(connections.map(connection => connection.user_low === userId ? connection.user_high : connection.user_low)))
+        : [projectMember];
+      if (!memberIds.length) {
+        setNotice("Connect with at least one member before sharing this project.");
+        return;
+      }
+      const { data, error } = await supabase.rpc("grand_lumen_share_project", {
+        p_project_id: projectId,
+        p_member_ids: memberIds,
+        p_role: projectRole
+      });
+      if (error) {
+        setNotice("Project sharing failed: " + error.message);
+        return;
+      }
+      const sharedCount = Number(data || 0);
+      setProjectMember("");
+      setNotice(sharedCount === 1 ? "Project shared successfully. The member can now see it in Team Projects." : "Project shared with " + sharedCount + " connected members.");
+      await loadTeam();
+    } catch (error) {
+      setNotice("Project sharing failed: " + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   };
 
   const deleteProject = async (project: Project) => {
