@@ -1911,7 +1911,7 @@ function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState<SearchItem[]>(() => readWorkspaceData("grandLumenSaved", []));
-  const [theme, setTheme] = useState<"dark" | "light">("light");
+  const [theme, setTheme] = useState<"dark" | "light">(() => localStorage.getItem("grandLumenTheme") === "dark" ? "dark" : "light");
   const [fontScale, setFontScale] = useState(() => initialDisplayScale("grandLumenFontScale"));
   const [interfaceScale, setInterfaceScale] = useState(() => initialDisplayScale("grandLumenInterfaceScale"));
   const [fontFamily, setFontFamily] = useState(() => localStorage.getItem("grandLumenFontFamily") || "Manrope, sans-serif");
@@ -2252,7 +2252,7 @@ function App() {
     let stopSync: (() => void) | undefined;
     setWorkspaceSyncReady(false);
     setWorkspaceSyncStatus("Connecting cloud");
-    startWorkspaceCloudSync(supabase, session.user.id, setWorkspaceSyncStatus).then(stop => {
+    startWorkspaceCloudSync(supabase, session.user.id, session.user.email || "", setWorkspaceSyncStatus).then(stop => {
       if (!active) {
         stop();
         return;
@@ -2265,9 +2265,10 @@ function App() {
       setWorkspaceSyncReady(true);
     }).catch(reason => {
       if (!active) return;
-      setWorkspaceSyncStatus(reason instanceof Error ? "Sync setup needed" : "Cloud sync unavailable");
+      const message = reason instanceof Error ? reason.message : "Cloud workspace could not be loaded. Your local data is still available.";
+      setWorkspaceSyncStatus("Sync failed · " + message);
       setWorkspaceSyncReady(true);
-      setError(reason instanceof Error ? reason.message : "Cloud workspace could not be loaded. Your local data is still available.");
+      setError(message);
     });
     return () => {
       active = false;
@@ -2282,10 +2283,17 @@ function App() {
       setResearchNotes(localStorage.getItem("grandLumenResearchNotes") || "");
       setFrequentSections(readWorkspaceData("grandLumenFrequentSections", []));
       setActivityEntries(readWorkspaceData(activityStorageKey, []));
+      setProfilePicture(localStorage.getItem("grandLumenProfileImage") || accountProfileImage(session?.user.email || localProfile?.email || ""));
+      setFontScale(initialDisplayScale("grandLumenFontScale"));
+      setInterfaceScale(initialDisplayScale("grandLumenInterfaceScale"));
+      setFontFamily(localStorage.getItem("grandLumenFontFamily") || "Manrope, sans-serif");
+      setFontWeight(localStorage.getItem("grandLumenFontWeight") || "normal");
+      setAppLanguage(localStorage.getItem("grandLumenLanguage") || "en");
+      setTheme(localStorage.getItem("grandLumenTheme") === "dark" ? "dark" : "light");
     };
     window.addEventListener("grand-lumen-workspace-restored", refreshWorkspace);
     return () => window.removeEventListener("grand-lumen-workspace-restored", refreshWorkspace);
-  }, [activityStorageKey]);
+  }, [activityStorageKey, session?.user.email, localProfile?.email]);
 
   useEffect(() => {
     localStorage.setItem("grandLumenSaved", JSON.stringify(saved));
@@ -2297,6 +2305,7 @@ function App() {
     localStorage.setItem("grandLumenResearchNotes", researchNotes);
   }, [researchNotes]);
   useEffect(() => {
+    localStorage.setItem("grandLumenTheme", theme);
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
