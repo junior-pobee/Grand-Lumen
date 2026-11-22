@@ -86,6 +86,14 @@ $$;
 revoke all on function public.grand_lumen_is_group_member(uuid) from public,anon;
 grant execute on function public.grand_lumen_is_group_member(uuid) to authenticated;
 
+
+drop policy if exists grand_lumen_profiles_read_connected on public.grand_lumen_profiles;
+create policy grand_lumen_profiles_read_connected on public.grand_lumen_profiles for select to authenticated using (
+ id=auth.uid()
+ or exists(select 1 from public.grand_lumen_team_connections c where (c.user_low=auth.uid() and c.user_high=id) or (c.user_high=auth.uid() and c.user_low=id))
+ or exists(select 1 from public.grand_lumen_group_chat_members gm where gm.user_id=id and public.grand_lumen_is_group_member(gm.group_id))
+);
+
 drop policy if exists grand_lumen_group_chats_read_members on public.grand_lumen_group_chats;
 create policy grand_lumen_group_chats_read_members on public.grand_lumen_group_chats for select to authenticated using (public.grand_lumen_is_group_member(id));
 
