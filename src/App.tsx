@@ -1913,7 +1913,7 @@ function ReminderToolsWorkspace() {
 }
 
 function TeamMessageAlert({ userId, onOpen }: { userId: string; onOpen: () => void }) {
-  const [alert, setAlert] = useState<{ sender: string; preview: string } | null>(null);
+  const [alert, setAlert] = useState<{ sender: string; preview: string; action: "message" | "group" | "call" } | null>(null);
 
   useEffect(() => {
     if (!supabase || !userId) return;
@@ -1935,7 +1935,29 @@ function TeamMessageAlert({ userId, onOpen }: { userId: string; onOpen: () => vo
               preview = "Sent an attachment";
             }
           }
-          setAlert({ sender: profile.data?.display_name || profile.data?.email || "A Team member", preview: preview.slice(0, 110) });
+          setAlert({ sender: profile.data?.display_name || profile.data?.email || "A Team member", preview: preview.slice(0, 110), action: "message" });
+        })();
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_group_chat_members", filter: "user_id=eq." + userId }, payload => {
+        const membership = payload.new as { group_id: string; user_id: string; added_by: string | null };
+        if (membership.user_id !== userId || membership.added_by === userId) return;
+        void (async () => {
+          const [group, profile] = await Promise.all([
+            client.from("grand_lumen_group_chats").select("name").eq("id", membership.group_id).maybeSingle(),
+            membership.added_by ? client.from("grand_lumen_profiles").select("display_name,email").eq("id", membership.added_by).maybeSingle() : Promise.resolve({ data: null })
+          ]);
+          setAlert({ sender: group.data?.name || "A new group", preview: "You were added to this group by " + (profile.data?.display_name || profile.data?.email || "a Team member") + ".", action: "group" });
+        })();
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_group_call_invites", filter: "recipient_id=eq." + userId }, payload => {
+        const invite = payload.new as { group_id: string; caller_id: string; media_type: string; recipient_id: string; status: string };
+        if (invite.recipient_id !== userId || invite.status !== "pending") return;
+        void (async () => {
+          const [group, profile] = await Promise.all([
+            client.from("grand_lumen_group_chats").select("name").eq("id", invite.group_id).maybeSingle(),
+            client.from("grand_lumen_profiles").select("display_name,email").eq("id", invite.caller_id).maybeSingle()
+          ]);
+          setAlert({ sender: group.data?.name || "Group Chat", preview: (profile.data?.display_name || profile.data?.email || "A member") + " started a group " + invite.media_type + " call.", action: "call" });
         })();
       })
       .subscribe();
@@ -1944,10 +1966,10 @@ function TeamMessageAlert({ userId, onOpen }: { userId: string; onOpen: () => vo
 
   if (!alert) return null;
   return <div className="global-team-message-backdrop">
-    <section className="global-team-message-alert" role="dialog" aria-modal="true" aria-label="New Team message">
+    <section className="global-team-message-alert" role="dialog" aria-modal="true" aria-label="Team notification">
       <button type="button" className="global-team-message-alert-close" aria-label="Dismiss notification" onClick={() => setAlert(null)}>×</button>
-      <span className="global-team-message-alert-icon">✉</span>
-      <div className="global-team-message-alert-copy"><span className="global-team-message-alert-label">NEW TEAM MESSAGE</span><b>{alert.sender}</b><p>{alert.preview}</p></div>
+      <span className="global-team-message-alert-icon">{alert.action === "call" ? "☎" : alert.action === "group" ? "👥" : "✉"}</span>
+      <div className="global-team-message-alert-copy"><span className="global-team-message-alert-label">{alert.action === "call" ? "INCOMING GROUP CALL" : alert.action === "group" ? "GROUP CHAT INVITATION" : "NEW TEAM MESSAGE"}</span><b>{alert.sender}</b><p>{alert.preview}</p></div>
       <button type="button" className="global-team-message-alert-open" onClick={() => { onOpen(); setAlert(null); }}>Open Team</button>
     </section>
   </div>;
