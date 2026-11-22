@@ -1938,6 +1938,29 @@ function TeamMessageAlert({ userId, onOpen }: { userId: string; onOpen: () => vo
           setAlert({ sender: profile.data?.display_name || profile.data?.email || "A Team member", preview: preview.slice(0, 110), action: "message" });
         })();
       })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_group_chat_messages" }, payload => {
+        const message = payload.new as { group_id: string; sender_id: string; body: string };
+        if (message.sender_id === userId) return;
+        void (async () => {
+          const membership = await client.from("grand_lumen_group_chat_members").select("group_id").eq("group_id", message.group_id).eq("user_id", userId).is("left_at", null).maybeSingle();
+          if (!membership.data) return;
+          const [group, profile] = await Promise.all([
+            client.from("grand_lumen_group_chats").select("name").eq("id", message.group_id).maybeSingle(),
+            client.from("grand_lumen_profiles").select("display_name,email").eq("id", message.sender_id).maybeSingle()
+          ]);
+          let preview = message.body || "You have a new group message.";
+          if (preview.startsWith("GLGROUPATTACH:")) {
+            try {
+              const attachment = JSON.parse(preview.slice("GLGROUPATTACH:".length));
+              preview = attachment.kind === "audio" ? "Sent an audio message" : "Sent " + (attachment.kind || "an attachment");
+            } catch {
+              preview = "Sent an attachment";
+            }
+          }
+          const sender = profile.data?.display_name || profile.data?.email || "A group member";
+          setAlert({ sender: (group.data?.name || "Group Chat") + " · " + sender, preview: preview.slice(0, 110), action: "message" });
+        })();
+      })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_group_chat_members", filter: "user_id=eq." + userId }, payload => {
         const membership = payload.new as { group_id: string; user_id: string; added_by: string | null };
         if (membership.user_id !== userId || membership.added_by === userId) return;
