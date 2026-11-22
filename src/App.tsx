@@ -2042,6 +2042,8 @@ function App() {
       } else {
         savedLanguage = "en";
       }
+      localStorage.setItem("grandLumenLanguage", "en");
+      localStorage.removeItem("grandLumenLanguageChosen");
     }
     setAppLanguage(savedLanguage);
     setLanguageOwner(accountLanguageStorageKey);
