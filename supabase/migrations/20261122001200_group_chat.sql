@@ -265,7 +265,7 @@ create policy grand_lumen_team_attachments_read on storage.objects for select to
  bucket_id='grand-lumen-team-attachments'
  and (
   exists(select 1 from public.grand_lumen_team_conversations cv join public.grand_lumen_team_connections c on c.id=cv.connection_id where cv.id::text=(storage.foldername(name))[1] and (c.user_low=auth.uid() or c.user_high=auth.uid()))
-  or exists(select 1 from public.grand_lumen_group_chat_members gm where gm.group_id::text=(storage.foldername(name))[1] and gm.user_id=auth.uid() and gm.left_at is null)
+  or public.grand_lumen_is_group_member((storage.foldername(name))[1]::uuid)
  )
 );
 
