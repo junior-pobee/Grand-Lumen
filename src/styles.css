@@ -2335,3 +2335,14 @@ html[data-theme="light"] .global-team-message-alert-copy p{color:#53657e}
 html[data-theme="light"] .global-team-message-alert .global-team-message-alert-open{border-color:#175d9d;background:#175d9d;color:#fff}
 @keyframes global-team-message-pop{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
 @media(max-width:640px){.global-team-message-backdrop{padding:16px}.global-team-message-alert{width:100%;padding:32px 20px 22px}}
+
+
+.team-clear-chat{min-height:40px;padding:9px 13px;border:1px solid rgba(245,112,132,.38);border-radius:10px;background:rgba(190,45,65,.13);color:#ffb0bd;font:inherit;font-size:11px;font-weight:800;cursor:pointer}
+.team-clear-chat:hover{background:rgba(190,45,65,.22)}
+.team-clear-chat-copy{margin:0;padding:2px 4px 8px;color:var(--muted,#94a3b8);font-size:13px;line-height:1.55}
+.team-message-menu button.team-clear-chat-confirm{border-color:rgba(245,112,132,.4);background:rgba(190,45,65,.15);color:#ff9eae;text-align:center}
+.team-message-menu button:disabled{opacity:.6;cursor:not-allowed}
+html[data-theme="light"] .team-clear-chat{border-color:#efc3ca;background:#fff0f1;color:#a92e43}
+html[data-theme="light"] .team-clear-chat-copy{color:#53657e}
+html[data-theme="light"] .team-message-menu button.team-clear-chat-confirm{border-color:#efc3ca;background:#fff0f1;color:#a92e43}
+@media(max-width:700px){.team-clear-chat{min-height:34px;padding:7px 9px;font-size:10px}}
