@@ -259,7 +259,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
   };
 
   const createGroup = async () => {
-    if (!supabase || !groupName.trim() || !selectedMembers.length) return;
+    if (!supabase || !groupName.trim()) return;
     setBusy(true);
     const result = await supabase.rpc("grand_lumen_create_group_chat", { p_name: groupName.trim(), p_member_ids: selectedMembers });
     if (result.error) setNotice(result.error.message);
@@ -356,12 +356,12 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
       if (existing.error) { setNotice(existing.error.message); return; }
       const rows = (existing.data || []) as CallParticipant[];
       setCallParticipants(rows);
-      for (const row of rows) if (userId < row.user_id) connectPeer(peer, row, stream, mediaType);
+      for (const row of rows) connectPeer(peer, row, stream, mediaType);
       const channel = supabase!.channel("grand-lumen-group-call-participants-" + sessionId + "-" + userId)
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_group_call_participants", filter: "session_id=eq." + sessionId }, payload => {
           const row = payload.new as CallParticipant;
           setCallParticipants(current => current.some(item => item.user_id === row.user_id) ? current : [...current, row]);
-          if (userId < row.user_id) connectPeer(peer, row, stream, mediaType);
+          connectPeer(peer, row, stream, mediaType);
         })
         .subscribe();
       (peer as any).__groupChannel = channel;
@@ -495,7 +495,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
       <div className="group-chat-panel-heading"><div><span className="eyebrow">NEW GROUP</span><h3>Create a group chat</h3></div><button className="team-secondary" onClick={() => setCreating(false)}><X size={16}/></button></div>
       <label>Group name<input value={groupName} onChange={event => setGroupName(event.target.value)} maxLength={80} placeholder="e.g. Project 2.2 or Group of Ninjas"/></label>
       <div className="group-chat-member-picker"><div><b>Add connected people</b><small>{selectedMembers.length} selected</small></div>{availableMembers.length ? availableMembers.map(id => <label key={id}><input type="checkbox" checked={selectedMembers.includes(id)} onChange={event => setSelectedMembers(current => event.target.checked ? [...current,id] : current.filter(value => value !== id))}/><span className="group-chat-member-avatar">{memberName(id).slice(0,1).toUpperCase()}</span><span><b>{memberName(id)}</b><small>{profiles[id]?.email || "Connected member"}</small></span></label>) : <p className="team-muted">Connect with people first. Your connected accounts will appear here.</p>}</div>
-      <button className="team-primary" disabled={busy || !groupName.trim() || !selectedMembers.length} onClick={() => void createGroup()}>{busy ? "Creating…" : "Create group and start chatting"}</button>
+      <button className="team-primary" disabled={busy || !groupName.trim()} onClick={() => void createGroup()}>{busy ? "Creating…" : "Create group"}</button>
     </div>}
     {selected && <section className="group-chat-fullscreen">
       <header className="group-chat-header"><div className="group-chat-header-title"><button className="team-secondary" onClick={() => { setSelected(null); setShowSettings(false); setNotice(""); }}><ArrowLeft size={16}/></button><span className="group-chat-avatar"><Users size={20}/></span><div><b>{selected.name}</b><small>{activeMembers.length} members · {isAdmin ? "Group admin" : "Group member"}</small></div></div>
