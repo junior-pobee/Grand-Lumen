@@ -103,7 +103,15 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
       .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_group_chats" }, () => void loadGroups())
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_group_call_invites", filter: "recipient_id=eq." + userId }, payload => {
         const invite = payload.new as CallInvite;
-        if (invite.status === "pending") setIncomingCall(invite);
+        if (invite.status === "pending") {
+          setIncomingCall(invite);
+          void supabase!.from("grand_lumen_group_chats").select("id,name,created_by,created_at").eq("id", invite.group_id).maybeSingle().then(result => {
+            if (result.data) {
+              setSelected(result.data as Group);
+              setRenameValue(result.data.name);
+            }
+          });
+        }
       })
       .subscribe();
     return () => { void supabase?.removeChannel(channel); };
