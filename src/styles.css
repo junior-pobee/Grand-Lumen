@@ -2482,3 +2482,9 @@ html[data-theme="light"] .group-chat-first-message>b{color:#17243a}
 .group-chat-launch-icon>svg:nth-child(2){z-index:1;transform:translateY(-4px) scale(1.08)}
 .group-chat-launch-icon>svg:nth-child(3){transform:translateX(-5px) scale(.88);opacity:.8}
 .group-chat-launch-icon i{display:none}
+
+
+.group-chat-fullscreen{z-index:99999;width:100vw;height:100vh;height:100dvh;max-height:100vh;max-height:100dvh;padding-top:max(10px,env(safe-area-inset-top));padding-right:max(10px,env(safe-area-inset-right));padding-bottom:max(10px,env(safe-area-inset-bottom));padding-left:max(10px,env(safe-area-inset-left));overscroll-behavior:contain}
+.group-chat-list-item{min-height:68px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+.group-chat-list-item:active{transform:scale(.99);background:var(--surface)}
+.group-chat-messages{-webkit-overflow-scrolling:touch;touch-action:pan-y}
