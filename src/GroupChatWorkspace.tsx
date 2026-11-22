@@ -20,6 +20,7 @@ const readAttachment = (body: string): Attachment | null => {
 
 export default function GroupChatWorkspace({ userId, connections, profiles }: { userId: string; connections: Connection[]; profiles: Record<string, Profile> }) {
   const [groups, setGroups] = useState<Group[]>([]);
+  const [groupProfiles, setGroupProfiles] = useState<Record<string, Profile>>({});
   const [members, setMembers] = useState<Record<string, Member[]>>({});
   const [selected, setSelected] = useState<Group | null>(null);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
@@ -90,6 +91,11 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
     const grouped: Record<string, Member[]> = {};
     for (const member of (memberResult.data || []) as Member[]) grouped[member.group_id] = [...(grouped[member.group_id] || []), member];
     setMembers(grouped);
+    const profileIds = Array.from(new Set((memberResult.data || []).map(item => String(item.user_id))));
+    if (profileIds.length) {
+      const profileResult = await supabase.from("grand_lumen_profiles").select("id,display_name,email,avatar_url").in("id", profileIds);
+      if (!profileResult.error) setGroupProfiles(Object.fromEntries(((profileResult.data || []) as Profile[]).map(profile => [profile.id, profile])));
+    }
     setLoading(false);
   }, [userId]);
 
@@ -473,7 +479,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
     pressTimerRef.current = null;
   };
 
-  const memberName = (id: string) => profiles[id]?.display_name || profiles[id]?.email || "Grand Lumen member";
+  const memberName = (id: string) => groupProfiles[id]?.display_name || groupProfiles[id]?.email || profiles[id]?.display_name || profiles[id]?.email || "Grand Lumen member";
 
   return <section className="group-chat-module">
     <button className="group-chat-launch" onClick={() => { setSelected(null); setCreating(false); setShowSettings(false); }}>
