@@ -79,9 +79,9 @@ language sql
 stable
 security definer
 set search_path=public,auth
-as $
+as $$
  select exists(select 1 from public.grand_lumen_group_chat_members gm where gm.group_id=p_group_id and gm.user_id=auth.uid() and gm.left_at is null);
-$;
+$$;
 
 revoke all on function public.grand_lumen_is_group_member(uuid) from public,anon;
 grant execute on function public.grand_lumen_is_group_member(uuid) to authenticated;
