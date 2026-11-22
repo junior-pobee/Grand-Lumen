@@ -742,7 +742,7 @@ function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup";
             email: email.trim(),
             password,
             options: {
-              data: { full_name: fullName.trim(), grand_lumen_onboarding_pending: true },
+              data: { full_name: fullName.trim(), grand_lumen_onboarding_pending: true, grand_lumen_language: "en" },
               emailRedirectTo: window.location.origin + window.location.pathname
             }
           });
@@ -2032,7 +2032,7 @@ function App() {
       clearGoogleTranslateState();
       return;
     }
-    let savedLanguage = localStorage.getItem(accountLanguageStorageKey);
+    let savedLanguage = session?.user.user_metadata?.grand_lumen_language || localStorage.getItem(accountLanguageStorageKey);
     if (!savedLanguage) {
       const legacyChosen = localStorage.getItem("grandLumenLanguageChosen") === "true";
       const legacyLanguage = localStorage.getItem("grandLumenLanguage") || "en";
@@ -2053,7 +2053,10 @@ function App() {
     document.documentElement.lang = appLanguage;
     if (!accountLanguageStorageKey || languageOwner !== accountLanguageStorageKey) return;
     localStorage.setItem(accountLanguageStorageKey, appLanguage);
-  }, [appLanguage, accountLanguageStorageKey, languageOwner]);
+    if (session && supabase && session.user.user_metadata?.grand_lumen_language !== appLanguage) {
+      void supabase.auth.updateUser({ data: { grand_lumen_language: appLanguage } });
+    }
+  }, [appLanguage, accountLanguageStorageKey, languageOwner, session?.user.user_metadata?.grand_lumen_language]);
 
   const resetToEnglish = () => {
     if (accountLanguageStorageKey) localStorage.setItem(accountLanguageStorageKey, "en");
