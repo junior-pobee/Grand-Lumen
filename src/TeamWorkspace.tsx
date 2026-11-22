@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import Peer from "peerjs";
 import { supabase } from "./auth";
+import GroupChatWorkspace from "./GroupChatWorkspace";
 
 type Profile = { id: string; display_name: string | null; email: string | null; avatar_url: string | null };
 type Connection = { id: string; user_low: string; user_high: string };
@@ -525,6 +526,19 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       if (shareMessages.length !== memberIds.length) throw new Error("The project was shared, but one or more Team conversations could not be found for the sharing message.");
       const messageResult = await supabase.from("grand_lumen_team_messages").insert(shareMessages);
       if (messageResult.error) throw new Error("The project was shared, but the Team message could not be sent: " + messageResult.error.message);
+      if (projectMember === "__all__") {
+        const groupMemberships = await supabase.from("grand_lumen_group_chat_members").select("group_id").eq("user_id", userId).is("left_at", null);
+        if (groupMemberships.error) throw new Error("The project was shared, but group notifications could not be loaded: " + groupMemberships.error.message);
+        const groupIds = Array.from(new Set((groupMemberships.data || []).map(item => item.group_id)));
+        if (groupIds.length) {
+          const groupNotice = await supabase.from("grand_lumen_group_chat_messages").insert(groupIds.map(groupId => ({
+            group_id: groupId,
+            sender_id: userId,
+            body: senderName + " shared the project “" + projectNameValue + "” with all connected members. Open Team projects to view the shared project."
+          })));
+          if (groupNotice.error) throw new Error("The project was shared, but group notifications could not be sent: " + groupNotice.error.message);
+        }
+      }
       setProjectMember("");
       setNotice(sharedCount === 1 ? "Project shared and a message sent to the member." : "Project shared with " + sharedCount + " connected members. A message was sent to each recipient.");
       await loadTeam();
@@ -712,6 +726,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       </section>
       <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">FIND A MEMBER</span><h3>Scan or enter a code</h3></div><span className="team-icon">+</span></div><p>Scan another member's QR invitation or paste their invitation code.</p><textarea value={inviteInput} onChange={event => setInviteInput(event.target.value)} placeholder="Paste invitation token here" rows={3}/><div className="team-actions"><button className="team-secondary" onClick={() => setCameraOpen(value => !value)}>{cameraOpen ? "Close camera" : "Scan QR code"}</button><button className="team-primary" onClick={() => void connectWithToken()} disabled={busy || !inviteInput.trim()}>Send request</button></div>{cameraOpen && <video className="team-camera" ref={videoRef} muted playsInline/>}</section>
     </div>
+    <GroupChatWorkspace userId={userId} connections={connections} profiles={profiles}/>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">CONNECTION REQUESTS</span><h3>Requests awaiting your approval</h3></div><span className="team-count">{requests.length}</span></div>{requests.length ? requests.map(request => <div className="team-request" key={request.id}><div><b>{profiles[request.requester_id]?.display_name || "Grand Lumen member"}</b><small>{profiles[request.requester_id]?.email || "Connection request"}</small></div><div className="team-actions"><button className="team-secondary" disabled={busy} onClick={() => void respond(request.id, false)}>Decline</button><button className="team-primary" disabled={busy} onClick={() => void respond(request.id, true)}>Accept</button></div></div>) : <p className="team-muted">No pending requests.</p>}</section>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">SENT REQUESTS</span><h3>Awaiting their response</h3></div><span className="team-count">{sentRequests.length}</span></div>{sentRequests.length ? sentRequests.map(request => <div className="team-request" key={request.id}><div><b>{profiles[request.recipient_id]?.display_name || "Grand Lumen member"}</b><small>{profiles[request.recipient_id]?.email || "Request pending"}</small></div><span className="team-muted">Pending approval</span></div>) : <p className="team-muted">You have no outgoing requests.</p>}</section>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">YOUR NETWORK</span><h3>Connected members</h3></div><span className="team-count">{connections.length}</span></div>{connections.length ? <div className="team-contacts">{connections.map(connection => { const memberId = connection.user_low === userId ? connection.user_high : connection.user_low; const profile = profiles[memberId]; return <button className="team-contact" key={connection.id} onClick={() => setSelected(connection)}><span className="team-avatar">{(profile?.display_name || profile?.email || "GL").slice(0, 1).toUpperCase()}</span><span><b>{profile?.display_name || "Grand Lumen member"}</b><small>{profile?.email || "Connected account"}</small></span>{Boolean(unreadCounts[connection.id]) && <span className="team-unread-badge">{unreadCounts[connection.id]}</span>}</button>; })}</div> : <p className="team-muted">Your connections will appear here after they approve your requests.</p>}</section>
