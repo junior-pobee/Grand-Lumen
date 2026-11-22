@@ -78,16 +78,18 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       return;
     }
     const conversationIds = conversations.data.map(item => item.id);
-    const [messageResult, receiptResult] = await Promise.all([
+    const [messageResult, receiptResult, hiddenResult] = await Promise.all([
       supabase.from("grand_lumen_team_messages").select("id,conversation_id,sender_id").in("conversation_id", conversationIds).neq("sender_id", userId).eq("deleted_for_everyone", false),
-      supabase.from("grand_lumen_team_message_reads").select("message_id").eq("user_id", userId)
+      supabase.from("grand_lumen_team_message_reads").select("message_id").eq("user_id", userId),
+      supabase.from("grand_lumen_team_message_hides").select("message_id").eq("user_id", userId)
     ]);
-    if (messageResult.error || receiptResult.error) return;
+    if (messageResult.error || receiptResult.error || hiddenResult.error) return;
     const readIds = new Set((receiptResult.data || []).map(item => item.message_id));
+    const hiddenIds = new Set((hiddenResult.data || []).map(item => item.message_id));
     const conversationById = new Map(conversations.data.map(item => [item.id, item.connection_id]));
     const counts: Record<string, number> = {};
     for (const message of messageResult.data || []) {
-      if (readIds.has(message.id)) continue;
+      if (readIds.has(message.id) || hiddenIds.has(message.id)) continue;
       const connectionId = conversationById.get(message.conversation_id);
       if (connectionId) counts[connectionId] = (counts[connectionId] || 0) + 1;
     }
