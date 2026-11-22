@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowLeft, Check, ChevronDown, Mic, Paperclip, Phone, Plus, Send, Settings, Trash2, UserPlus, Users, Video, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Mic, Paperclip, Phone, Plus, Send, Settings, Trash2, UserPlus, UserRound, Users, Video, X } from "lucide-react";
 import Peer from "peerjs";
 import { supabase } from "./auth";
 
@@ -507,7 +507,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
 
   return <section className="group-chat-module">
     <button className="group-chat-launch" onClick={() => { setOpened(value => !value); setSelected(null); setCreating(false); setShowSettings(false); }}>
-      <span className="group-chat-launch-icon"><Users size={28}/><i/><i/><i/></span>
+      <span className="group-chat-launch-icon"><UserRound size={25}/><UserRound size={25}/><UserRound size={25}/></span>
       <span><b>Group Chat</b><small>Bring your connected people into one conversation</small></span>
       <span className="group-chat-launch-count">{groups.length} groups</span>
     </button>
