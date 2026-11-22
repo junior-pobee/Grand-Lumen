@@ -357,14 +357,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
       const rows = (existing.data || []) as CallParticipant[];
       setCallParticipants(rows);
       for (const row of rows) connectPeer(peer, row, stream, mediaType);
-      const channel = supabase!.channel("grand-lumen-group-call-participants-" + sessionId + "-" + userId)
-        .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_group_call_participants", filter: "session_id=eq." + sessionId }, payload => {
-          const row = payload.new as CallParticipant;
-          setCallParticipants(current => current.some(item => item.user_id === row.user_id) ? current : [...current, row]);
-          connectPeer(peer, row, stream, mediaType);
-        })
-        .subscribe();
-      (peer as any).__groupChannel = channel;
+
     });
     if (initialPeerId) peer.on("open", () => { peerUsersRef.current[initialPeerId] = "group-host"; });
     return stream;
@@ -444,7 +437,6 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
     callsRef.current = {};
     peerRef.current?.destroy();
     const peer = peerRef.current as any;
-    if (peer?.__groupChannel) void supabase?.removeChannel(peer.__groupChannel);
     if (peer?.__sessionChannel) void supabase?.removeChannel(peer.__sessionChannel);
     peerRef.current = null;
     localStreamRef.current?.getTracks().forEach(track => track.stop());
