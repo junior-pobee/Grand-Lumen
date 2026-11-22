@@ -73,41 +73,54 @@ alter table public.grand_lumen_group_call_sessions enable row level security;
 alter table public.grand_lumen_group_call_invites enable row level security;
 alter table public.grand_lumen_group_call_participants enable row level security;
 
+create or replace function public.grand_lumen_is_group_member(p_group_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path=public,auth
+as $
+ select exists(select 1 from public.grand_lumen_group_chat_members gm where gm.group_id=p_group_id and gm.user_id=auth.uid() and gm.left_at is null);
+$;
+
+revoke all on function public.grand_lumen_is_group_member(uuid) from public,anon;
+grant execute on function public.grand_lumen_is_group_member(uuid) to authenticated;
+
 drop policy if exists grand_lumen_group_chats_read_members on public.grand_lumen_group_chats;
-create policy grand_lumen_group_chats_read_members on public.grand_lumen_group_chats for select to authenticated using (exists(select 1 from public.grand_lumen_group_chat_members m where m.group_id=id and m.user_id=auth.uid() and m.left_at is null));
+create policy grand_lumen_group_chats_read_members on public.grand_lumen_group_chats for select to authenticated using (public.grand_lumen_is_group_member(id));
 
 drop policy if exists grand_lumen_group_members_read_members on public.grand_lumen_group_chat_members;
-create policy grand_lumen_group_members_read_members on public.grand_lumen_group_chat_members for select to authenticated using (exists(select 1 from public.grand_lumen_group_chat_members mine where mine.group_id=grand_lumen_group_chat_members.group_id and mine.user_id=auth.uid() and mine.left_at is null));
+create policy grand_lumen_group_members_read_members on public.grand_lumen_group_chat_members for select to authenticated using (public.grand_lumen_is_group_member(group_id));
 
 drop policy if exists grand_lumen_group_messages_read_members on public.grand_lumen_group_chat_messages;
-create policy grand_lumen_group_messages_read_members on public.grand_lumen_group_chat_messages for select to authenticated using (exists(select 1 from public.grand_lumen_group_chat_members m where m.group_id=grand_lumen_group_chat_messages.group_id and m.user_id=auth.uid() and m.left_at is null));
+create policy grand_lumen_group_messages_read_members on public.grand_lumen_group_chat_messages for select to authenticated using (public.grand_lumen_is_group_member(group_id));
 
 drop policy if exists grand_lumen_group_messages_insert_members on public.grand_lumen_group_chat_messages;
-create policy grand_lumen_group_messages_insert_members on public.grand_lumen_group_chat_messages for insert to authenticated with check (sender_id=auth.uid() and exists(select 1 from public.grand_lumen_group_chat_members m where m.group_id=grand_lumen_group_chat_messages.group_id and m.user_id=auth.uid() and m.left_at is null));
+create policy grand_lumen_group_messages_insert_members on public.grand_lumen_group_chat_messages for insert to authenticated with check (sender_id=auth.uid() and public.grand_lumen_is_group_member(group_id));
 
 drop policy if exists grand_lumen_group_hides_read_own on public.grand_lumen_group_message_hides;
 create policy grand_lumen_group_hides_read_own on public.grand_lumen_group_message_hides for select to authenticated using (user_id=auth.uid());
 
 drop policy if exists grand_lumen_group_calls_read_members on public.grand_lumen_group_call_sessions;
-create policy grand_lumen_group_calls_read_members on public.grand_lumen_group_call_sessions for select to authenticated using (exists(select 1 from public.grand_lumen_group_chat_members m where m.group_id=grand_lumen_group_call_sessions.group_id and m.user_id=auth.uid() and m.left_at is null));
+create policy grand_lumen_group_calls_read_members on public.grand_lumen_group_call_sessions for select to authenticated using (public.grand_lumen_is_group_member(group_id));
 
 drop policy if exists grand_lumen_group_invites_read_members on public.grand_lumen_group_call_invites;
 create policy grand_lumen_group_invites_read_members on public.grand_lumen_group_call_invites for select to authenticated using (recipient_id=auth.uid() or caller_id=auth.uid());
 
 drop policy if exists grand_lumen_group_invites_insert_members on public.grand_lumen_group_call_invites;
-create policy grand_lumen_group_invites_insert_members on public.grand_lumen_group_call_invites for insert to authenticated with check (caller_id=auth.uid() and exists(select 1 from public.grand_lumen_group_chat_members m where m.group_id=grand_lumen_group_call_invites.group_id and m.user_id=auth.uid() and m.left_at is null));
+create policy grand_lumen_group_invites_insert_members on public.grand_lumen_group_call_invites for insert to authenticated with check (caller_id=auth.uid() and public.grand_lumen_is_group_member(group_id));
 
 drop policy if exists grand_lumen_group_participants_read_members on public.grand_lumen_group_call_participants;
-create policy grand_lumen_group_participants_read_members on public.grand_lumen_group_call_participants for select to authenticated using (exists(select 1 from public.grand_lumen_group_chat_members m join public.grand_lumen_group_call_sessions s on s.group_id=m.group_id where s.id=grand_lumen_group_call_participants.session_id and m.user_id=auth.uid() and m.left_at is null));
+create policy grand_lumen_group_participants_read_members on public.grand_lumen_group_call_participants for select to authenticated using (exists(select 1 from public.grand_lumen_group_chat_members m join public.grand_lumen_group_call_sessions s on s.group_id=m.group_id where s.id=grand_lumen_group_call_participants.session_id and public.grand_lumen_is_group_member(s.group_id)));
 
 drop policy if exists grand_lumen_group_calls_insert_host on public.grand_lumen_group_call_sessions;
-create policy grand_lumen_group_calls_insert_host on public.grand_lumen_group_call_sessions for insert to authenticated with check (host_id=auth.uid() and exists(select 1 from public.grand_lumen_group_chat_members gm where gm.group_id=grand_lumen_group_call_sessions.group_id and gm.user_id=auth.uid() and gm.left_at is null));
+create policy grand_lumen_group_calls_insert_host on public.grand_lumen_group_call_sessions for insert to authenticated with check (host_id=auth.uid() and public.grand_lumen_is_group_member(group_id));
 drop policy if exists grand_lumen_group_calls_update_host on public.grand_lumen_group_call_sessions;
 create policy grand_lumen_group_calls_update_host on public.grand_lumen_group_call_sessions for update to authenticated using (host_id=auth.uid()) with check (host_id=auth.uid());
 drop policy if exists grand_lumen_group_invites_update_participants on public.grand_lumen_group_call_invites;
 create policy grand_lumen_group_invites_update_participants on public.grand_lumen_group_call_invites for update to authenticated using (recipient_id=auth.uid() or caller_id=auth.uid()) with check (recipient_id=auth.uid() or caller_id=auth.uid());
 drop policy if exists grand_lumen_group_participants_insert_self on public.grand_lumen_group_call_participants;
-create policy grand_lumen_group_participants_insert_self on public.grand_lumen_group_call_participants for insert to authenticated with check (user_id=auth.uid() and exists(select 1 from public.grand_lumen_group_call_sessions s join public.grand_lumen_group_chat_members gm on gm.group_id=s.group_id where s.id=grand_lumen_group_call_participants.session_id and gm.user_id=auth.uid() and gm.left_at is null));
+create policy grand_lumen_group_participants_insert_self on public.grand_lumen_group_call_participants for insert to authenticated with check (user_id=auth.uid() and exists(select 1 from public.grand_lumen_group_call_sessions s join public.grand_lumen_group_chat_members gm on gm.group_id=s.group_id where s.id=grand_lumen_group_call_participants.session_id and public.grand_lumen_is_group_member(s.group_id)));
 drop policy if exists grand_lumen_group_participants_delete_self on public.grand_lumen_group_call_participants;
 create policy grand_lumen_group_participants_delete_self on public.grand_lumen_group_call_participants for delete to authenticated using (user_id=auth.uid());
 create or replace function public.grand_lumen_create_group_chat(p_name text,p_member_ids uuid[])
@@ -243,7 +256,7 @@ create policy grand_lumen_team_attachments_upload on storage.objects for insert 
  and (storage.foldername(name))[2]=auth.uid()::text
  and (
   exists(select 1 from public.grand_lumen_team_conversations cv join public.grand_lumen_team_connections c on c.id=cv.connection_id where cv.id::text=(storage.foldername(name))[1] and (c.user_low=auth.uid() or c.user_high=auth.uid()))
-  or exists(select 1 from public.grand_lumen_group_chat_members gm where gm.group_id::text=(storage.foldername(name))[1] and gm.user_id=auth.uid() and gm.left_at is null)
+  or exists(select 1 from public.grand_lumen_group_chat_members gm where gm.group_id::text=(storage.foldername(name))[1] and public.grand_lumen_is_group_member(gm.group_id))
  )
 );
 
