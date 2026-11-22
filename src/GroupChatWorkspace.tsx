@@ -103,6 +103,27 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
   useEffect(() => { void loadGroups(); }, [loadGroups]);
 
   useEffect(() => {
+    if (!supabase || !userId) return;
+    let active = true;
+    const loadPendingCall = async () => {
+      const inviteResult = await supabase!.from("grand_lumen_group_call_invites").select("*").eq("recipient_id", userId).eq("status", "pending").order("created_at", { ascending: false }).limit(1).maybeSingle();
+      if (!active || inviteResult.error || !inviteResult.data) return;
+      const sessionResult = await supabase!.from("grand_lumen_group_call_sessions").select("status").eq("id", inviteResult.data.session_id).maybeSingle();
+      if (!active || sessionResult.data?.status !== "active") return;
+      const groupResult = await supabase!.from("grand_lumen_group_chats").select("id,name,created_by,created_at").eq("id", inviteResult.data.group_id).maybeSingle();
+      if (!active) return;
+      setIncomingCall(inviteResult.data as CallInvite);
+      if (groupResult.data) {
+        setOpened(true);
+        setSelected(groupResult.data as Group);
+        setRenameValue(groupResult.data.name);
+      }
+    };
+    void loadPendingCall();
+    return () => { active = false; };
+  }, [userId]);
+
+  useEffect(() => {
     if (!supabase) return;
     const channel = supabase.channel("grand-lumen-group-memberships-" + userId)
       .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_group_chat_members", filter: "user_id=eq." + userId }, () => void loadGroups())
