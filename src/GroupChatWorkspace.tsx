@@ -35,6 +35,8 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
   const [creating, setCreating] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [addableMembers, setAddableMembers] = useState<string[]>([]);
+  const [addPeopleLoading, setAddPeopleLoading] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [renameValue, setRenameValue] = useState("");
@@ -398,8 +400,28 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
     setBusy(false);
   };
 
+  const openAddPeople = async () => {
+    setShowAdd(true);
+    setSelectedMembers([]);
+    if (!supabase || !selected) return;
+    setAddPeopleLoading(true);
+    const connectionResult = await supabase.from("grand_lumen_team_connections").select("user_low,user_high");
+    if (connectionResult.error) {
+      setNotice("Your connected-people list could not load. " + connectionResult.error.message);
+      setAddPeopleLoading(false);
+      return;
+    }
+    const connected = Array.from(new Set(((connectionResult.data || []) as Connection[]).map(item => item.user_low === userId ? item.user_high : item.user_low))).filter(id => id !== userId && !(members[selected.id] || []).some(member => member.user_id === id && !member.left_at));
+    setAddableMembers(connected);
+    if (connected.length) {
+      const profileResult = await supabase.from("grand_lumen_profiles").select("id,display_name,email,avatar_url").in("id", connected);
+      if (!profileResult.error) setGroupProfiles(current => ({ ...current, ...Object.fromEntries(((profileResult.data || []) as Profile[]).map(profile => [profile.id, profile])) }));
+    }
+    setAddPeopleLoading(false);
+  };
+
   const addMembers = async () => {
-    if (!supabase || !selected || !selectedMembers.length) return;
+    if (!supabase || !selected || !selectedMembers.length || busy) return;
     setBusy(true);
     const result = await supabase.rpc("grand_lumen_add_group_chat_members", { p_group_id: selected.id, p_member_ids: selectedMembers });
     if (result.error) setNotice(result.error.message);
@@ -619,10 +641,10 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
       {showSettings && <div className="group-chat-settings">
         <div className="group-chat-settings-top"><b>Group information</b><button onClick={() => setShowSettings(false)}><X size={15}/></button></div>
         {isAdmin && <div className="group-chat-rename"><input value={renameValue} onChange={event => setRenameValue(event.target.value)} maxLength={80}/><button className="team-secondary" onClick={() => void renameGroup()} disabled={busy || !renameValue.trim()}>Save name</button></div>}
-        <div className="group-chat-settings-members"><div><b>Members</b>{isAdmin && <button className="team-secondary" onClick={() => setShowAdd(value => !value)}><UserPlus size={14}/> Add people</button>}</div>
+        <div className="group-chat-settings-members"><div><b>Members</b>{isAdmin && <button className="team-secondary" type="button" onClick={() => void openAddPeople()}><UserPlus size={14}/> Add people</button>}</div>
           {activeMembers.map(member => <div key={member.user_id}><span className="group-chat-member-avatar">{memberName(member.user_id).slice(0,1).toUpperCase()}</span><span><b>{memberName(member.user_id)}{member.user_id === userId ? " (You)" : ""}</b><small>{member.role === "admin" ? "Admin" : "Member"}</small></span>{isAdmin && member.role !== "admin" && <button onClick={() => void removeMember(member.user_id)} aria-label="Remove member"><Trash2 size={14}/></button>}</div>)}
         </div>
-        {showAdd && <div className="group-chat-member-picker group-chat-add-picker">{availableMembers.filter(id => !activeMembers.some(member => member.user_id === id)).map(id => <label key={id}><input type="checkbox" checked={selectedMembers.includes(id)} onChange={event => setSelectedMembers(current => event.target.checked ? [...current,id] : current.filter(value => value !== id))}/><span className="group-chat-member-avatar">{memberName(id).slice(0,1).toUpperCase()}</span><span><b>{memberName(id)}</b><small>{profiles[id]?.email || "Connected member"}</small></span></label>)}<button className="team-primary" disabled={busy || !selectedMembers.length} onClick={() => void addMembers()}>Add selected people</button></div>}
+        {showAdd && <div className="group-chat-member-picker group-chat-add-picker">{addPeopleLoading ? <p className="team-muted">Loading your connected people…</p> : addableMembers.length ? addableMembers.map(id => <label key={id}><input type="checkbox" checked={selectedMembers.includes(id)} onChange={event => setSelectedMembers(current => event.target.checked ? [...current,id] : current.filter(value => value !== id))}/><span className="group-chat-member-avatar">{memberName(id).slice(0,1).toUpperCase()}</span><span><b>{groupProfiles[id]?.display_name || profiles[id]?.display_name || "Grand Lumen member"}</b><small>{groupProfiles[id]?.email || profiles[id]?.email || "Connected member"}</small></span></label>) : <p className="team-muted">All your connected people are already in this group.</p>}<button className="team-primary" disabled={busy || addPeopleLoading || !selectedMembers.length} onClick={() => void addMembers()}>{busy ? "Adding…" : "Add selected people"}</button></div>}
         <button className="group-chat-leave" onClick={() => void leaveGroup()}>Leave group</button>
       </div>}
       {notice && <div className="team-notice group-chat-notice" role="status">{notice}</div>}
