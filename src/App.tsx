@@ -54,6 +54,24 @@ function saveAccountProfileImage(email: string, image: string): void {
   }
 }
 
+function clearGoogleTranslateState(): void {
+  const expires = "expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  const hostname = window.location.hostname;
+  const parts = hostname.split(".");
+  const domains = new Set([hostname, "." + hostname]);
+  for (let index = 1; index < parts.length - 1; index += 1) domains.add("." + parts.slice(index).join("."));
+  const paths = new Set(["/", window.location.pathname, window.location.pathname.replace(/\/[^/]*$/, "/")]);
+  for (const path of paths) {
+    document.cookie = "googtrans=;" + expires + ";path=" + path + ";SameSite=Lax";
+    for (const domain of domains) document.cookie = "googtrans=;" + expires + ";path=" + path + ";domain=" + domain + ";SameSite=Lax";
+  }
+  const selector = document.querySelector<HTMLSelectElement>(".goog-te-combo");
+  if (selector) {
+    selector.value = "";
+    selector.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+}
+
 function initialDisplayScale(key: string): number {
   const smallScreen = typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches;
   const stored = localStorage.getItem(smallScreen ? key + "Mobile" : key);
@@ -717,6 +735,9 @@ function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup";
     try {
       if (supabase) {
         if (isSignup) {
+          localStorage.setItem("grandLumenLanguage", "en");
+          localStorage.removeItem("grandLumenLanguageChosen");
+          clearGoogleTranslateState();
           const { data, error } = await supabase.auth.signUp({
             email: email.trim(),
             password,
@@ -726,8 +747,10 @@ function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup";
             }
           });
           if (error) throw error;
+          if (data.user) localStorage.setItem("grandLumenLanguageAccount:user:" + data.user.id, "en");
           if (data.session) setNotice("Your account is ready. Opening your workspace…", "success");
           else setNotice("Account created. Email confirmation is still required by the current authentication settings. Verify your email, then sign in.", "success");
+          window.setTimeout(() => window.location.reload(), 300);
         } else {
           const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
           if (error) throw error;
@@ -737,13 +760,17 @@ function AuthPanel({ mode, onModeChange, onGuest }: { mode: "signin" | "signup";
         const normalizedEmail = email.trim().toLowerCase();
         if (isSignup) {
           if (accounts.some(account => account.email === normalizedEmail)) throw new Error("An account with this email already exists. Sign in instead.");
+          localStorage.setItem("grandLumenLanguage", "en");
+          localStorage.removeItem("grandLumenLanguageChosen");
+          clearGoogleTranslateState();
+          localStorage.setItem("grandLumenLanguageAccount:local:" + normalizedEmail, "en");
           const salt = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(value => value.toString(16).padStart(2, "0")).join("");
           const passwordHash = await hashLocalPassword(password, salt);
           accounts.push({ fullName: fullName.trim(), email: normalizedEmail, salt, passwordHash, onboardingPending: true });
           localStorage.setItem("grandLumenLocalAccounts", JSON.stringify(accounts));
           localStorage.setItem("grandLumenLocalSession", JSON.stringify({ fullName: fullName.trim(), email: normalizedEmail, onboardingPending: true }));
           setNotice("Your local account is ready. Opening Grand-Lumen…", "success");
-          window.setTimeout(() => onGuest({ fullName: fullName.trim(), email: normalizedEmail, onboardingPending: true }), 250);
+          window.setTimeout(() => window.location.reload(), 300);
         } else {
           const account = accounts.find(item => item.email === normalizedEmail);
           if (!account || await hashLocalPassword(password, account.salt) !== account.passwordHash) throw new Error("Email or password is incorrect.");
@@ -1957,15 +1984,14 @@ function App() {
   const [interfaceScale, setInterfaceScale] = useState(() => initialDisplayScale("grandLumenInterfaceScale"));
   const [fontFamily, setFontFamily] = useState(() => localStorage.getItem("grandLumenFontFamily") || "Manrope, sans-serif");
   const [fontWeight, setFontWeight] = useState(() => localStorage.getItem("grandLumenFontWeight") || "normal");
-  const [appLanguage, setAppLanguage] = useState(() => {
-    const chosen = localStorage.getItem("grandLumenLanguageChosen") === "true";
-    if (!chosen) {
-      localStorage.setItem("grandLumenLanguage", "en");
-      return "en";
-    }
-    return localStorage.getItem("grandLumenLanguage") || "en";
-  });
-  const [languageSearch, setLanguageSearch] = useState(() => appLanguages.find(language => language.code === (localStorage.getItem("grandLumenLanguageChosen") === "true" ? localStorage.getItem("grandLumenLanguage") || "en" : "en"))?.name || "English");
+  const accountLanguageStorageKey = session?.user.id
+    ? "grandLumenLanguageAccount:user:" + session.user.id
+    : localProfile?.email
+      ? "grandLumenLanguageAccount:local:" + localProfile.email.trim().toLowerCase()
+      : null;
+  const [appLanguage, setAppLanguage] = useState("en");
+  const [languageOwner, setLanguageOwner] = useState<string | null>(null);
+  const [languageSearch, setLanguageSearch] = useState("English");
 
   useEffect(() => {
     const smallScreen = window.matchMedia("(max-width: 760px)").matches;
@@ -1999,32 +2025,43 @@ function App() {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem("grandLumenLanguage", appLanguage);
+    if (!authReady) return;
+    if (!accountLanguageStorageKey) {
+      setAppLanguage("en");
+      setLanguageOwner(null);
+      clearGoogleTranslateState();
+      return;
+    }
+    let savedLanguage = localStorage.getItem(accountLanguageStorageKey);
+    if (!savedLanguage) {
+      const legacyChosen = localStorage.getItem("grandLumenLanguageChosen") === "true";
+      const legacyLanguage = localStorage.getItem("grandLumenLanguage") || "en";
+      if (legacyChosen && legacyLanguage !== "en") {
+        savedLanguage = legacyLanguage;
+        localStorage.setItem(accountLanguageStorageKey, legacyLanguage);
+      } else {
+        savedLanguage = "en";
+      }
+    }
+    setAppLanguage(savedLanguage);
+    setLanguageOwner(accountLanguageStorageKey);
+  }, [authReady, accountLanguageStorageKey]);
+
+  useEffect(() => {
     document.documentElement.lang = appLanguage;
-    if (appLanguage === "en") return;
-    let attempts = 0;
-    const applyLanguage = () => {
-      const selector = document.querySelector<HTMLSelectElement>(".goog-te-combo");
-      if (!selector) return false;
-      selector.value = appLanguage;
-      selector.dispatchEvent(new Event("change", { bubbles: true }));
-      return true;
-    };
-    const timer = window.setInterval(() => {
-      attempts += 1;
-      if (applyLanguage() || attempts >= 40) window.clearInterval(timer);
-    }, 250);
-    return () => window.clearInterval(timer);
-  }, [appLanguage]);
+    if (!accountLanguageStorageKey || languageOwner !== accountLanguageStorageKey) return;
+    localStorage.setItem(accountLanguageStorageKey, appLanguage);
+  }, [appLanguage, accountLanguageStorageKey, languageOwner]);
 
   const resetToEnglish = () => {
-    localStorage.setItem("grandLumenLanguageChosen", "true");
+    if (accountLanguageStorageKey) localStorage.setItem(accountLanguageStorageKey, "en");
     localStorage.setItem("grandLumenLanguage", "en");
-    document.cookie = "googtrans=;path=/;expires=Thu, 01 Jan 1970 00:00:00 GMT;SameSite=Lax";
-    document.cookie = "googtrans=;path=/;domain=" + window.location.hostname + ";expires=Thu, 01 Jan 1970 00:00:00 GMT;SameSite=Lax";
+    localStorage.removeItem("grandLumenLanguageChosen");
+    clearGoogleTranslateState();
     document.documentElement.lang = "en";
     setAppLanguage("en");
-    window.setTimeout(() => window.location.reload(), 120);
+    setLanguageOwner(accountLanguageStorageKey);
+    window.setTimeout(() => window.location.reload(), 250);
   };
 
   useEffect(() => {
@@ -2278,6 +2315,13 @@ function App() {
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, nextSession) => {
       const nextUserId = nextSession?.user.id || null;
+      if (!nextSession) {
+        localStorage.setItem("grandLumenLanguage", "en");
+        localStorage.removeItem("grandLumenLanguageChosen");
+        clearGoogleTranslateState();
+        setAppLanguage("en");
+        setLanguageOwner(null);
+      }
       if (authUserIdRef.current !== nextUserId) setWorkspaceSyncReady(false);
       authUserIdRef.current = nextUserId;
       setSession(nextSession);
@@ -2337,7 +2381,6 @@ function App() {
       setInterfaceScale(initialDisplayScale("grandLumenInterfaceScale"));
       setFontFamily(localStorage.getItem("grandLumenFontFamily") || "Manrope, sans-serif");
       setFontWeight(localStorage.getItem("grandLumenFontWeight") || "normal");
-      setAppLanguage(localStorage.getItem("grandLumenLanguage") || "en");
       setTheme(localStorage.getItem("grandLumenTheme") === "dark" ? "dark" : "light");
     };
     window.addEventListener("grand-lumen-workspace-restored", refreshWorkspace);
@@ -2434,10 +2477,16 @@ function App() {
       setLocalProfile(null);
       setGuestMode(false);
     }
+    localStorage.setItem("grandLumenLanguage", "en");
+    localStorage.removeItem("grandLumenLanguageChosen");
+    clearGoogleTranslateState();
+    setAppLanguage("en");
+    setLanguageOwner(null);
     setWelcomeTourOpen(false);
     setProfilePicture("");
     setSession(null);
     setSection("Home");
+    window.setTimeout(() => window.location.reload(), 250);
   };
 
   const exportWorkspace = () => {
