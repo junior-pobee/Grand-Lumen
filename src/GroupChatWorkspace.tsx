@@ -191,16 +191,25 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
     let active = true;
     let channel: ReturnType<typeof client.channel> | null = null;
     const load = async () => {
-      const [messageResult, hiddenResult] = await Promise.all([
-        client.from("grand_lumen_group_chat_messages").select("*").eq("group_id", selected.id).order("created_at", { ascending: true }).limit(500),
-        client.from("grand_lumen_group_message_hides").select("message_id").eq("user_id", userId)
-      ]);
+      const messageResult = await client.from("grand_lumen_group_chat_messages").select("*").eq("group_id", selected.id).order("created_at", { ascending: true }).limit(500);
       if (!active) return;
-      if (messageResult.error) { setNotice(messageResult.error.message); return; }
-      if (hiddenResult.error) { setNotice(hiddenResult.error.message); return; }
-      setMessages((messageResult.data || []) as GroupMessage[]);
-      setHiddenIds((hiddenResult.data || []).map(item => String(item.message_id)));
-      channel = client.channel("grand-lumen-group-chat-" + selected.id)
+      if (messageResult.error) {
+        setNotice(messageResult.error.message);
+      } else {
+        const rows = (messageResult.data || []) as GroupMessage[];
+        setMessages(rows);
+        const ids = rows.map(item => item.id);
+        if (ids.length) {
+          const hiddenResult = await client.from("grand_lumen_group_message_hides").select("message_id").eq("user_id", userId).in("message_id", ids);
+          if (!active) return;
+          if (hiddenResult.error) setNotice(hiddenResult.error.message);
+          else setHiddenIds((hiddenResult.data || []).map(item => String(item.message_id)));
+        } else {
+          setHiddenIds([]);
+        }
+      }
+      if (!active) return;
+      channel = client.channel("grand-lumen-group-chat-" + selected.id + "-" + userId)
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_group_chat_messages", filter: "group_id=eq." + selected.id }, payload => {
           const row = payload.new as GroupMessage;
           if (active) setMessages(current => current.some(item => item.id === row.id) ? current : [...current, row]);
