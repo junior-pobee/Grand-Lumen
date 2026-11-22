@@ -163,6 +163,28 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
   }, [selected?.id, messages, hiddenIds]);
 
   useEffect(() => {
+    if (!supabase || !activeCall) return;
+    const sessionId = activeCall.id;
+    let alive = true;
+    const loadParticipants = async () => {
+      const result = await supabase!.from("grand_lumen_group_call_participants").select("session_id,user_id,peer_id").eq("session_id", sessionId);
+      if (alive && !result.error) setCallParticipants((result.data || []) as CallParticipant[]);
+    };
+    void loadParticipants();
+    const channel = supabase.channel("grand-lumen-group-call-roster-" + sessionId + "-" + userId)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_group_call_participants", filter: "session_id=eq." + sessionId }, payload => {
+        const row = payload.new as CallParticipant;
+        setCallParticipants(current => current.some(item => item.user_id === row.user_id) ? current : [...current, row]);
+      })
+      .on("postgres_changes", { event: "DELETE", schema: "public", table: "grand_lumen_group_call_participants", filter: "session_id=eq." + sessionId }, payload => {
+        const row = payload.old as CallParticipant;
+        setCallParticipants(current => current.filter(item => item.user_id !== row.user_id));
+      })
+      .subscribe();
+    return () => { alive = false; void supabase?.removeChannel(channel); };
+  }, [activeCall?.id, userId]);
+
+  useEffect(() => {
     if (!supabase || !messages.length) return;
     let active = true;
     const pending = messages.filter(message => !message.deleted_for_everyone && readAttachment(message.body) && !urls[message.id]);
