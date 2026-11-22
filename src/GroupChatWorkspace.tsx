@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ArrowLeft, Check, ChevronDown, Mic, Paperclip, Phone, Plus, Send, Settings, Trash2, UserPlus, UserRound, Users, Video, X } from "lucide-react";
 import Peer from "peerjs";
+import AudioMessagePlayer from "./AudioMessagePlayer";
 import { supabase } from "./auth";
 
 type Connection = { id: string; user_low: string; user_high: string };
@@ -659,7 +660,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
           {message.deleted_for_everyone ? <p>This message was deleted</p> : attachment ? <div className="team-attachment">
             {attachment.kind === "image" && (url ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={attachment.name}/></a> : <span>Loading image…</span>)}
             {attachment.kind === "video" && (url ? <video src={url} controls preload="metadata"/> : <span>Loading video…</span>)}
-            {attachment.kind === "audio" && (url ? <audio src={url} controls preload="metadata"/> : <span>Loading audio…</span>)}
+            {attachment.kind === "audio" && (url ? <AudioMessagePlayer src={url} name={attachment.name}/> : <span>Loading audio…</span>)}
             {attachment.kind === "file" && <div className="team-attachment-file"><span>FILE</span><div><b>{attachment.name}</b><small>{(attachment.size / 1024 / 1024).toFixed(2)} MB</small></div>{url ? <a href={url} target="_blank" rel="noreferrer" download={attachment.name}>Open / download</a> : <span>Preparing…</span>}</div>}
           </div> : <p>{message.body}</p>}
           <small>{own ? "You" : memberName(message.sender_id)} · {new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small>
