@@ -2488,3 +2488,21 @@ html[data-theme="light"] .group-chat-first-message>b{color:#17243a}
 .group-chat-list-item{min-height:68px;cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 .group-chat-list-item:active{transform:scale(.99);background:var(--surface)}
 .group-chat-messages{-webkit-overflow-scrolling:touch;touch-action:pan-y}
+
+
+.group-chat-settings-screen{display:flex;flex:1 1 auto;flex-direction:column;gap:16px;min-height:0;width:100%;padding:16px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--text)}
+.group-chat-settings-screen>.group-chat-settings-top{justify-content:flex-start;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.group-chat-settings-screen>.group-chat-settings-top>div{display:grid;gap:4px}
+.group-chat-settings-screen>.group-chat-settings-top b{font-size:17px}
+.group-chat-settings-screen>.group-chat-settings-top small{color:var(--muted);font-size:11px}
+.group-chat-settings-screen .group-chat-rename{width:100%}
+.group-chat-settings-screen .group-chat-settings-members{display:grid;gap:9px;width:100%;min-width:0}
+.group-chat-settings-screen .group-chat-settings-members>div:first-child{position:relative;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 0 10px;border-bottom:1px solid var(--line)}
+.group-chat-settings-screen .group-chat-settings-members>div:not(:first-child){min-height:68px;padding:12px}
+.group-chat-settings-screen .group-chat-member-picker.group-chat-add-picker{display:grid;gap:9px;width:100%;max-height:none;min-height:0;padding:12px;overflow:visible;border:1px solid var(--line);border-radius:13px;background:var(--surface-2)}
+.group-chat-settings-screen .group-chat-add-picker>label{min-height:62px;padding:10px}
+.group-chat-settings-screen .group-chat-add-picker>label>span:nth-last-child(1){min-width:0;overflow-wrap:anywhere}
+.group-chat-settings-screen .group-chat-add-picker>.team-primary{justify-self:start;min-height:42px;margin-top:3px;padding:10px 16px}
+html[data-theme="light"] .group-chat-settings-screen{background:#fff;border-color:#d4dfec;color:#17243a}
+html[data-theme="light"] .group-chat-settings-screen .group-chat-add-picker{background:#f6f9fd;border-color:#d8e2ee}
+@media(max-width:700px){.group-chat-settings-screen{gap:13px;padding:12px}.group-chat-settings-screen>.group-chat-settings-top b{font-size:16px}.group-chat-settings-screen .group-chat-settings-members>div:not(:first-child){min-height:64px;padding:10px}.group-chat-settings-screen .group-chat-add-picker>label{min-height:60px}}
