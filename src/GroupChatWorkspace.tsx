@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ArrowLeft, Check, ChevronDown, Mic, Paperclip, Phone, Plus, Send, Settings, Trash2, UserPlus, UserRound, Users, Video, X } from "lucide-react";
 import Peer from "peerjs";
 import { supabase } from "./auth";
@@ -92,12 +93,12 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
     const grouped: Record<string, Member[]> = {};
     for (const member of (memberResult.data || []) as Member[]) grouped[member.group_id] = [...(grouped[member.group_id] || []), member];
     setMembers(grouped);
+    setLoading(false);
     const profileIds = Array.from(new Set((memberResult.data || []).map(item => String(item.user_id))));
     if (profileIds.length) {
       const profileResult = await supabase.from("grand_lumen_profiles").select("id,display_name,email,avatar_url").in("id", profileIds);
       if (!profileResult.error) setGroupProfiles(Object.fromEntries(((profileResult.data || []) as Profile[]).map(profile => [profile.id, profile])));
     }
-    setLoading(false);
   }, [userId]);
 
   useEffect(() => { void loadGroups(); }, [loadGroups]);
@@ -213,6 +214,13 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
     void load();
     return () => { active = false; if (channel) void client.removeChannel(channel); };
   }, [selected?.id, userId]);
+
+  useEffect(() => {
+    if (!selected) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [selected?.id]);
 
   useEffect(() => {
     if (!selected || !messageListRef.current) return;
@@ -352,18 +360,31 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
   };
 
   const createGroup = async () => {
-    if (!supabase || !groupName.trim()) return;
+    if (!supabase || !groupName.trim() || busy) return;
     setBusy(true);
-    const result = await supabase.rpc("grand_lumen_create_group_chat", { p_name: groupName.trim(), p_member_ids: selectedMembers });
-    if (result.error) setNotice(result.error.message);
-    else {
-      setCreating(false);
-      setGroupName("");
-      setSelectedMembers([]);
-      await loadGroups();
-      const group = await supabase.from("grand_lumen_group_chats").select("id,name,created_by,created_at").eq("id", result.data).single();
-      if (!group.error && group.data) setSelected(group.data as Group);
-      setNotice("Group created. You are the admin and your selected connections have been added.");
+    const name = groupName.trim();
+    const result = await supabase.rpc("grand_lumen_create_group_chat", { p_name: name, p_member_ids: selectedMembers });
+    if (result.error) {
+      setNotice(result.error.message);
+      setBusy(false);
+      return;
+    }
+    const fallback: Group = { id: String(result.data), name, created_by: userId, created_at: new Date().toISOString() };
+    setOpened(true);
+    setCreating(false);
+    setGroupName("");
+    setSelectedMembers([]);
+    setSelected(fallback);
+    setRenameValue(name);
+    setShowSettings(false);
+    setNotice("Group created. You are the admin and the first member of this group.");
+    void loadGroups();
+    const group = await supabase.from("grand_lumen_group_chats").select("id,name,created_by,created_at").eq("id", String(result.data)).maybeSingle();
+    if (group.data) {
+      setSelected(group.data as Group);
+      setRenameValue(group.data.name);
+    } else if (group.error) {
+      setNotice("The group was created, but its details are still loading. " + group.error.message);
     }
     setBusy(false);
   };
@@ -571,7 +592,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
       {notice && <div className="team-notice">{notice}</div>}
       {loading ? <p className="team-muted">Loading your groups…</p> : groups.length ? <div className="group-chat-list">{groups.map(group => {
         const groupMembers = (members[group.id] || []).filter(item => !item.left_at);
-        return <button className="group-chat-list-item" key={group.id} onClick={() => { setSelected(group); setRenameValue(group.name); setNotice(""); }}>
+        return <button type="button" className="group-chat-list-item" key={group.id} onClick={() => { setOpened(true); setCreating(false); setSelected(group); setRenameValue(group.name); setShowSettings(false); setShowAdd(false); setNotice(""); setMessages([]); setHiddenIds([]); }}>
           <span className="group-chat-avatar"><Users size={20}/></span><span><b>{group.name}</b><small>{groupMembers.length} members · {groupMembers.some(item => item.user_id === userId && item.role === "admin") ? "Admin" : "Member"}</small></span><ChevronDown size={16}/>
         </button>;
       })}</div> : <div className="group-chat-empty"><span className="group-chat-empty-icon"><Users size={28}/></span><b>No group chats yet</b><p>Create a group, choose people from your connections and start talking together.</p><button className="team-primary" onClick={() => setCreating(true)}><Plus size={15}/> Create your first group</button></div>}
@@ -582,7 +603,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
       <div className="group-chat-member-picker"><div><b>Add connected people</b><small>{selectedMembers.length} selected</small></div>{availableMembers.length ? availableMembers.map(id => <label key={id}><input type="checkbox" checked={selectedMembers.includes(id)} onChange={event => setSelectedMembers(current => event.target.checked ? [...current,id] : current.filter(value => value !== id))}/><span className="group-chat-member-avatar">{memberName(id).slice(0,1).toUpperCase()}</span><span><b>{memberName(id)}</b><small>{profiles[id]?.email || "Connected member"}</small></span></label>) : <p className="team-muted">Connect with people first. Your connected accounts will appear here.</p>}</div>
       <button className="team-primary" disabled={busy || !groupName.trim()} onClick={() => void createGroup()}>{busy ? "Creating…" : "Create group"}</button>
     </div>}
-    {selected && <section className="group-chat-fullscreen">
+    {selected && createPortal(<section className="group-chat-fullscreen" role="dialog" aria-modal="true" aria-label={selected.name}>
       <header className="group-chat-header"><div className="group-chat-header-title"><button className="team-secondary" onClick={() => { setSelected(null); setShowSettings(false); setNotice(""); }}><ArrowLeft size={16}/></button><span className="group-chat-avatar"><Users size={20}/></span><div><b>{selected.name}</b><small>{activeMembers.length} members · {isAdmin ? "Group admin" : "Group member"}</small></div></div>
         <div className="group-chat-header-actions"><button className="team-secondary" onClick={() => void startGroupCall("audio")} disabled={callBusy}><Phone size={15}/> Audio call</button><button className="team-secondary" onClick={() => void startGroupCall("video")} disabled={callBusy}><Video size={15}/> Video call</button><button className="team-secondary" onClick={() => setShowSettings(value => !value)}><Settings size={15}/></button></div>
       </header>
@@ -624,6 +645,6 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
         <button type="button" className="team-secondary" onClick={() => setClearConfirm(true)} title="Clear chat for me"><Trash2 size={16}/></button>
       </form>
       <div className="group-chat-footnote">Messages and attachments are shared with active group members. Long-press a message for deletion options.</div>
-    </section>}
+    </section>, document.body)}
   </section>;
 }
