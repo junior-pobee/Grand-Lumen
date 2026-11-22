@@ -105,6 +105,29 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
   useEffect(() => {
     if (!supabase || !userId) return;
     let active = true;
+    const key = "grandLumenGroupAddedSeen:" + userId;
+    const seen = new Set<string>(JSON.parse(localStorage.getItem(key) || "[]") as string[]);
+    const loadRecentAddition = async () => {
+      const result = await supabase!.from("grand_lumen_group_chat_members").select("group_id,added_by,joined_at").eq("user_id", userId).is("left_at", null).neq("added_by", userId).order("joined_at", { ascending: false }).limit(30);
+      if (!active || result.error) return;
+      const latest = (result.data || []).find(item => !seen.has(String(item.group_id)));
+      if (!latest) return;
+      const group = await supabase!.from("grand_lumen_group_chats").select("id,name,created_by,created_at").eq("id", latest.group_id).maybeSingle();
+      if (!active || !group.data) return;
+      seen.add(String(latest.group_id));
+      localStorage.setItem(key, JSON.stringify(Array.from(seen)));
+      setOpened(true);
+      setSelected(group.data as Group);
+      setRenameValue(group.data.name);
+      setNotice("You have been added to " + group.data.name + ".");
+    };
+    void loadRecentAddition();
+    return () => { active = false; };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!supabase || !userId) return;
+    let active = true;
     const loadPendingCall = async () => {
       const inviteResult = await supabase!.from("grand_lumen_group_call_invites").select("*").eq("recipient_id", userId).eq("status", "pending").order("created_at", { ascending: false }).limit(1).maybeSingle();
       if (!active || inviteResult.error || !inviteResult.data) return;
@@ -128,6 +151,17 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
     const channel = supabase.channel("grand-lumen-group-memberships-" + userId)
       .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_group_chat_members", filter: "user_id=eq." + userId }, () => void loadGroups())
       .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_group_chat_members" }, () => void loadGroups())
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_group_chat_members", filter: "user_id=eq." + userId }, payload => {
+        const membership = payload.new as Member & { added_by: string | null };
+        if (membership.user_id !== userId || membership.added_by === userId) return;
+        void supabase!.from("grand_lumen_group_chats").select("id,name,created_by,created_at").eq("id", membership.group_id).maybeSingle().then(result => {
+          if (!result.data) return;
+          setOpened(true);
+          setSelected(result.data as Group);
+          setRenameValue(result.data.name);
+          setNotice("You have been added to " + result.data.name + ".");
+        });
+      })
       .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_group_chats" }, () => void loadGroups())
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "grand_lumen_group_call_invites", filter: "recipient_id=eq." + userId }, payload => {
         const invite = payload.new as CallInvite;
