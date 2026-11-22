@@ -20,6 +20,7 @@ const readAttachment = (body: string): Attachment | null => {
 
 export default function GroupChatWorkspace({ userId, connections, profiles }: { userId: string; connections: Connection[]; profiles: Record<string, Profile> }) {
   const [groups, setGroups] = useState<Group[]>([]);
+  const [opened, setOpened] = useState(false);
   const [groupProfiles, setGroupProfiles] = useState<Record<string, Profile>>({});
   const [members, setMembers] = useState<Record<string, Member[]>>({});
   const [selected, setSelected] = useState<Group | null>(null);
@@ -113,6 +114,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
           setIncomingCall(invite);
           void supabase!.from("grand_lumen_group_chats").select("id,name,created_by,created_at").eq("id", invite.group_id).maybeSingle().then(result => {
             if (result.data) {
+              setOpened(true);
               setSelected(result.data as Group);
               setRenameValue(result.data.name);
             }
@@ -504,12 +506,12 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
   const memberName = (id: string) => groupProfiles[id]?.display_name || groupProfiles[id]?.email || profiles[id]?.display_name || profiles[id]?.email || "Grand Lumen member";
 
   return <section className="group-chat-module">
-    <button className="group-chat-launch" onClick={() => { setSelected(null); setCreating(false); setShowSettings(false); }}>
+    <button className="group-chat-launch" onClick={() => { setOpened(value => !value); setSelected(null); setCreating(false); setShowSettings(false); }}>
       <span className="group-chat-launch-icon"><Users size={28}/><i/><i/><i/></span>
       <span><b>Group Chat</b><small>Bring your connected people into one conversation</small></span>
       <span className="group-chat-launch-count">{groups.length} groups</span>
     </button>
-    {!selected && !creating && <div className="group-chat-list-panel">
+    {opened && !selected && !creating && <div className="group-chat-list-panel">
       <div className="group-chat-panel-heading"><div><span className="eyebrow">YOUR GROUPS</span><h3>Group conversations</h3></div><button className="team-primary" onClick={() => setCreating(true)}><Plus size={15}/> Create group</button></div>
       {notice && <div className="team-notice">{notice}</div>}
       {loading ? <p className="team-muted">Loading your groups…</p> : groups.length ? <div className="group-chat-list">{groups.map(group => {
@@ -519,7 +521,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
         </button>;
       })}</div> : <div className="group-chat-empty"><span className="group-chat-empty-icon"><Users size={28}/></span><b>No group chats yet</b><p>Create a group, choose people from your connections and start talking together.</p><button className="team-primary" onClick={() => setCreating(true)}><Plus size={15}/> Create your first group</button></div>}
     </div>}
-    {creating && <div className="group-chat-create-panel">
+    {opened && creating && <div className="group-chat-create-panel">
       <div className="group-chat-panel-heading"><div><span className="eyebrow">NEW GROUP</span><h3>Create a group chat</h3></div><button className="team-secondary" onClick={() => setCreating(false)}><X size={16}/></button></div>
       <label>Group name<input value={groupName} onChange={event => setGroupName(event.target.value)} maxLength={80} placeholder="e.g. Project 2.2 or Group of Ninjas"/></label>
       <div className="group-chat-member-picker"><div><b>Add connected people</b><small>{selectedMembers.length} selected</small></div>{availableMembers.length ? availableMembers.map(id => <label key={id}><input type="checkbox" checked={selectedMembers.includes(id)} onChange={event => setSelectedMembers(current => event.target.checked ? [...current,id] : current.filter(value => value !== id))}/><span className="group-chat-member-avatar">{memberName(id).slice(0,1).toUpperCase()}</span><span><b>{memberName(id)}</b><small>{profiles[id]?.email || "Connected member"}</small></span></label>) : <p className="team-muted">Connect with people first. Your connected accounts will appear here.</p>}</div>
