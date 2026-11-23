@@ -19,7 +19,7 @@ type SocialProfile = {
 };
 type SocialRequest = { id: string; requester_id: string; recipient_id: string; created_at: string };
 type Moment = { id: string; author_id: string; body: string; kind: string; visibility: string; media_path: string | null; media_type: string | null; created_at: string; expires_at: string };
-type MomentAuthor = { id: string; display_name: string | null; username: string | null };
+type MomentAuthor = { id: string; display_name: string | null; username: string | null; account_status: "active" | "deactivated" | "deleted" };
 type Notice = { id: string; title: string; body: string; kind: string; created_at: string; read_at: string | null };
 type Broadcast = { id: string; title: string; body: string; kind: string; created_at: string };
 type ConnectionRow = { id: string; user_low: string; user_high: string };
@@ -141,12 +141,12 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
       setMoments(rows);
       const authorIds = Array.from(new Set(rows.map(item => item.author_id).filter(id => id !== userId)));
       if (authorIds.length) {
-        const [authors, statuses] = await Promise.all([
-          supabase.rpc("grand_lumen_get_moment_authors", { p_author_ids: authorIds }),
-          supabase.from("grand_lumen_profiles").select("id,account_status").in("id", authorIds)
-        ]);
-        if (!authors.error) setMomentAuthors((authors.data || []) as MomentAuthor[]);
-        if (!statuses.error) setDeletedMomentAuthorIds((statuses.data || []).filter(item => item.account_status === "deleted").map(item => String(item.id)));
+        const authors = await supabase.rpc("grand_lumen_get_moment_authors", { p_author_ids: authorIds });
+        if (!authors.error) {
+          const authorRows = (authors.data || []) as MomentAuthor[];
+          setMomentAuthors(authorRows);
+          setDeletedMomentAuthorIds(authorRows.filter(item => item.account_status === "deleted").map(item => item.id));
+        }
       } else {
         setMomentAuthors([]);
         setDeletedMomentAuthorIds([]);
