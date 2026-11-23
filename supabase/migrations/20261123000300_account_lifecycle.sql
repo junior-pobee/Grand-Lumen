@@ -63,13 +63,14 @@ begin
   update public.grand_lumen_profiles
   set account_status = p_status,
       deleted_at = case when p_status = 'deleted' then now() else deleted_at end,
-      discoverable = false,
-      profile_viewable = false,
-      allow_requests = false,
-      show_online = false,
+      discoverable = case when p_status = 'deleted' then false else discoverable end,
+      profile_viewable = case when p_status = 'deleted' then false else profile_viewable end,
+      allow_requests = case when p_status = 'deleted' then false else allow_requests end,
+      show_online = case when p_status = 'deleted' then false else show_online end,
       show_avatar = case when p_status = 'deleted' then false else show_avatar end,
       username = case when p_status = 'deleted' then null else username end,
       display_name = case when p_status = 'deleted' then 'Deleted account' else display_name end,
+      email = case when p_status = 'deleted' then null else email end,
       bio = case when p_status = 'deleted' then null else bio end,
       avatar_url = case when p_status = 'deleted' then null else avatar_url end,
       cover_url = case when p_status = 'deleted' then null else cover_url end,
@@ -206,7 +207,9 @@ as $$
          case when p.account_status = 'active' and p.show_avatar then p.avatar_url else null end,
          case when p.account_status = 'active' and p.profile_viewable then p.cover_url else null end,
          case when p.account_status = 'active' and p.profile_viewable then p.interests else '{}'::text[] end,
-         p.discoverable, p.profile_viewable, p.allow_requests, p.show_online, p.show_avatar,
+         p.discoverable, p.profile_viewable, p.allow_requests,
+         case when p.account_status = 'active' then p.show_online else false end,
+         p.show_avatar,
          (select count(*) from public.grand_lumen_team_connections c where c.user_low = p.id or c.user_high = p.id)
   from public.grand_lumen_profiles p
   where p.id = any(coalesce(p_user_ids, '{}'::uuid[]))
