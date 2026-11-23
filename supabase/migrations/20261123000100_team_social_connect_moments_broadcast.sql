@@ -14,6 +14,9 @@ on public.grand_lumen_profiles (lower(username))
 where username is not null and length(trim(username)) > 0;
 
 alter table public.grand_lumen_profiles
+  drop constraint if exists grand_lumen_profiles_username_format;
+
+alter table public.grand_lumen_profiles
   add constraint grand_lumen_profiles_username_format
   check (username is null or username ~ '^[a-z0-9_]{3,24}$');
 
@@ -35,6 +38,7 @@ create table if not exists public.grand_lumen_profile_blocks (
 );
 
 alter table public.grand_lumen_profile_blocks enable row level security;
+drop policy if exists grand_lumen_profile_blocks_read_own on public.grand_lumen_profile_blocks;
 create policy grand_lumen_profile_blocks_read_own
 on public.grand_lumen_profile_blocks for select to authenticated
 using (blocker_id = auth.uid());
@@ -55,9 +59,11 @@ create index if not exists grand_lumen_notifications_user_created_idx
 on public.grand_lumen_notifications (user_id, created_at desc);
 
 alter table public.grand_lumen_notifications enable row level security;
+drop policy if exists grand_lumen_notifications_read_own on public.grand_lumen_notifications;
 create policy grand_lumen_notifications_read_own
 on public.grand_lumen_notifications for select to authenticated
 using (user_id = auth.uid());
+drop policy if exists grand_lumen_notifications_update_own on public.grand_lumen_notifications;
 create policy grand_lumen_notifications_update_own
 on public.grand_lumen_notifications for update to authenticated
 using (user_id = auth.uid())
@@ -227,8 +233,7 @@ as $
     and auth.uid() is not null
     and not public.grand_lumen_is_blocked_pair(auth.uid(), p.id)
   limit 1;
-$;
-
+$$;
 create or replace function public.grand_lumen_get_profiles_by_ids(p_user_ids uuid[])
 returns table (
   id uuid,
@@ -379,6 +384,7 @@ begin
 end;
 $$;
 
+drop policy if exists grand_lumen_moments_read_visible on public.grand_lumen_moments;
 create policy grand_lumen_moments_read_visible
 on public.grand_lumen_moments for select to authenticated
 using (
@@ -399,9 +405,11 @@ using (
   )
 );
 
+drop policy if exists grand_lumen_moments_insert_own on public.grand_lumen_moments;
 create policy grand_lumen_moments_insert_own
 on public.grand_lumen_moments for insert to authenticated
 with check (author_id = auth.uid());
+drop policy if exists grand_lumen_moments_delete_own on public.grand_lumen_moments;
 create policy grand_lumen_moments_delete_own
 on public.grand_lumen_moments for delete to authenticated
 using (author_id = auth.uid());
@@ -414,26 +422,30 @@ security definer
 set search_path = public, auth
 as $
   select exists (select 1 from public.grand_lumen_moments m where m.id = p_moment_id and m.author_id = auth.uid());
-$;
-
+$$;
 drop policy if exists grand_lumen_moment_tags_read_visible on public.grand_lumen_moment_tags;
 create policy grand_lumen_moment_tags_read_visible
 on public.grand_lumen_moment_tags for select to authenticated
 using (user_id = auth.uid() or public.grand_lumen_is_moment_author(moment_id));
 
+drop policy if exists grand_lumen_moment_reactions_read_visible on public.grand_lumen_moment_reactions;
 create policy grand_lumen_moment_reactions_read_visible
 on public.grand_lumen_moment_reactions for select to authenticated
 using (exists (select 1 from public.grand_lumen_moments m where m.id = moment_id));
+drop policy if exists grand_lumen_moment_reactions_insert_own on public.grand_lumen_moment_reactions;
 create policy grand_lumen_moment_reactions_insert_own
 on public.grand_lumen_moment_reactions for insert to authenticated
 with check (user_id = auth.uid() and exists (select 1 from public.grand_lumen_moments m where m.id = moment_id));
+drop policy if exists grand_lumen_moment_reactions_delete_own on public.grand_lumen_moment_reactions;
 create policy grand_lumen_moment_reactions_delete_own
 on public.grand_lumen_moment_reactions for delete to authenticated
 using (user_id = auth.uid());
 
+drop policy if exists grand_lumen_moment_comments_read_visible on public.grand_lumen_moment_comments;
 create policy grand_lumen_moment_comments_read_visible
 on public.grand_lumen_moment_comments for select to authenticated
 using (exists (select 1 from public.grand_lumen_moments m where m.id = moment_id));
+drop policy if exists grand_lumen_moment_comments_insert_own on public.grand_lumen_moment_comments;
 create policy grand_lumen_moment_comments_insert_own
 on public.grand_lumen_moment_comments for insert to authenticated
 with check (user_id = auth.uid() and exists (select 1 from public.grand_lumen_moments m where m.id = moment_id and m.expires_at > now()));
@@ -468,6 +480,7 @@ create table if not exists public.grand_lumen_broadcasts (
 );
 
 alter table public.grand_lumen_broadcasts enable row level security;
+drop policy if exists grand_lumen_broadcasts_admin_read on public.grand_lumen_broadcasts;
 create policy grand_lumen_broadcasts_admin_read
 on public.grand_lumen_broadcasts for select to authenticated
 using (public.grand_lumen_is_admin());
@@ -526,10 +539,12 @@ insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
 values ('grand-lumen-moments','grand-lumen-moments',false,52428800,array['image/*','video/*'])
 on conflict(id) do update set public=false,file_size_limit=52428800,allowed_mime_types=excluded.allowed_mime_types;
 
+drop policy if exists grand_lumen_moments_upload_own on storage.objects;
 create policy grand_lumen_moments_upload_own
 on storage.objects for insert to authenticated
 with check (bucket_id = 'grand-lumen-moments' and (storage.foldername(name))[1] = auth.uid()::text);
 
+drop policy if exists grand_lumen_moments_read_visible on storage.objects;
 create policy grand_lumen_moments_read_visible
 on storage.objects for select to authenticated
 using (
@@ -537,6 +552,7 @@ using (
   and exists (select 1 from public.grand_lumen_moments m where m.media_path = name)
 );
 
+drop policy if exists grand_lumen_moments_delete_own on storage.objects;
 create policy grand_lumen_moments_delete_own
 on storage.objects for delete to authenticated
 using (bucket_id = 'grand-lumen-moments' and (storage.foldername(name))[1] = auth.uid()::text);
