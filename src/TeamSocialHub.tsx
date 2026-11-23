@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "./auth";
 import "./team-social.css";
 
@@ -69,6 +69,8 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
   const [broadcastPassword, setBroadcastPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [liveNotice, setLiveNotice] = useState<Notice | null>(null);
+  const knownNoticeIds = useRef<Set<string> | null>(null);
 
   const isAdmin = email.trim().toLowerCase() === ADMIN_EMAIL;
   const normalizedUsername = username.trim().replace(/^@/, "").toLowerCase();
@@ -176,6 +178,15 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
     const result = await supabase.from("grand_lumen_notifications").select("id,title,body,kind,created_at,read_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(100);
     if (!result.error) setNotices((result.data || []) as Notice[]);
   }, [userId]);
+
+  useEffect(() => {
+    const currentIds = new Set(notices.map(notice => notice.id));
+    if (knownNoticeIds.current) {
+      const fresh = notices.find(notice => !knownNoticeIds.current?.has(notice.id));
+      if (fresh) setLiveNotice(fresh);
+    }
+    knownNoticeIds.current = currentIds;
+  }, [notices]);
 
   const loadBroadcasts = useCallback(async () => {
     if (!supabase || !isAdmin) return;
@@ -480,6 +491,7 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
     <nav className="team-social-tabs">{["Discover","Notifications","Privacy",...(isAdmin ? ["Administrator"] : [])].map(item => <button type="button" className={tab === item ? "active" : ""} key={item} disabled={!profile?.username && ["Discover","Moments"].includes(item)} onClick={() => { setTab(item); setSelectedProfile(null); }}>{item}{item === "Notifications" && notices.some(notice => !notice.read_at) ? <i/> : null}</button>)}</nav>
     <button type="button" className="team-social-moments-launch" onClick={() => setTab("Moments")} aria-label={"Open Moments, " + moments.length + " active moments"}><span className="team-social-moments-launch-icon">◉</span><span><b>Moments</b><small>{moments.length} active {moments.length === 1 ? "moment" : "moments"}</small></span><strong>{moments.length}</strong></button>
     {message && <div className="team-social-message" role="status">{message}</div>}
+    {liveNotice && <button type="button" className="team-social-live-notice" onClick={() => { setTab("Notifications"); setLiveNotice(null); }}><span className="team-social-live-notice-dot"/><span><b>{liveNotice.title}</b><small>{liveNotice.body}</small></span><strong>View</strong><i onClick={event => { event.stopPropagation(); setLiveNotice(null); }}>×</i></button>}
     {tab === "Discover" && <div className="team-social-panel">
       <div className="team-social-search"><input value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void searchPeople(); }} placeholder="Search by name or @username"/><button type="button" disabled={busy} onClick={() => void searchPeople()}>Search members</button><button type="button" className="team-social-all-users" disabled={busy} onClick={() => { setQuery(""); void searchPeople(true); }}>All users</button></div>
       {requests.length > 0 && <section className="team-social-subpanel"><h3>Connection requests <span>{requests.length}</span></h3>{requests.map(request => <article className="team-social-person" key={request.id}><div><b>New connection request</b><small>Review the request to connect.</small></div><div className="team-social-actions"><button type="button" onClick={() => void respondRequest(request.id, false)} disabled={busy}>Decline</button><button type="button" className="primary" onClick={() => void respondRequest(request.id, true)} disabled={busy}>Accept</button></div></article>)}</section>}
