@@ -114,7 +114,7 @@ returns boolean
 language sql
 stable
 security definer
-set search_path = public
+set search_path = public, auth
 as $$
   select exists (
     select 1 from public.grand_lumen_profile_blocks b
@@ -371,7 +371,7 @@ returns boolean
 language sql
 stable
 security definer
-set search_path = public
+set search_path = public, auth
 as $
   select exists (select 1 from public.grand_lumen_moments m where m.id = p_moment_id and m.author_id = auth.uid());
 $;
