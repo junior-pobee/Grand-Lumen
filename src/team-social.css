@@ -338,3 +338,26 @@ html[data-theme="light"] .connect-dashboard-mode>.team-social{background:#f3f7fc
 .account-deleted-overlay{position:absolute;inset:0;display:grid;place-items:center;padding:12px;background:rgba(12,16,24,.48);color:#fff;font-size:12px;font-weight:900;letter-spacing:.08em;text-align:center;text-transform:uppercase}
 
 .team-message-sender,.group-chat-sender{display:block;margin:0 0 6px;color:var(--text)!important;font-size:13px;font-weight:900;line-height:1.35;letter-spacing:.01em;overflow-wrap:anywhere}.team-message,.group-chat-message{touch-action:pan-y}.group-chat-message{user-select:none;-webkit-user-select:none}
+
+
+.team-social-search{display:grid;grid-template-columns:minmax(0,1fr) auto auto;align-items:stretch}
+.team-social-all-users{border:1px solid var(--line)!important;border-radius:12px!important;padding:11px 14px!important;background:var(--surface-2)!important;color:var(--text)!important;font-weight:800!important;white-space:nowrap}
+.team-social-profile-backdrop{position:fixed;inset:0;z-index:100020;display:grid;place-items:center;padding:clamp(12px,3vw,28px);background:rgba(5,12,24,.62);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);animation:team-profile-fade .2s ease both}
+.team-social-profile-dialog{width:min(720px,100%);max-height:min(88dvh,820px);overflow-y:auto;overscroll-behavior:contain;background:var(--surface)!important;box-shadow:0 30px 100px rgba(0,0,0,.38);animation:team-profile-pop .24s cubic-bezier(.2,.8,.2,1) both}
+.team-social-profile-dialog .team-social-profile-cover{height:clamp(110px,22vw,190px)}
+.team-social-profile-dialog .team-social-profile-main{align-items:flex-start}
+.team-social-profile-dialog .team-social-actions{padding-top:12px;border-top:1px solid var(--line)}
+.team-social-notice{display:grid!important;grid-template-columns:38px minmax(0,1fr) 9px!important;align-items:start!important;gap:12px!important;width:100%;height:auto!important;min-height:0!important;padding:15px!important;overflow:visible!important}
+.team-social-notice>div:not(.team-social-notice-badge){display:block!important;flex:initial!important;width:auto!important;min-width:0!important;max-width:100%!important;overflow-wrap:anywhere!important}
+.team-social-notice-badge{width:38px!important;height:38px!important;min-width:38px!important}
+.team-social-notice b{display:block;line-height:1.35;overflow-wrap:anywhere}
+.team-social-notice p{margin:7px 0!important;line-height:1.55!important;white-space:pre-line!important;overflow-wrap:anywhere!important;word-break:break-word!important}
+.team-social-notice small{display:block;line-height:1.5;overflow-wrap:anywhere}
+.team-social-notice .team-social-official-label{display:block!important;margin-top:5px!important;line-height:1.5}
+.team-social-notice>i{align-self:start;margin:5px 0 0!important}
+.team-social-moments-screen{background:radial-gradient(ellipse at 12% 5%,rgba(75,139,220,.18),transparent 38%),radial-gradient(ellipse at 90% 18%,rgba(104,91,194,.13),transparent 34%),linear-gradient(145deg,#0a1729,#101f35 58%,#0b192b)!important}
+html[data-theme="light"] .team-social-moments-screen{background:radial-gradient(ellipse at 12% 5%,rgba(119,177,245,.22),transparent 38%),radial-gradient(ellipse at 90% 18%,rgba(169,158,244,.16),transparent 34%),linear-gradient(145deg,#f5f9ff,#eaf2fc 58%,#f7f9fe)!important}
+@keyframes team-profile-fade{from{opacity:0}to{opacity:1}}
+@keyframes team-profile-pop{from{opacity:0;transform:translateY(18px) scale(.975)}to{opacity:1;transform:translateY(0) scale(1)}}
+@media(max-width:760px){.team-social-search{grid-template-columns:minmax(0,1fr)!important}.team-social-search button{width:100%;min-height:44px}.team-social-profile-backdrop{padding:10px}.team-social-profile-dialog{max-height:calc(100dvh - 20px);padding:13px}.team-social-notice{grid-template-columns:34px minmax(0,1fr) 8px!important;gap:9px!important;padding:12px!important}.team-social-notice-badge{width:34px!important;height:34px!important;min-width:34px!important}}
+@media(prefers-reduced-motion:reduce){.team-social-profile-backdrop,.team-social-profile-dialog{animation:none!important}}
