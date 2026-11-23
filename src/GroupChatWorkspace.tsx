@@ -6,7 +6,7 @@ import AudioMessagePlayer from "./AudioMessagePlayer";
 import { supabase } from "./auth";
 
 type Connection = { id: string; user_low: string; user_high: string };
-type Profile = { id: string; display_name: string | null; email: string | null; avatar_url: string | null; account_status?: "active" | "deactivated" | "deleted" };
+type Profile = { id: string; display_name: string | null; chat_display_name?: string | null; email: string | null; avatar_url: string | null; account_status?: "active" | "deactivated" | "deleted" };
 type Group = { id: string; name: string; created_by: string; created_at: string };
 type Member = { group_id: string; user_id: string; role: "admin" | "member"; joined_at: string; left_at: string | null };
 type GroupMessage = { id: string; group_id: string; sender_id: string; body: string; created_at: string; deleted_for_everyone: boolean };
@@ -20,7 +20,7 @@ const readAttachment = (body: string): Attachment | null => {
   try { return JSON.parse(body.slice(prefix.length)) as Attachment; } catch { return null; }
 };
 
-export default function GroupChatWorkspace({ userId, connections, profiles }: { userId: string; connections: Connection[]; profiles: Record<string, Profile> }) {
+export default function GroupChatWorkspace({ userId, connections, profiles, onOpenPrivateChat }: { userId: string; connections: Connection[]; profiles: Record<string, Profile>; onOpenPrivateChat: (connection: Connection) => void }) {
   const [groups, setGroups] = useState<Group[]>([]);
   const [opened, setOpened] = useState(false);
   const [groupProfiles, setGroupProfiles] = useState<Record<string, Profile>>({});
@@ -58,6 +58,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const pressTimerRef = useRef<number | null>(null);
+  const swipeStartRef = useRef<{ x: number; y: number } | null>(null);
   const peerRef = useRef<Peer | null>(null);
   const localStreamRef = useRef<MediaStream | null>(null);
   const callsRef = useRef<Record<string, any>>({});
@@ -105,6 +106,12 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
         setGroupProfiles({});
       } else {
         const nextProfiles = Object.fromEntries(((profileResult.data || []) as Profile[]).map(profile => [profile.id, profile]));
+        const chatNameResult = await supabase.from("grand_lumen_profiles").select("id,chat_display_name").in("id", profileIds);
+        if (!chatNameResult.error) {
+          for (const profile of chatNameResult.data || []) {
+            if (nextProfiles[profile.id]) nextProfiles[profile.id] = { ...nextProfiles[profile.id], chat_display_name: profile.chat_display_name };
+          }
+        }
         const statusResult = await supabase.from("grand_lumen_profiles").select("id,account_status").in("id", profileIds);
         if (!statusResult.error) {
           for (const status of statusResult.data || []) {
@@ -628,7 +635,25 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
     pressTimerRef.current = null;
   };
 
-  const memberName = (id: string) => groupProfiles[id]?.display_name || groupProfiles[id]?.email || profiles[id]?.display_name || profiles[id]?.email || "Grand Lumen member";
+  const memberName = (id: string) => groupProfiles[id]?.chat_display_name || profiles[id]?.chat_display_name || groupProfiles[id]?.display_name || profiles[id]?.display_name || "Grand Lumen member";
+  const beginMessageTouch = (message: GroupMessage, event: React.TouchEvent<HTMLElement>) => {
+    const touch = event.touches[0];
+    swipeStartRef.current = { x: touch.clientX, y: touch.clientY };
+    beginPress(message);
+  };
+  const finishMessageTouch = (message: GroupMessage, event: React.TouchEvent<HTMLElement>) => {
+    cancelPress();
+    const start = swipeStartRef.current;
+    const touch = event.changedTouches[0];
+    swipeStartRef.current = null;
+    if (!start || message.sender_id === userId || message.deleted_for_everyone) return;
+    const deltaX = touch.clientX - start.x;
+    const deltaY = Math.abs(touch.clientY - start.y);
+    if (Math.abs(deltaX) < 72 || deltaY > 55) return;
+    const connection = connections.find(item => item.user_low === message.sender_id && item.user_high === userId || item.user_high === message.sender_id && item.user_low === userId);
+    if (!connection) { setNotice("You need an active connection with this member to open a private conversation."); return; }
+    onOpenPrivateChat(connection);
+  };
 
   return <section className="group-chat-module">
     <button className="group-chat-launch" onClick={() => { setOpened(value => !value); setSelected(null); setCreating(false); setShowSettings(false); }}>
@@ -672,8 +697,8 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
         const own = message.sender_id === userId;
         const attachment = readAttachment(message.body);
         const url = urls[message.id];
-        return <article key={message.id} className={"group-chat-message" + (own ? " own" : "") + (message.deleted_for_everyone ? " deleted" : "")} onContextMenu={event => { event.preventDefault(); if (!message.deleted_for_everyone) setMessageMenu(message); }} onTouchStart={() => beginPress(message)} onTouchEnd={cancelPress} onTouchMove={cancelPress} onTouchCancel={cancelPress}>
-          {(() => { const deletedAccount = groupProfiles[message.sender_id]?.account_status === "deleted" || profiles[message.sender_id]?.account_status === "deleted"; return <>{!message.deleted_for_everyone && <><b className="group-chat-sender">{deletedAccount ? "Deleted account" : own ? groupProfiles[userId]?.display_name || groupProfiles[userId]?.email || "You" : memberName(message.sender_id)}</b>{!deletedAccount && (own ? groupProfiles[userId]?.email : groupProfiles[message.sender_id]?.email || profiles[message.sender_id]?.email) && <small className="group-chat-sender-email">{own ? groupProfiles[userId]?.email : groupProfiles[message.sender_id]?.email || profiles[message.sender_id]?.email}</small>}</>}<div className="account-deleted-wrap"><div className={"account-deleted-content" + (deletedAccount ? " blurred" : "")}>{message.deleted_for_everyone ? <p>This message was deleted</p> : attachment ? <div className="team-attachment">
+        return <article key={message.id} className={"group-chat-message" + (own ? " own" : "") + (message.deleted_for_everyone ? " deleted" : "")} onContextMenu={event => { event.preventDefault(); if (!message.deleted_for_everyone) setMessageMenu(message); }} onTouchStart={event => beginMessageTouch(message, event)} onTouchEnd={event => finishMessageTouch(message, event)} onTouchMove={event => { if (swipeStartRef.current && Math.abs(event.touches[0].clientX - swipeStartRef.current.x) > 12) cancelPress(); }} onTouchCancel={() => { cancelPress(); swipeStartRef.current = null; }}>
+          {(() => { const deletedAccount = groupProfiles[message.sender_id]?.account_status === "deleted" || profiles[message.sender_id]?.account_status === "deleted"; return <>{!message.deleted_for_everyone && <><b className="group-chat-sender">{deletedAccount ? "Deleted account" : memberName(message.sender_id)}</b></>}<div className="account-deleted-wrap"><div className={"account-deleted-content" + (deletedAccount ? " blurred" : "")}>{message.deleted_for_everyone ? <p>This message was deleted</p> : attachment ? <div className="team-attachment">
             {attachment.kind === "image" && (url ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={attachment.name}/></a> : <span>Loading image…</span>)}
             {attachment.kind === "video" && (url ? <video src={url} controls preload="metadata"/> : <span>Loading video…</span>)}
             {attachment.kind === "audio" && (url ? <AudioMessagePlayer src={url} name={attachment.name}/> : <span>Loading audio…</span>)}
@@ -691,7 +716,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
         <button type="button" className="team-secondary" onClick={() => recording ? recorderRef.current?.stop() : void startRecording()} disabled={uploading}><Mic size={16}/></button>
         <button type="button" className="team-secondary" onClick={() => setClearConfirm(true)} title="Clear chat for me"><Trash2 size={16}/></button>
       </form>
-      <div className="group-chat-footnote">Messages and attachments are shared with active group members. Long-press a message for deletion options.</div>
+      <div className="group-chat-footnote">Messages and attachments are shared with active group members. Swipe a member’s message sideways to open a private chat, or long-press for message options.</div>
       </>}
     </section>, document.body)}
   </section>;
