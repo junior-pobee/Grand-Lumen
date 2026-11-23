@@ -239,3 +239,52 @@ begin
   return request_id;
 end;
 $$;
+
+create or replace function public.grand_lumen_require_active_account()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, auth
+as $$
+declare
+  actor_id uuid;
+  actor_status text;
+begin
+  actor_id := (to_jsonb(new) ->> tg_argv[0])::uuid;
+  select account_status into actor_status
+  from public.grand_lumen_profiles
+  where id = actor_id;
+
+  if actor_status is distinct from 'active' then
+    raise exception 'This account is not active and cannot create new content.';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists grand_lumen_active_team_messages on public.grand_lumen_team_messages;
+create trigger grand_lumen_active_team_messages before insert on public.grand_lumen_team_messages
+for each row execute function public.grand_lumen_require_active_account('sender_id');
+
+drop trigger if exists grand_lumen_active_group_messages on public.grand_lumen_group_chat_messages;
+create trigger grand_lumen_active_group_messages before insert on public.grand_lumen_group_chat_messages
+for each row execute function public.grand_lumen_require_active_account('sender_id');
+
+drop trigger if exists grand_lumen_active_moments on public.grand_lumen_moments;
+create trigger grand_lumen_active_moments before insert on public.grand_lumen_moments
+for each row execute function public.grand_lumen_require_active_account('author_id');
+
+drop trigger if exists grand_lumen_active_connection_requests on public.grand_lumen_connection_requests;
+create trigger grand_lumen_active_connection_requests before insert on public.grand_lumen_connection_requests
+for each row execute function public.grand_lumen_require_active_account('requester_id');
+
+drop trigger if exists grand_lumen_active_moment_comments on public.grand_lumen_moment_comments;
+create trigger grand_lumen_active_moment_comments before insert on public.grand_lumen_moment_comments
+for each row execute function public.grand_lumen_require_active_account('user_id');
+
+drop trigger if exists grand_lumen_active_moment_reactions on public.grand_lumen_moment_reactions;
+create trigger grand_lumen_active_moment_reactions before insert on public.grand_lumen_moment_reactions
+for each row execute function public.grand_lumen_require_active_account('user_id');
+
+revoke all on function public.grand_lumen_require_active_account() from public, anon, authenticated;
