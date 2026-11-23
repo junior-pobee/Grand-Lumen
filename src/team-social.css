@@ -8,3 +8,6 @@
 .team-chat-fullscreen{position:relative;inset:auto;z-index:1;width:100%;height:auto;min-height:calc(100dvh - 90px);max-height:none;overflow:visible;border:1px solid var(--line);border-radius:22px}
 .team-chat-fullscreen .team-message-list{flex:1 1 420px;max-height:min(58vh,620px);min-height:180px;overflow-y:auto;overscroll-behavior-y:auto;touch-action:pan-y}
 @media(max-width:650px){.team-chat-fullscreen{min-height:calc(100dvh - 40px);padding:14px}.team-chat-fullscreen .team-message-list{max-height:58vh;min-height:180px}}
+
+.team-social-notice.broadcast .team-social-notice-badge,.team-social-notice.important .team-social-notice-badge{background:#236ed0;color:#fff;box-shadow:0 0 0 3px #236ed022}
+.team-social-official-label{display:inline-block;margin-top:5px;color:#3988df;font-size:9px;font-weight:900;letter-spacing:.12em}
