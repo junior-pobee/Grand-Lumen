@@ -76,6 +76,7 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
     }
     const value = result.data as SocialProfile | null;
     setProfile(value);
+    if (!value?.username) setTab("Privacy");
     setUsername(value?.username || "");
     setDisplayName(value?.display_name || "");
     setBio(value?.bio || "");
@@ -409,7 +410,7 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
 
   return <section className="team-social">
     <header className="team-social-heading"><div><span className="team-social-eyebrow">THE GRAND-LUMEN NETWORK</span><h2>Connect, share and stay in the loop.</h2><p>Discover people, share moments and manage how others see your profile.</p></div><span className="team-social-mark">GL</span></header>
-    <nav className="team-social-tabs">{["Discover","Moments","Notifications","Privacy",...(isAdmin ? ["Administrator"] : [])].map(item => <button type="button" className={tab === item ? "active" : ""} key={item} onClick={() => { setTab(item); setSelectedProfile(null); }}>{item}{item === "Notifications" && notices.some(notice => !notice.read_at) ? <i/> : null}</button>)}</nav>
+    <nav className="team-social-tabs">{["Discover","Moments","Notifications","Privacy",...(isAdmin ? ["Administrator"] : [])].map(item => <button type="button" className={tab === item ? "active" : ""} key={item} disabled={!profile?.username && ["Discover","Moments"].includes(item)} onClick={() => { setTab(item); setSelectedProfile(null); }}>{item}{item === "Notifications" && notices.some(notice => !notice.read_at) ? <i/> : null}</button>)}</nav>
     {message && <div className="team-social-message" role="status">{message}</div>}
     {tab === "Discover" && <div className="team-social-panel">
       <div className="team-social-search"><input value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void searchPeople(); }} placeholder="Search by name or @username"/><button type="button" disabled={busy} onClick={() => void searchPeople()}>Search members</button></div>
