@@ -2206,7 +2206,7 @@ html{scroll-behavior:auto}
 
 .team-message{touch-action:pan-y;user-select:none;-webkit-user-select:none}
 .team-message.deleted p{font-style:italic;opacity:.72}
-.team-message-menu-backdrop{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(3,8,18,.62);backdrop-filter:blur(7px)}
+.team-message-menu-backdrop{position:fixed;inset:0;z-index:20050;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(3,8,18,.62);backdrop-filter:blur(7px)}
 .team-message-menu{width:min(100%,330px);display:flex;flex-direction:column;gap:8px;padding:17px;border:1px solid var(--border-color,rgba(255,255,255,.14));border-radius:18px;background:var(--panel-bg,#111827);box-shadow:0 22px 70px rgba(0,0,0,.38)}
 .team-message-menu>span{padding:2px 5px 7px;color:var(--muted,#94a3b8);font-size:10px;font-weight:800;letter-spacing:.14em}
 .team-message-menu button{min-height:46px;padding:11px 13px;border:1px solid var(--border-color,rgba(255,255,255,.12));border-radius:11px;background:var(--card-bg,rgba(255,255,255,.045));color:var(--text,#f8fafc);font:inherit;text-align:left;font-weight:700}
