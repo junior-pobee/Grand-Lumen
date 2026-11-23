@@ -3,6 +3,7 @@ import { QRCodeSVG } from "qrcode.react";
 import Peer from "peerjs";
 import { supabase } from "./auth";
 import GroupChatWorkspace from "./GroupChatWorkspace";
+import TeamSocialHub from "./TeamSocialHub";
 
 type Profile = { id: string; display_name: string | null; email: string | null; avatar_url: string | null };
 type Connection = { id: string; user_low: string; user_high: string };
@@ -726,6 +727,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       </section>
       <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">FIND A MEMBER</span><h3>Scan or enter a code</h3></div><span className="team-icon">+</span></div><p>Scan another member's QR invitation or paste their invitation code.</p><textarea value={inviteInput} onChange={event => setInviteInput(event.target.value)} placeholder="Paste invitation token here" rows={3}/><div className="team-actions"><button className="team-secondary" onClick={() => setCameraOpen(value => !value)}>{cameraOpen ? "Close camera" : "Scan QR code"}</button><button className="team-primary" onClick={() => void connectWithToken()} disabled={busy || !inviteInput.trim()}>Send request</button></div>{cameraOpen && <video className="team-camera" ref={videoRef} muted playsInline/>}</section>
     </div>
+    <TeamSocialHub userId={userId} email={email} onOpenChat={connection => setSelected(connection as Connection)}/>
     <GroupChatWorkspace userId={userId} connections={connections} profiles={profiles}/>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">CONNECTION REQUESTS</span><h3>Requests awaiting your approval</h3></div><span className="team-count">{requests.length}</span></div>{requests.length ? requests.map(request => <div className="team-request" key={request.id}><div><b>{profiles[request.requester_id]?.display_name || "Grand Lumen member"}</b><small>{profiles[request.requester_id]?.email || "Connection request"}</small></div><div className="team-actions"><button className="team-secondary" disabled={busy} onClick={() => void respond(request.id, false)}>Decline</button><button className="team-primary" disabled={busy} onClick={() => void respond(request.id, true)}>Accept</button></div></div>) : <p className="team-muted">No pending requests.</p>}</section>
     <section className="team-card"><div className="team-card-heading"><div><span className="eyebrow">SENT REQUESTS</span><h3>Awaiting their response</h3></div><span className="team-count">{sentRequests.length}</span></div>{sentRequests.length ? sentRequests.map(request => <div className="team-request" key={request.id}><div><b>{profiles[request.recipient_id]?.display_name || "Grand Lumen member"}</b><small>{profiles[request.recipient_id]?.email || "Request pending"}</small></div><span className="team-muted">Pending approval</span></div>) : <p className="team-muted">You have no outgoing requests.</p>}</section>
@@ -737,6 +739,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
       const url = attachmentUrls[message.id];
       const own = message.sender_id === userId;
       return <article className={("team-message" + (own ? " own" : "") + (message.deleted_for_everyone ? " deleted" : "") + (attachment ? " has-attachment" : ""))} key={message.id} onContextMenu={event => { event.preventDefault(); if (!message.deleted_for_everyone) setMessageMenu(message); }} onTouchStart={() => beginMessagePress(message)} onTouchEnd={cancelMessagePress} onTouchMove={cancelMessagePress} onTouchCancel={cancelMessagePress}>
+        {!message.deleted_for_everyone && <b className="team-message-sender">{own ? "You" : profiles[selected.user_low === userId ? selected.user_high : selected.user_low]?.display_name || "Team member"}</b>}
         {message.deleted_for_everyone ? <p>This message was deleted</p> : attachment ? <div className="team-attachment">
           {attachment.kind === "image" && (url ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={attachment.name}/></a> : <span>Loading image…</span>)}
           {attachment.kind === "video" && (url ? <video src={url} controls preload="metadata"/> : <span>Loading video…</span>)}
