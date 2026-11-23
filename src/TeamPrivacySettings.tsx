@@ -28,8 +28,9 @@ export default function TeamPrivacySettings({ userId }: { userId: string }) {
 
   useEffect(() => {
     if (!supabase || !userId) return;
+    const client = supabase;
     let active = true;
-    supabase.from("grand_lumen_profiles").select("username,display_name,discoverable,profile_viewable,allow_requests,show_online,show_avatar,account_status").eq("id", userId).maybeSingle().then(result => {
+    client.from("grand_lumen_profiles").select("username,display_name,discoverable,profile_viewable,allow_requests,show_online,show_avatar,account_status").eq("id", userId).maybeSingle().then(result => {
       if (!active) return;
       if (result.error) {
         setNotice(result.error.message);
@@ -38,7 +39,7 @@ export default function TeamPrivacySettings({ userId }: { userId: string }) {
       const value = result.data as SettingsProfile | null;
       setUsername(value?.username || "");
       setDisplayName(value?.display_name || "");
-      supabase.from("grand_lumen_profiles").select("chat_display_name").eq("id", userId).maybeSingle().then(chatResult => {
+      client.from("grand_lumen_profiles").select("chat_display_name").eq("id", userId).maybeSingle().then(chatResult => {
         if (active && !chatResult.error) setChatDisplayName(chatResult.data?.chat_display_name || "");
       });
       setDiscoverable(value?.discoverable ?? true);
