@@ -189,11 +189,7 @@ as $$
     and not public.grand_lumen_is_blocked_pair(auth.uid(), p.id)
     and (
       p.id = auth.uid()
-      or (p.profile_viewable and (p.discoverable or exists (
-        select 1 from public.grand_lumen_team_connections c
-        where (c.user_low = auth.uid() and c.user_high = p.id)
-           or (c.user_high = auth.uid() and c.user_low = p.id)
-      )))
+      or p.profile_viewable
     );
 $$;
 
@@ -444,8 +440,7 @@ begin
   returning id into broadcast_id;
   insert into public.grand_lumen_notifications(user_id,title,body,kind,related_id)
   select p.id, 'Grand-Lumen', trim(p_title) || E'\n' || trim(p_body), case when p_kind = 'important' then 'important' else 'broadcast' end, broadcast_id
-  from public.grand_lumen_profiles p
-  where p.id <> actor;
+  from public.grand_lumen_profiles p;
   return broadcast_id;
 end;
 $$;
