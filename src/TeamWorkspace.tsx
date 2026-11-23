@@ -151,6 +151,7 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     if (!supabase) return;
     const channel = supabase.channel("grand-lumen-team-" + userId)
       .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_team_connections" }, () => void loadTeam())
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "grand_lumen_profiles" }, () => void loadTeam())
       .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_connection_requests", filter: "recipient_id=eq." + userId }, () => void loadTeam())
       .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_connection_requests", filter: "requester_id=eq." + userId }, () => void loadTeam())
       .on("postgres_changes", { event: "*", schema: "public", table: "grand_lumen_projects" }, () => void loadTeam())
