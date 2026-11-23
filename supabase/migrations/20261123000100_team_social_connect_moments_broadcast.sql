@@ -490,6 +490,7 @@ end;
 $$;
 
 revoke all on function public.grand_lumen_is_blocked_pair(uuid,uuid) from public, anon;
+revoke all on function public.grand_lumen_is_moment_author(uuid) from public, anon;
 revoke all on function public.grand_lumen_search_profiles(text) from public, anon;
 revoke all on function public.grand_lumen_get_profile(uuid) from public, anon;
 revoke all on function public.grand_lumen_get_shared_profile(text) from public, anon;
