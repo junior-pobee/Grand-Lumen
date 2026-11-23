@@ -182,11 +182,17 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
   useEffect(() => {
     const currentIds = new Set(notices.map(notice => notice.id));
     if (knownNoticeIds.current) {
-      const fresh = notices.find(notice => !knownNoticeIds.current?.has(notice.id));
+      const fresh = notices.find(notice => !notice.read_at && !knownNoticeIds.current?.has(notice.id));
       if (fresh) setLiveNotice(fresh);
     }
     knownNoticeIds.current = currentIds;
   }, [notices]);
+
+  useEffect(() => {
+    if (liveNotice && notices.some(notice => notice.id === liveNotice.id && notice.read_at)) {
+      setLiveNotice(null);
+    }
+  }, [liveNotice, notices]);
 
   const loadBroadcasts = useCallback(async () => {
     if (!supabase || !isAdmin) return;
@@ -428,8 +434,14 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
 
   const markRead = async (notice: Notice) => {
     if (!supabase || notice.read_at) return;
-    await supabase.from("grand_lumen_notifications").update({ read_at: new Date().toISOString() }).eq("id", notice.id).eq("user_id", userId);
-    await loadNotices();
+    const readAt = new Date().toISOString();
+    const result = await supabase.from("grand_lumen_notifications").update({ read_at: readAt }).eq("id", notice.id).eq("user_id", userId);
+    if (result.error) {
+      setMessage("This notification could not be marked as read. " + result.error.message);
+      return;
+    }
+    setNotices(current => current.map(item => item.id === notice.id ? { ...item, read_at: readAt } : item));
+    setLiveNotice(current => current?.id === notice.id ? null : current);
   };
 
   const publishBroadcast = async () => {
@@ -460,8 +472,14 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
 
   const markAllRead = async () => {
     if (!supabase) return;
-    await supabase.from("grand_lumen_notifications").update({ read_at: new Date().toISOString() }).eq("user_id", userId).is("read_at", null);
-    await loadNotices();
+    const readAt = new Date().toISOString();
+    const result = await supabase.from("grand_lumen_notifications").update({ read_at: readAt }).eq("user_id", userId).is("read_at", null);
+    if (result.error) {
+      setMessage("Notifications could not be marked as read. " + result.error.message);
+      return;
+    }
+    setNotices(current => current.map(item => item.read_at ? item : { ...item, read_at: readAt }));
+    setLiveNotice(null);
   };
 
   const openConnectionChat = (personId: string) => {
