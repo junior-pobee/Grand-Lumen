@@ -2011,7 +2011,7 @@ function TeamMessageAlert({ userId, onOpen }: { userId: string; onOpen: () => vo
 
 function App() {
   const contentRef = useRef<HTMLDivElement>(null);
-  const [section, setSection] = useState<Section>("Home");
+  const [section, setSection] = useState<Section>(() => new URLSearchParams(window.location.search).has("lumen-profile") ? "Team" : "Home");
   const [session, setSession] = useState<Session | null>(null);
   const [verificationBusy, setVerificationBusy] = useState(false);
   const [verificationMessage, setVerificationMessage] = useState("");
