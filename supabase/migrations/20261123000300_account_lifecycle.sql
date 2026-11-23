@@ -291,3 +291,67 @@ create trigger grand_lumen_active_moment_reactions before insert on public.grand
 for each row execute function public.grand_lumen_require_active_account('user_id');
 
 revoke all on function public.grand_lumen_require_active_account() from public, anon, authenticated;
+
+drop function if exists public.grand_lumen_get_moment_authors(uuid[]);
+create function public.grand_lumen_get_moment_authors(p_author_ids uuid[])
+returns table (
+  id uuid,
+  display_name text,
+  username text,
+  account_status text
+)
+language sql
+stable
+security definer
+set search_path = public, auth
+as $$
+  select distinct p.id,
+         case when p.account_status = 'deleted' then 'Deleted account' else p.display_name end,
+         case when p.account_status = 'deleted' then null else p.username end,
+         p.account_status
+  from public.grand_lumen_profiles p
+  where auth.uid() is not null
+    and p.id = any(coalesce(p_author_ids, '{}'::uuid[]))
+    and not public.grand_lumen_is_blocked_pair(auth.uid(), p.id)
+    and exists (
+      select 1
+      from public.grand_lumen_moments m
+      where m.author_id = p.id
+        and m.expires_at > now()
+        and (
+          m.author_id = auth.uid()
+          or m.visibility = 'public'
+          or (m.visibility = 'connections' and exists (
+            select 1 from public.grand_lumen_team_connections c
+            where (c.user_low = auth.uid() and c.user_high = m.author_id)
+               or (c.user_high = auth.uid() and c.user_low = m.author_id)
+          ))
+          or (m.visibility = 'tagged' and exists (
+            select 1 from public.grand_lumen_moment_tags t
+            where t.moment_id = m.id and t.user_id = auth.uid()
+          ))
+          or exists (
+            select 1 from public.grand_lumen_moment_tags t
+            where t.moment_id = m.id and t.user_id = auth.uid()
+          )
+        )
+    );
+$$;
+
+revoke all on function public.grand_lumen_get_moment_authors(uuid[]) from public, anon;
+grant execute on function public.grand_lumen_get_moment_authors(uuid[]) to authenticated;
+
+drop policy if exists grand_lumen_profiles_read_group_members on public.grand_lumen_profiles;
+create policy grand_lumen_profiles_read_group_members
+on public.grand_lumen_profiles for select to authenticated
+using (
+  exists (
+    select 1
+    from public.grand_lumen_group_chat_members viewer
+    join public.grand_lumen_group_chat_members subject
+      on subject.group_id = viewer.group_id
+    where viewer.user_id = auth.uid()
+      and viewer.left_at is null
+      and subject.user_id = id
+  )
+);
