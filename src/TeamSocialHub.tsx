@@ -40,6 +40,7 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [query, setQuery] = useState("");
   const [username, setUsername] = useState("");
+  const [usernameAvailability, setUsernameAvailability] = useState<"idle" | "checking" | "available" | "taken" | "unknown">("idle");
   const [displayName, setDisplayName] = useState("");
   const [bio, setBio] = useState("");
   const [interests, setInterests] = useState("");
@@ -66,6 +67,8 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
   const [message, setMessage] = useState("");
 
   const isAdmin = email.trim().toLowerCase() === ADMIN_EMAIL;
+  const normalizedUsername = username.trim().replace(/^@/, "").toLowerCase();
+  const usernameFormatError = !normalizedUsername ? "Choose a username to continue." : normalizedUsername.length < 3 ? "Username is too short. Use at least 3 characters." : normalizedUsername.length > 24 ? "Username is too long. Use no more than 24 characters." : !/^[a-z0-9_]+$/.test(normalizedUsername) ? "Only letters (a–z), numbers (0–9) and underscores (_) are allowed. Remove spaces, dots and symbols." : "";
 
   const loadProfile = useCallback(async () => {
     if (!supabase) return;
@@ -87,6 +90,29 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
     setShowOnline(value?.show_online ?? true);
     setShowAvatar(value?.show_avatar ?? true);
   }, [userId]);
+
+  useEffect(() => {
+    if (!normalizedUsername || usernameFormatError) {
+      setUsernameAvailability("idle");
+      return;
+    }
+    let active = true;
+    setUsernameAvailability("checking");
+    const timer = window.setTimeout(async () => {
+      if (!supabase) {
+        if (active) setUsernameAvailability("unknown");
+        return;
+      }
+      const result = await supabase.from("grand_lumen_profiles").select("id").eq("username", normalizedUsername).neq("id", userId).maybeSingle();
+      if (!active) return;
+      if (result.error) setUsernameAvailability("unknown");
+      else setUsernameAvailability(result.data ? "taken" : "available");
+    }, 450);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [normalizedUsername, usernameFormatError, userId]);
 
   const loadConnections = useCallback(async () => {
     if (!supabase) return;
@@ -249,9 +275,14 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
 
   const savePrivacy = async () => {
     if (!supabase) return;
-    const normalized = username.trim().replace(/^@/, "").toLowerCase();
-    if (!/^[a-z0-9_]{3,24}$/.test(normalized)) {
-      setMessage("Username must be 3–24 characters and use only letters, numbers or underscores.");
+    const normalized = normalizedUsername;
+    if (usernameFormatError) {
+      setUsernameAvailability("idle");
+      setMessage(usernameFormatError);
+      return;
+    }
+    if (usernameAvailability === "taken") {
+      setMessage("That username is already taken. Choose another one.");
       return;
     }
     setBusy(true);
@@ -266,6 +297,7 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
       show_online: showOnline,
       show_avatar: showAvatar
     }).eq("id", userId);
+    if (result.error?.code === "23505") setUsernameAvailability("taken");
     setMessage(result.error ? result.error.code === "23505" ? "That username is already taken. Choose another one." : result.error.message : "Your profile and privacy settings have been saved.");
     setBusy(false);
     await loadProfile();
@@ -429,7 +461,7 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
       {!moments.length && <p className="team-social-empty">No active moments yet. Share the first one with your connections.</p>}
     </div>}
     {tab === "Notifications" && <div className="team-social-panel"><div className="team-social-panel-title"><h3>Your notifications</h3><button type="button" onClick={() => void markAllRead()}>Mark all read</button></div>{notices.map(notice => <article className={"team-social-notice " + notice.kind + (!notice.read_at ? " unread" : "")} key={notice.id} onClick={() => void markRead(notice)}><div className="team-social-notice-badge">{notice.kind === "important" ? "!" : notice.kind === "broadcast" ? "GL" : "•"}</div><div><b>{notice.title}</b>{(notice.kind === "broadcast" || notice.kind === "important") && <small className="team-social-official-label">VERIFIED · OFFICIAL ANNOUNCEMENT</small>}<p>{notice.body}</p><small>{new Date(notice.created_at).toLocaleString()}</small></div>{!notice.read_at && <i/>}</article>)}{!notices.length && <p className="team-social-empty">You are all caught up.</p>}</div>}
-    {tab === "Privacy" && <div className="team-social-panel"><h3>Your public identity</h3><div className="team-social-form-grid"><label>Unique username<input value={username} onChange={event => setUsername(event.target.value)} placeholder="your_username"/></label><label>Display name<input value={displayName} onChange={event => setDisplayName(event.target.value)} placeholder="Your display name"/></label><label className="wide">Biography<textarea value={bio} onChange={event => setBio(event.target.value)} rows={3}/></label><label className="wide">Interests and skills<input value={interests} onChange={event => setInterests(event.target.value)} placeholder="Design, coding, science"/></label></div><div className="team-social-toggles">{privacyToggles.map(item => <label key={item.label}><span>{item.label}</span><input type="checkbox" checked={item.value} onChange={event => item.setter(event.target.checked)}/></label>)}</div><button type="button" className="primary" onClick={() => void savePrivacy()} disabled={busy}>Save profile and privacy</button><p className="team-social-help">Turning off discovery hides you from new searches. Existing connections and conversations remain intact.</p></div>}
+    {tab === "Privacy" && <div className="team-social-panel"><h3>Your public identity</h3><div className="team-social-form-grid"><label className="team-social-username-field">Unique username<input value={username} onChange={event => { setUsername(event.target.value); setMessage(""); }} placeholder="your_username" autoComplete="off" maxLength={40} aria-invalid={Boolean(usernameFormatError || usernameAvailability === "taken")} aria-describedby="team-social-username-feedback"/><small id="team-social-username-feedback" className={"team-social-username-feedback " + (usernameFormatError || usernameAvailability === "taken" ? "error" : usernameAvailability === "available" ? "success" : "")} aria-live="polite">{usernameFormatError || (usernameAvailability === "checking" ? "Checking whether this username is available…" : usernameAvailability === "taken" ? "This username is already in use. Please choose another." : usernameAvailability === "available" ? "Username format is valid and it appears to be available." : usernameAvailability === "unknown" ? "Username format is valid. Availability will be confirmed when you save." : "Use 3–24 characters: letters, numbers and underscores only.")}</small></label><label>Display name<input value={displayName} onChange={event => setDisplayName(event.target.value)} placeholder="Your display name"/></label><label className="wide">Biography<textarea value={bio} onChange={event => setBio(event.target.value)} rows={3}/></label><label className="wide">Interests and skills<input value={interests} onChange={event => setInterests(event.target.value)} placeholder="Design, coding, science"/></label></div><div className="team-social-toggles">{privacyToggles.map(item => <label key={item.label}><span>{item.label}</span><input type="checkbox" checked={item.value} onChange={event => item.setter(event.target.checked)}/></label>)}</div><button type="button" className="primary" onClick={() => void savePrivacy()} disabled={busy}>Save profile and privacy</button><p className="team-social-help">Turning off discovery hides you from new searches. Existing connections and conversations remain intact.</p></div>}
     {tab === "Administrator" && isAdmin && <div className="team-social-panel"><div className="team-social-admin-mark">✓ <span>GRAND-LUMEN OFFICIAL</span></div><h3>Broadcast centre</h3><p>Publish official updates to the in-app notification centre of every registered member.</p><label>Announcement title<input value={broadcastTitle} onChange={event => setBroadcastTitle(event.target.value)} placeholder="A message from Grand-Lumen"/></label><label>Announcement message<textarea value={broadcastBody} onChange={event => setBroadcastBody(event.target.value)} rows={4} placeholder="Write your announcement…"/></label><label>Announcement type<select value={broadcastKind} onChange={event => setBroadcastKind(event.target.value)}><option value="normal">Normal announcement</option><option value="important">Important announcement</option></select></label><label>Confirm your account password<input type="password" autoComplete="current-password" value={broadcastPassword} onChange={event => setBroadcastPassword(event.target.value)} placeholder="Re-enter your account password"/></label><button type="button" className="primary" disabled={busy || !broadcastTitle.trim() || !broadcastBody.trim() || !broadcastPassword} onClick={() => void publishBroadcast()}>{busy ? "Verifying and publishing…" : "Verify and publish to everyone"}</button><p className="team-social-help">Your password is used only for sign-in verification and is not saved by this feature. Every broadcast is recorded in the official announcement history.</p><section className="team-social-subpanel"><h3>Announcement history <span>{broadcasts.length}</span></h3>{broadcasts.map(item => <article className="team-social-notice" key={item.id}><div className="team-social-notice-badge">{item.kind === "important" ? "!" : "GL"}</div><div><b>{item.title}</b><p>{item.body}</p><small>{new Date(item.created_at).toLocaleString()}</small></div></article>)}{!broadcasts.length && <p className="team-social-empty">No announcements have been published yet.</p>}</section></div>}
   </section>;
 }
