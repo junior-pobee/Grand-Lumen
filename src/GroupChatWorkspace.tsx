@@ -635,7 +635,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles, onOp
     pressTimerRef.current = null;
   };
 
-  const memberName = (id: string) => groupProfiles[id]?.chat_display_name || profiles[id]?.chat_display_name || groupProfiles[id]?.display_name || profiles[id]?.display_name || "Grand Lumen member";
+  const memberName = (id: string) => profiles[id]?.chat_display_name || groupProfiles[id]?.chat_display_name || profiles[id]?.display_name || groupProfiles[id]?.display_name || "Grand Lumen member";
   const beginMessageTouch = (message: GroupMessage, event: React.TouchEvent<HTMLElement>) => {
     const touch = event.touches[0];
     swipeStartRef.current = { x: touch.clientX, y: touch.clientY };
