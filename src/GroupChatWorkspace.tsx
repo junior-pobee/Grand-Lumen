@@ -99,8 +99,20 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
     setLoading(false);
     const profileIds = Array.from(new Set((memberResult.data || []).map(item => String(item.user_id))));
     if (profileIds.length) {
-      const profileResult = await supabase.from("grand_lumen_profiles").select("id,display_name,email,avatar_url,account_status").in("id", profileIds);
-      if (!profileResult.error) setGroupProfiles(Object.fromEntries(((profileResult.data || []) as Profile[]).map(profile => [profile.id, profile])));
+      const profileResult = await supabase.from("grand_lumen_profiles").select("id,display_name,email,avatar_url").in("id", profileIds);
+      if (profileResult.error) {
+        setNotice("Unable to load group member account details: " + profileResult.error.message);
+        setGroupProfiles({});
+      } else {
+        const nextProfiles = Object.fromEntries(((profileResult.data || []) as Profile[]).map(profile => [profile.id, profile]));
+        const statusResult = await supabase.from("grand_lumen_profiles").select("id,account_status").in("id", profileIds);
+        if (!statusResult.error) {
+          for (const status of statusResult.data || []) {
+            if (nextProfiles[status.id]) nextProfiles[status.id] = { ...nextProfiles[status.id], account_status: status.account_status };
+          }
+        }
+        setGroupProfiles(nextProfiles);
+      }
     }
   }, [userId]);
 
@@ -661,7 +673,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
         const attachment = readAttachment(message.body);
         const url = urls[message.id];
         return <article key={message.id} className={"group-chat-message" + (own ? " own" : "") + (message.deleted_for_everyone ? " deleted" : "")} onContextMenu={event => { event.preventDefault(); if (!message.deleted_for_everyone) setMessageMenu(message); }} onTouchStart={() => beginPress(message)} onTouchEnd={cancelPress} onTouchMove={cancelPress} onTouchCancel={cancelPress}>
-          {(() => { const deletedAccount = groupProfiles[message.sender_id]?.account_status === "deleted" || profiles[message.sender_id]?.account_status === "deleted"; return <>{!own && !message.deleted_for_everyone && <><b className="group-chat-sender">{deletedAccount ? "Deleted account" : memberName(message.sender_id)}</b>{!deletedAccount && (groupProfiles[message.sender_id]?.email || profiles[message.sender_id]?.email) && <small className="group-chat-sender-email">{groupProfiles[message.sender_id]?.email || profiles[message.sender_id]?.email}</small>}</>}<div className="account-deleted-wrap"><div className={"account-deleted-content" + (deletedAccount ? " blurred" : "")}>{message.deleted_for_everyone ? <p>This message was deleted</p> : attachment ? <div className="team-attachment">
+          {(() => { const deletedAccount = groupProfiles[message.sender_id]?.account_status === "deleted" || profiles[message.sender_id]?.account_status === "deleted"; return <>{!message.deleted_for_everyone && <><b className="group-chat-sender">{deletedAccount ? "Deleted account" : own ? groupProfiles[userId]?.display_name || groupProfiles[userId]?.email || "You" : memberName(message.sender_id)}</b>{!deletedAccount && (own ? groupProfiles[userId]?.email : groupProfiles[message.sender_id]?.email || profiles[message.sender_id]?.email) && <small className="group-chat-sender-email">{own ? groupProfiles[userId]?.email : groupProfiles[message.sender_id]?.email || profiles[message.sender_id]?.email}</small>}</>}<div className="account-deleted-wrap"><div className={"account-deleted-content" + (deletedAccount ? " blurred" : "")}>{message.deleted_for_everyone ? <p>This message was deleted</p> : attachment ? <div className="team-attachment">
             {attachment.kind === "image" && (url ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={attachment.name}/></a> : <span>Loading image…</span>)}
             {attachment.kind === "video" && (url ? <video src={url} controls preload="metadata"/> : <span>Loading video…</span>)}
             {attachment.kind === "audio" && (url ? <AudioMessagePlayer src={url} name={attachment.name}/> : <span>Loading audio…</span>)}
