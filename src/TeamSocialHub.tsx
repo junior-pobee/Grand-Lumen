@@ -56,6 +56,7 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
   const [commentDrafts, setCommentDrafts] = useState<Record<string, string>>({});
   const [comments, setComments] = useState<Record<string, { id: string; user_id: string; body: string; created_at: string }[]>>({});
   const [liked, setLiked] = useState<Record<string, boolean>>({});
+  const [reactionCounts, setReactionCounts] = useState<Record<string, number>>({});
   const [onlineIds, setOnlineIds] = useState<string[]>([]);
   const [broadcastTitle, setBroadcastTitle] = useState("");
   const [broadcastBody, setBroadcastBody] = useState("");
@@ -104,8 +105,28 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
   const loadMoments = useCallback(async () => {
     if (!supabase) return;
     const result = await supabase.from("grand_lumen_moments").select("*").gt("expires_at", new Date().toISOString()).order("created_at", { ascending: false }).limit(100);
-    if (!result.error) setMoments((result.data || []) as Moment[]);
-  }, []);
+    if (!result.error) {
+      const rows = (result.data || []) as Moment[];
+      setMoments(rows);
+      const ids = rows.map(item => item.id);
+      if (ids.length) {
+        const reactions = await supabase.from("grand_lumen_moment_reactions").select("moment_id,user_id").in("moment_id", ids);
+        if (!reactions.error) {
+          const counts: Record<string, number> = {};
+          const currentLikes: Record<string, boolean> = {};
+          for (const reaction of reactions.data || []) {
+            counts[reaction.moment_id] = (counts[reaction.moment_id] || 0) + 1;
+            if (reaction.user_id === userId) currentLikes[reaction.moment_id] = true;
+          }
+          setReactionCounts(counts);
+          setLiked(currentLikes);
+        }
+      } else {
+        setReactionCounts({});
+        setLiked({});
+      }
+    }
+  }, [userId]);
 
   const loadNotices = useCallback(async () => {
     if (!supabase) return;
@@ -291,11 +312,17 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
     if (!supabase) return;
     const existing = await supabase.from("grand_lumen_moment_reactions").select("moment_id").eq("moment_id", momentId).eq("user_id", userId).maybeSingle();
     if (existing.data) {
-      await supabase.from("grand_lumen_moment_reactions").delete().eq("moment_id", momentId).eq("user_id", userId);
-      setLiked(current => ({ ...current, [momentId]: false }));
+      const removed = await supabase.from("grand_lumen_moment_reactions").delete().eq("moment_id", momentId).eq("user_id", userId);
+      if (!removed.error) {
+        setLiked(current => ({ ...current, [momentId]: false }));
+        setReactionCounts(current => ({ ...current, [momentId]: Math.max(0, (current[momentId] || 0) - 1) }));
+      }
     } else {
       const result = await supabase.from("grand_lumen_moment_reactions").insert({ moment_id: momentId, user_id: userId });
-      if (!result.error) setLiked(current => ({ ...current, [momentId]: true }));
+      if (!result.error) {
+        setLiked(current => ({ ...current, [momentId]: true }));
+        setReactionCounts(current => ({ ...current, [momentId]: (current[momentId] || 0) + 1 }));
+      }
     }
   };
 
@@ -393,7 +420,7 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
     </div>}
     {tab === "Moments" && <div className="team-social-panel">
       <section className="team-social-composer"><div className="team-social-composer-title"><h3>Share a Lumen Moment</h3><span>EXPIRES AFTER 24 HOURS</span></div><textarea value={momentBody} onChange={event => setMomentBody(event.target.value)} rows={3} placeholder="Share an idea, thought or update…"/><div className="team-social-compose-options"><select value={momentKind} onChange={event => setMomentKind(event.target.value)}><option value="idea">Idea</option><option value="text">Text update</option><option value="photo">Photo</option><option value="video">Video</option></select><select value={momentVisibility} onChange={event => setMomentVisibility(event.target.value)}><option value="connections">My connections</option><option value="tagged">Tagged people only</option><option value="public">Everyone discoverable</option></select><select multiple value={taggedUsers} onChange={event => setTaggedUsers(Array.from(event.target.selectedOptions).map(option => option.value))}>{connectionProfiles.map(person => <option key={person.id} value={person.id}>{person.display_name || person.username || "Member"}</option>)}</select><label className="team-social-file">Add photo/video<input type="file" accept="image/*,video/*" onChange={event => setMomentFile(event.target.files?.[0] || null)}/></label><button type="button" className="primary" onClick={() => void createMoment()} disabled={busy || (!momentBody.trim() && !momentFile)}>Publish moment</button></div>{momentFile && <small>{momentFile.name}</small>}</section>
-      <div className="team-social-moments">{moments.map(moment => <article className="team-social-moment" key={moment.id}><div className="team-social-moment-meta"><b>{moment.author_id === userId ? displayName || "You" : connectionProfiles.find(person => person.id === moment.author_id)?.display_name || "Grand-Lumen member"}</b><span>{remainingTime(moment.expires_at)}</span></div>{moment.body && <p>{moment.body}</p>}{moment.media_path && <MomentMedia path={moment.media_path} type={moment.media_type || "image"}/>}<div className="team-social-actions"><button type="button" onClick={() => void reactToMoment(moment.id)}>{liked[moment.id] ? "♥ Liked" : "♡ Like"}</button><button type="button" onClick={() => void loadComments(moment.id)}>View replies</button>{moment.author_id === userId && <button type="button" onClick={() => void deleteMoment(moment)}>Delete</button>}</div>{comments[moment.id] && <div className="team-social-comments">{comments[moment.id].map(comment => <p key={comment.id}>{comment.body}</p>)}<div><input value={commentDrafts[moment.id] || ""} onChange={event => setCommentDrafts(current => ({ ...current, [moment.id]: event.target.value }))} placeholder="Write a reply"/><button type="button" onClick={() => void addComment(moment.id)}>Reply</button></div></div>}</article>)}</div>
+      <div className="team-social-moments">{moments.map(moment => <article className="team-social-moment" key={moment.id}><div className="team-social-moment-meta"><b>{moment.author_id === userId ? displayName || "You" : connectionProfiles.find(person => person.id === moment.author_id)?.display_name || "Grand-Lumen member"}</b><span>{remainingTime(moment.expires_at)}</span></div>{moment.body && <p>{moment.body}</p>}{moment.media_path && <MomentMedia path={moment.media_path} type={moment.media_type || "image"}/>}<div className="team-social-actions"><button type="button" onClick={() => void reactToMoment(moment.id)}>{liked[moment.id] ? "♥ Liked" : "♡ Like"} · {reactionCounts[moment.id] || 0}</button><button type="button" onClick={() => void loadComments(moment.id)}>View replies</button>{moment.author_id === userId && <button type="button" onClick={() => void deleteMoment(moment)}>Delete</button>}</div>{comments[moment.id] && <div className="team-social-comments">{comments[moment.id].map(comment => <p key={comment.id}>{comment.body}</p>)}<div><input value={commentDrafts[moment.id] || ""} onChange={event => setCommentDrafts(current => ({ ...current, [moment.id]: event.target.value }))} placeholder="Write a reply"/><button type="button" onClick={() => void addComment(moment.id)}>Reply</button></div></div>}</article>)}</div>
       {!moments.length && <p className="team-social-empty">No active moments yet. Share the first one with your connections.</p>}
     </div>}
     {tab === "Notifications" && <div className="team-social-panel"><div className="team-social-panel-title"><h3>Your notifications</h3><button type="button" onClick={() => void markAllRead()}>Mark all read</button></div>{notices.map(notice => <article className={"team-social-notice " + notice.kind + (!notice.read_at ? " unread" : "")} key={notice.id} onClick={() => void markRead(notice)}><div className="team-social-notice-badge">{notice.kind === "important" ? "!" : notice.kind === "broadcast" ? "GL" : "•"}</div><div><b>{notice.title}</b><p>{notice.body}</p><small>{new Date(notice.created_at).toLocaleString()}</small></div>{!notice.read_at && <i/>}</article>)}{!notices.length && <p className="team-social-empty">You are all caught up.</p>}</div>}
