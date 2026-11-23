@@ -347,6 +347,10 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
     if (!supabase || moment.author_id !== userId) return;
     if (!window.confirm("Delete this moment for everyone?")) return;
     const result = await supabase.from("grand_lumen_moments").delete().eq("id", moment.id).eq("author_id", userId);
+    if (!result.error && moment.media_path) {
+      const removed = await supabase.storage.from(momentBucket).remove([moment.media_path]);
+      if (removed.error) setMessage("Moment deleted, but its media file could not be removed from storage: " + removed.error.message);
+    }
     setMessage(result.error ? result.error.message : "Moment deleted.");
     await loadMoments();
   };
