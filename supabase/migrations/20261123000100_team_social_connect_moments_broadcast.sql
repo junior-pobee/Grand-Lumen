@@ -318,6 +318,7 @@ begin
   if length(trim(coalesce(p_body,''))) = 0 and p_media_path is null then raise exception 'Add text or media to your moment.'; end if;
   if p_kind not in ('idea','text','photo','video') then raise exception 'Invalid moment type.'; end if;
   if p_visibility not in ('connections','tagged','public') then raise exception 'Invalid audience.'; end if;
+  if p_visibility = 'tagged' and coalesce(cardinality(p_tagged_users),0) = 0 then raise exception 'Tag at least one connection for a tagged-only moment.'; end if;
   if p_media_path is not null and split_part(p_media_path,'/',1) <> actor::text then raise exception 'Invalid media ownership.'; end if;
   if exists (
     select 1 from unnest(coalesce(p_tagged_users,'{}'::uuid[])) t(id)
@@ -365,9 +366,20 @@ create policy grand_lumen_moments_delete_own
 on public.grand_lumen_moments for delete to authenticated
 using (author_id = auth.uid());
 
+create or replace function public.grand_lumen_is_moment_author(p_moment_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $
+  select exists (select 1 from public.grand_lumen_moments m where m.id = p_moment_id and m.author_id = auth.uid());
+$;
+
+drop policy if exists grand_lumen_moment_tags_read_visible on public.grand_lumen_moment_tags;
 create policy grand_lumen_moment_tags_read_visible
 on public.grand_lumen_moment_tags for select to authenticated
-using (user_id = auth.uid() or exists (select 1 from public.grand_lumen_moments m where m.id = moment_id and m.author_id = auth.uid()));
+using (user_id = auth.uid() or public.grand_lumen_is_moment_author(moment_id));
 
 create policy grand_lumen_moment_reactions_read_visible
 on public.grand_lumen_moment_reactions for select to authenticated
@@ -455,6 +467,8 @@ revoke all on function public.grand_lumen_remove_connection(uuid) from public, a
 revoke all on function public.grand_lumen_create_moment(text,text,text,text,text,uuid[]) from public, anon;
 revoke all on function public.grand_lumen_is_admin() from public, anon;
 revoke all on function public.grand_lumen_publish_broadcast(text,text,text) from public, anon;
+grant execute on function public.grand_lumen_is_blocked_pair(uuid,uuid) to authenticated;
+grant execute on function public.grand_lumen_is_moment_author(uuid) to authenticated;
 grant execute on function public.grand_lumen_search_profiles(text) to authenticated;
 grant execute on function public.grand_lumen_get_profile(uuid) to authenticated;
 grant execute on function public.grand_lumen_get_profiles_by_ids(uuid[]) to authenticated;
