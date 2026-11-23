@@ -220,13 +220,16 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
     return directory.filter(person => (person.username || "").toLowerCase().includes(term) || (person.display_name || "").toLowerCase().includes(term));
   }, [directory, query]);
 
-  const searchPeople = async () => {
+  const searchPeople = async (allUsers = false) => {
     if (!supabase) return;
     setBusy(true);
     setMessage("");
-    const result = await supabase.rpc("grand_lumen_search_profiles", { p_query: query.trim() });
+    const result = await supabase.rpc("grand_lumen_search_profiles", { p_query: allUsers ? "" : query.trim() });
     if (result.error) setMessage(result.error.message);
-    else setDirectory((result.data || []) as SocialProfile[]);
+    else {
+      setDirectory((result.data || []) as SocialProfile[]);
+      if (allUsers) setMessage("Showing all members who have made themselves discoverable.");
+    }
     setBusy(false);
   };
 
@@ -451,8 +454,11 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
   };
 
   const openConnectionChat = (personId: string) => {
-    const connection = connections.find(row => row.user_low === personId || row.user_high === personId);
-    if (connection) onOpenChat(connection);
+    const connection = connections.find(row => (row.user_low === userId && row.user_high === personId) || (row.user_high === userId && row.user_low === personId));
+    if (connection) {
+      setSelectedProfile(null);
+      onOpenChat(connection);
+    } else setMessage("This member is not in your connections yet.");
   };
 
   const remainingTime = (expiresAt: string) => {
@@ -475,9 +481,9 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
     <button type="button" className="team-social-moments-launch" onClick={() => setTab("Moments")} aria-label={"Open Moments, " + moments.length + " active moments"}><span className="team-social-moments-launch-icon">◉</span><span><b>Moments</b><small>{moments.length} active {moments.length === 1 ? "moment" : "moments"}</small></span><strong>{moments.length}</strong></button>
     {message && <div className="team-social-message" role="status">{message}</div>}
     {tab === "Discover" && <div className="team-social-panel">
-      <div className="team-social-search"><input value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void searchPeople(); }} placeholder="Search by name or @username"/><button type="button" disabled={busy} onClick={() => void searchPeople()}>Search members</button></div>
+      <div className="team-social-search"><input value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key === "Enter") void searchPeople(); }} placeholder="Search by name or @username"/><button type="button" disabled={busy} onClick={() => void searchPeople()}>Search members</button><button type="button" className="team-social-all-users" disabled={busy} onClick={() => { setQuery(""); void searchPeople(true); }}>All users</button></div>
       {requests.length > 0 && <section className="team-social-subpanel"><h3>Connection requests <span>{requests.length}</span></h3>{requests.map(request => <article className="team-social-person" key={request.id}><div><b>New connection request</b><small>Review the request to connect.</small></div><div className="team-social-actions"><button type="button" onClick={() => void respondRequest(request.id, false)} disabled={busy}>Decline</button><button type="button" className="primary" onClick={() => void respondRequest(request.id, true)} disabled={busy}>Accept</button></div></article>)}</section>}
-      {selectedProfile && <section className="team-social-profile"><button type="button" className="team-social-back" onClick={() => setSelectedProfile(null)}>← Back to discovery</button><div className="team-social-profile-cover" style={selectedProfile.cover_url ? { backgroundImage: "url(" + selectedProfile.cover_url + ")" } : {}}/><div className="team-social-profile-main"><div className="team-social-avatar">{selectedProfile.show_avatar && selectedProfile.avatar_url ? <img src={selectedProfile.avatar_url} alt=""/> : (selectedProfile.display_name || "G").slice(0,1).toUpperCase()}</div><div><h3>{selectedProfile.display_name || "Grand-Lumen member"}</h3><b>@{selectedProfile.username}</b><p>{selectedProfile.bio || "No biography added yet."}</p>{(selectedProfile.interests || []).length > 0 && <small>{selectedProfile.interests?.join(" · ")}</small>}</div></div><div className="team-social-actions"><button type="button" onClick={() => void sendRequest(selectedProfile.id)} disabled={busy || !selectedProfile.allow_requests}>Send connection request</button><button type="button" onClick={() => void navigator.clipboard?.writeText(window.location.origin + window.location.pathname + "?lumen-profile=" + encodeURIComponent(selectedProfile.username || "")).then(() => setMessage("Profile link copied.")).catch(() => setMessage("Clipboard access is unavailable on this device."))}>Copy profile link</button><button type="button" onClick={() => void blockPerson(selectedProfile.id)}>Block</button>{connections.some(row => row.user_low === selectedProfile.id || row.user_high === selectedProfile.id) && <><button type="button" className="primary" onClick={() => openConnectionChat(selectedProfile.id)}>Open chat</button><button type="button" onClick={() => void removeConnection(selectedProfile.id)}>Remove connection</button></>}</div></section>}
+      {selectedProfile && <div className="team-social-profile-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) setSelectedProfile(null); }}><section className="team-social-profile team-social-profile-dialog" role="dialog" aria-modal="true" aria-label="Member profile"><button type="button" className="team-social-back" onClick={() => setSelectedProfile(null)}>← Back to discovery</button><div className="team-social-profile-cover" style={selectedProfile.cover_url ? { backgroundImage: "url(" + selectedProfile.cover_url + ")" } : {}}/><div className="team-social-profile-main"><div className="team-social-avatar">{selectedProfile.show_avatar && selectedProfile.avatar_url ? <img src={selectedProfile.avatar_url} alt=""/> : (selectedProfile.display_name || "G").slice(0,1).toUpperCase()}</div><div><h3>{selectedProfile.display_name || "Grand-Lumen member"}</h3><b>@{selectedProfile.username}</b><p>{selectedProfile.bio || "No biography added yet."}</p>{(selectedProfile.interests || []).length > 0 && <small>{selectedProfile.interests?.join(" · ")}</small>}</div></div><div className="team-social-actions"><button type="button" onClick={() => void sendRequest(selectedProfile.id)} disabled={busy || !selectedProfile.allow_requests}>Send connection request</button><button type="button" onClick={() => void navigator.clipboard?.writeText(window.location.origin + window.location.pathname + "?lumen-profile=" + encodeURIComponent(selectedProfile.username || "")).then(() => setMessage("Profile link copied.")).catch(() => setMessage("Clipboard access is unavailable on this device."))}>Copy profile link</button><button type="button" onClick={() => void blockPerson(selectedProfile.id)}>Block</button>{connections.some(row => row.user_low === selectedProfile.id || row.user_high === selectedProfile.id) && <><button type="button" className="primary" onClick={() => openConnectionChat(selectedProfile.id)}>Open chat</button><button type="button" onClick={() => void removeConnection(selectedProfile.id)}>Remove connection</button></>}</div></section></div>}
       <div className="team-social-directory">{filteredDirectory.map(person => <article className="team-social-person" key={person.id}><div className="team-social-avatar small">{person.show_avatar && person.avatar_url ? <img src={person.avatar_url} alt=""/> : (person.display_name || "G").slice(0,1).toUpperCase()}</div><div className="team-social-person-copy"><b>{person.display_name || "Grand-Lumen member"}</b><small>@{person.username} · {person.connection_count || 0} connections{person.show_online && onlineIds.includes(person.id) ? " · Online" : ""}</small></div><div className="team-social-actions"><button type="button" disabled={!person.profile_viewable} onClick={() => void openProfile(person)}>{person.profile_viewable ? "View profile" : "Profile private"}</button><button type="button" className="primary" disabled={busy || !person.allow_requests} onClick={() => void sendRequest(person.id)}>Connect</button></div></article>)}</div>
       {!directory.length && <p className="team-social-empty">Search for people who have chosen to appear in Lumen Connect.</p>}
     </div>}
