@@ -336,3 +336,5 @@ html[data-theme="light"] .connect-dashboard-mode>.team-social{background:#f3f7fc
 .account-deleted-wrap{position:relative;overflow:hidden;border-radius:10px}
 .account-deleted-content.blurred{filter:blur(7px);user-select:none;pointer-events:none}
 .account-deleted-overlay{position:absolute;inset:0;display:grid;place-items:center;padding:12px;background:rgba(12,16,24,.48);color:#fff;font-size:12px;font-weight:900;letter-spacing:.08em;text-align:center;text-transform:uppercase}
+
+.team-message-sender,.group-chat-sender{display:block;margin:0 0 6px;color:var(--text)!important;font-size:13px;font-weight:900;line-height:1.35;letter-spacing:.01em;overflow-wrap:anywhere}.team-message,.group-chat-message{touch-action:pan-y}.group-chat-message{user-select:none;-webkit-user-select:none}
