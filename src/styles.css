@@ -2525,3 +2525,13 @@ body:has(.studio-shell.studio-has-preview){overflow:hidden!important}
 .studio-shell .studio-code-input,.studio-shell .studio-code-highlight{font-family:ui-monospace,monospace!important;font-size:12px!important;font-style:normal!important;font-weight:400!important;line-height:1.7!important;letter-spacing:0!important;word-spacing:0!important;text-indent:0!important;text-align:left!important;text-transform:none!important;white-space:pre!important;tab-size:2!important;font-kerning:none!important;font-variant-ligatures:none!important;font-feature-settings:"liga" 0,"calt" 0!important;font-synthesis:none!important;-webkit-text-size-adjust:100%!important;text-size-adjust:100%!important}
 .studio-shell .studio-code-input{padding:13px 14px!important;box-sizing:border-box!important}
 .studio-shell .studio-code-highlight{padding:13px 14px!important;box-sizing:border-box!important}
+
+.team-chat-fullscreen{position:relative;inset:auto;z-index:1;width:100%;height:auto;min-height:calc(100dvh - 90px);max-height:none;overflow:visible;border:1px solid var(--line);border-radius:22px}
+.team-chat-fullscreen .team-message-list{flex:1 1 420px;max-height:min(58vh,620px);min-height:180px;overflow-y:auto;overscroll-behavior-y:auto;touch-action:pan-y}
+.team-message-sender{display:block;margin-bottom:5px;color:var(--accent);font-size:11px;font-weight:800;letter-spacing:.01em}
+.team-chat-settings{width:min(440px,calc(100vw - 32px));display:grid;gap:12px}
+.team-chat-settings label{display:grid;gap:7px;color:var(--muted);font-size:12px}
+.team-chat-settings input{width:100%;min-width:0;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface-2);color:var(--text)}
+.team-chat-settings button{border:1px solid var(--line);border-radius:10px;padding:11px;background:var(--accent);color:#07101e;font-weight:800}
+.team-chat-settings button.cancel{background:var(--surface-2);color:var(--text)}
+@media(max-width:650px){.team-chat-fullscreen{min-height:calc(100dvh - 40px);padding:14px}.team-chat-fullscreen .team-message-list{max-height:58vh;min-height:180px}}
