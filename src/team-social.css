@@ -11,3 +11,5 @@
 
 .team-social-notice.broadcast .team-social-notice-badge,.team-social-notice.important .team-social-notice-badge{background:#236ed0;color:#fff;box-shadow:0 0 0 3px #236ed022}
 .team-social-official-label{display:inline-block;margin-top:5px;color:#3988df;font-size:9px;font-weight:900;letter-spacing:.12em}
+
+.team-social-username-field{align-content:start}.team-social-username-feedback{display:block;min-height:18px;font-size:11px;line-height:1.5;color:var(--muted)}.team-social-username-feedback.error{color:#dc4545;font-weight:700}.team-social-username-feedback.success{color:#16834b;font-weight:700}.team-social-username-field input[aria-invalid=true]{border-color:#dc4545;box-shadow:0 0 0 2px #dc454522}.team-social-username-field input[aria-invalid=false]{border-color:var(--line)}
