@@ -140,8 +140,20 @@ export default function TeamWorkspace({ userId, email, connectOnly = false, onCl
       ...outgoingRequests.map(item => item.recipient_id)
     ].filter(id => id !== userId)));
     if (ids.length) {
-      const result = await supabase.from("grand_lumen_profiles").select("id,display_name,email,avatar_url,account_status").in("id", ids);
-      if (!result.error) setProfiles(Object.fromEntries(((result.data || []) as Profile[]).map(profile => [profile.id, profile])));
+      const result = await supabase.from("grand_lumen_profiles").select("id,display_name,email,avatar_url").in("id", ids);
+      if (result.error) {
+        setNotice("Unable to load connected account details: " + result.error.message);
+        setProfiles({});
+      } else {
+        const nextProfiles = Object.fromEntries(((result.data || []) as Profile[]).map(profile => [profile.id, profile]));
+        const statusResult = await supabase.from("grand_lumen_profiles").select("id,account_status").in("id", ids);
+        if (!statusResult.error) {
+          for (const status of statusResult.data || []) {
+            if (nextProfiles[status.id]) nextProfiles[status.id] = { ...nextProfiles[status.id], account_status: status.account_status };
+          }
+        }
+        setProfiles(nextProfiles);
+      }
     } else {
       setProfiles({});
     }
@@ -783,7 +795,7 @@ export default function TeamWorkspace({ userId, email, connectOnly = false, onCl
       const url = attachmentUrls[message.id];
       const own = message.sender_id === userId;
       return <article className={("team-message" + (own ? " own" : "") + (message.deleted_for_everyone ? " deleted" : "") + (attachment ? " has-attachment" : ""))} key={message.id} onContextMenu={event => { event.preventDefault(); if (!message.deleted_for_everyone) setMessageMenu(message); }} onTouchStart={() => beginMessagePress(message)} onTouchEnd={cancelMessagePress} onTouchMove={cancelMessagePress} onTouchCancel={cancelMessagePress}>
-        {(() => { const senderProfile = profiles[message.sender_id]; const deletedAccount = senderProfile?.account_status === "deleted"; return <>{!message.deleted_for_everyone && <><b className="team-message-sender">{deletedAccount ? "Deleted account" : own ? "You" : senderProfile?.display_name || senderProfile?.email || "Connected account"}</b>{!deletedAccount && !own && senderProfile?.email && <small className="team-message-sender-email">{senderProfile.email}</small>}</>}<div className="account-deleted-wrap"><div className={"account-deleted-content" + (deletedAccount ? " blurred" : "")}>{message.deleted_for_everyone ? <p>This message was deleted</p> : attachment ? <div className="team-attachment">
+        {(() => { const senderProfile = profiles[message.sender_id]; const deletedAccount = senderProfile?.account_status === "deleted"; return <>{!message.deleted_for_everyone && <><b className="team-message-sender">{deletedAccount ? "Deleted account" : own ? accountName || email || "You" : senderProfile?.display_name || senderProfile?.email || "Connected account"}</b>{!deletedAccount && !own && senderProfile?.email && <small className="team-message-sender-email">{senderProfile.email}</small>}</>}<div className="account-deleted-wrap"><div className={"account-deleted-content" + (deletedAccount ? " blurred" : "")}>{message.deleted_for_everyone ? <p>This message was deleted</p> : attachment ? <div className="team-attachment">
           {attachment.kind === "image" && (url ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={attachment.name}/></a> : <span>Loading image…</span>)}
           {attachment.kind === "video" && (url ? <video src={url} controls preload="metadata"/> : <span>Loading video…</span>)}
           {attachment.kind === "audio" && (url ? <audio src={url} controls preload="metadata"/> : <span>Loading audio…</span>)}
