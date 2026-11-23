@@ -578,3 +578,78 @@ html[data-theme="light"] .connect-dashboard-mode>.team-social{background:#f3f7fc
     padding:8px!important;
   }
 }
+
+
+.connect-dashboard-mode>.team-social{
+  flex:1 1 0!important;
+  height:0!important;
+  min-height:0!important;
+  max-height:none!important;
+  overflow-x:hidden!important;
+  overflow-y:auto!important;
+  overscroll-behavior-y:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+  touch-action:pan-y!important;
+  scroll-behavior:smooth!important;
+  padding-bottom:calc(30px + env(safe-area-inset-bottom, 0px))!important;
+  scrollbar-gutter:stable;
+}
+.connect-dashboard-mode .team-social-panel{
+  display:grid!important;
+  align-content:start!important;
+  min-height:max-content!important;
+  height:auto!important;
+  overflow:visible!important;
+  padding-bottom:calc(28px + env(safe-area-inset-bottom, 0px))!important;
+  touch-action:pan-y!important;
+}
+.connect-dashboard-mode .team-social-notice{
+  min-height:0!important;
+  height:auto!important;
+  flex-shrink:0!important;
+  touch-action:pan-y!important;
+}
+.connect-dashboard-mode .team-social-panel-title{
+  position:relative!important;
+  z-index:1!important;
+  min-height:42px;
+}
+.connect-dashboard-mode .team-social-panel>.team-social-toggles{
+  min-height:max-content!important;
+  overflow:visible!important;
+}
+.connect-dashboard-mode .team-social-panel>button.primary{
+  position:relative!important;
+  z-index:1!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  justify-self:stretch!important;
+  width:100%!important;
+  min-height:48px!important;
+  margin:8px 0 12px!important;
+  padding:13px 18px!important;
+  white-space:normal!important;
+  overflow:visible!important;
+  touch-action:manipulation!important;
+}
+.connect-dashboard-mode .team-social-panel>.team-social-help{
+  margin:0 0 12px!important;
+  padding-bottom:8px!important;
+}
+@media(max-width:760px){
+  .connect-dashboard-mode>.team-social{
+    height:0!important;
+    min-height:0!important;
+    padding-bottom:calc(36px + env(safe-area-inset-bottom, 0px))!important;
+    scroll-padding-bottom:calc(36px + env(safe-area-inset-bottom, 0px));
+    scroll-behavior:auto!important;
+  }
+  .connect-dashboard-mode .team-social-panel{
+    padding-bottom:calc(36px + env(safe-area-inset-bottom, 0px))!important;
+  }
+  .connect-dashboard-mode .team-social-panel>button.primary{
+    min-height:50px!important;
+    margin-bottom:16px!important;
+  }
+}
