@@ -238,3 +238,233 @@ html[data-theme="light"] .connect-dashboard-mode>.team-social{background:#f3f7fc
     font-size:21px;
   }
 }
+
+
+.connect-dashboard-mode,
+.connect-dashboard-mode *{
+  box-sizing:border-box;
+}
+.connect-dashboard-mode{
+  min-width:0!important;
+  max-width:100vw!important;
+  overflow-x:hidden!important;
+}
+.connect-dashboard-mode>.team-social{
+  flex:1 1 0!important;
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+  padding:clamp(12px,2.4vw,30px)!important;
+  overflow-x:hidden!important;
+}
+.connect-dashboard-mode .team-social-heading,
+.connect-dashboard-mode .team-social-heading>div,
+.connect-dashboard-mode .team-social-panel,
+.connect-dashboard-mode .team-social-panel>*,
+.connect-dashboard-mode .team-social-subpanel,
+.connect-dashboard-mode .team-social-profile,
+.connect-dashboard-mode .team-social-composer,
+.connect-dashboard-mode .team-social-moments,
+.connect-dashboard-mode .team-social-moment,
+.connect-dashboard-mode .team-social-person,
+.connect-dashboard-mode .team-social-notice,
+.connect-dashboard-mode .team-social-comments,
+.connect-dashboard-mode .team-social-comments>*{
+  min-width:0!important;
+  max-width:100%!important;
+}
+.connect-dashboard-mode .team-social-heading{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:flex-start;
+  gap:12px;
+}
+.connect-dashboard-mode .team-social-heading>div{
+  flex:1 1 260px;
+}
+.connect-dashboard-mode .team-social-heading h2,
+.connect-dashboard-mode .team-social-heading p,
+.connect-dashboard-mode .team-social-person *,
+.connect-dashboard-mode .team-social-notice *,
+.connect-dashboard-mode .team-social-moment *{
+  overflow-wrap:anywhere;
+  word-break:normal;
+}
+.connect-dashboard-mode .team-social-search{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto;
+  align-items:stretch;
+  gap:8px;
+  width:100%;
+  min-width:0;
+  max-width:100%;
+}
+.connect-dashboard-mode .team-social-search input{
+  width:100%!important;
+  min-width:0!important;
+  max-width:100%!important;
+}
+.connect-dashboard-mode .team-social-search button{
+  min-width:0;
+  max-width:100%;
+  white-space:normal;
+}
+.connect-dashboard-mode .team-social-form-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr))!important;
+  width:100%;
+  min-width:0;
+}
+.connect-dashboard-mode .team-social-form-grid>*,
+.connect-dashboard-mode .team-social-form-grid label,
+.connect-dashboard-mode .team-social-form-grid input,
+.connect-dashboard-mode .team-social-form-grid textarea,
+.connect-dashboard-mode .team-social-form-grid select,
+.connect-dashboard-mode .team-social-panel>label,
+.connect-dashboard-mode .team-social-panel>label input,
+.connect-dashboard-mode .team-social-panel>label textarea,
+.connect-dashboard-mode .team-social-panel>label select{
+  min-width:0!important;
+  max-width:100%!important;
+}
+.connect-dashboard-mode .team-social input:not([type=checkbox]):not([type=file]),
+.connect-dashboard-mode .team-social textarea,
+.connect-dashboard-mode .team-social select{
+  width:100%;
+  max-width:100%;
+  min-width:0;
+}
+.connect-dashboard-mode .team-social-profile-main{
+  display:flex;
+  flex-wrap:wrap;
+  min-width:0;
+  max-width:100%;
+}
+.connect-dashboard-mode .team-social-profile-main>div:last-child{
+  flex:1 1 180px;
+  min-width:0;
+  max-width:100%;
+}
+.connect-dashboard-mode .team-social-profile-main p,
+.connect-dashboard-mode .team-social-profile-main small{
+  overflow-wrap:anywhere;
+}
+.connect-dashboard-mode .team-social-moment-meta{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:flex-start;
+  gap:8px;
+}
+.connect-dashboard-mode .team-social-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.connect-dashboard-mode .team-social-actions>button,
+.connect-dashboard-mode .team-social-comments button,
+.connect-dashboard-mode .team-social-panel button{
+  min-width:0;
+  max-width:100%;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.connect-dashboard-mode .team-social-comments>div{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.connect-dashboard-mode .team-social-comments>div input{
+  flex:1 1 180px;
+  min-width:0;
+  max-width:100%;
+}
+.connect-dashboard-mode .team-social-media,
+.connect-dashboard-mode .team-social-moment img,
+.connect-dashboard-mode .team-social-moment video,
+.connect-dashboard-mode .team-social-moment iframe{
+  display:block;
+  width:100%;
+  max-width:100%;
+  height:auto;
+  min-width:0;
+  object-fit:contain;
+}
+.connect-dashboard-mode .team-social-file,
+.connect-dashboard-mode .team-social-file input,
+.connect-dashboard-mode .team-social-compose-options>*{
+  min-width:0;
+  max-width:100%;
+}
+.connect-dashboard-mode .team-social-moments-screen{
+  width:100%;
+  max-width:100vw;
+  min-width:0;
+  padding:clamp(10px,2.5vw,28px);
+  overflow-x:hidden;
+}
+.connect-dashboard-mode .team-social-moments-screen>*{
+  min-width:0;
+  max-width:100%;
+}
+.connect-dashboard-mode .team-social-composer-title{
+  flex-wrap:wrap;
+}
+.connect-dashboard-mode .team-social-compose-options{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+}
+@media(max-width:760px){
+  .connect-dashboard-mode>.team-social{
+    padding:12px!important;
+  }
+  .connect-dashboard-mode .team-social-form-grid,
+  .connect-dashboard-mode .team-social-compose-options{
+    grid-template-columns:minmax(0,1fr)!important;
+  }
+  .connect-dashboard-mode .team-social-form-grid .wide,
+  .connect-dashboard-mode .team-social-compose-options select[multiple]{
+    grid-column:1;
+  }
+  .connect-dashboard-mode .team-social-search{
+    grid-template-columns:minmax(0,1fr);
+  }
+  .connect-dashboard-mode .team-social-search button{
+    width:100%;
+    min-height:44px;
+  }
+  .connect-dashboard-mode .team-social-heading{
+    align-items:flex-start;
+  }
+  .connect-dashboard-mode .team-social-heading h2{
+    font-size:clamp(21px,6vw,30px);
+    line-height:1.2;
+  }
+  .connect-dashboard-mode .team-social-profile-main{
+    gap:10px;
+  }
+  .connect-dashboard-mode .team-social-actions>button,
+  .connect-dashboard-mode .team-social-comments button{
+    flex:1 1 130px;
+  }
+  .connect-dashboard-mode .team-social-moments-screen-heading{
+    flex-wrap:wrap;
+  }
+}
+@media(max-width:390px){
+  .connect-dashboard-mode>.team-social{
+    padding:9px!important;
+  }
+  .connect-dashboard-mode .team-social-subpanel,
+  .connect-dashboard-mode .team-social-profile,
+  .connect-dashboard-mode .team-social-composer,
+  .connect-dashboard-mode .team-social-moment{
+    padding:10px;
+  }
+  .connect-dashboard-mode .team-social-tabs{
+    max-width:100%;
+  }
+  .connect-dashboard-mode .team-social-tabs>button{
+    flex:0 0 auto;
+  }
+  .connect-dashboard-mode .team-social-actions>button{
+    flex-basis:100%;
+  }
+}
