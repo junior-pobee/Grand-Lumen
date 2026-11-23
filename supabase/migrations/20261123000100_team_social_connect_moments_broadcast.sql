@@ -536,6 +536,9 @@ using (bucket_id = 'grand-lumen-moments' and (storage.foldername(name))[1] = aut
 do $$
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'grand_lumen_profiles') then
+      alter publication supabase_realtime add table public.grand_lumen_profiles;
+    end if;
     if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'grand_lumen_moments') then
       alter publication supabase_realtime add table public.grand_lumen_moments;
     end if;
