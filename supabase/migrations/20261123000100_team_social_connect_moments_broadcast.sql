@@ -193,6 +193,38 @@ as $$
     );
 $$;
 
+create or replace function public.grand_lumen_get_shared_profile(p_username text)
+returns table (
+  id uuid,
+  display_name text,
+  username text,
+  bio text,
+  avatar_url text,
+  cover_url text,
+  interests text[],
+  discoverable boolean,
+  profile_viewable boolean,
+  allow_requests boolean,
+  show_online boolean,
+  show_avatar boolean,
+  connection_count bigint
+)
+language sql
+stable
+security definer
+set search_path = public, auth
+as $
+  select p.id, p.display_name, p.username, p.bio, p.avatar_url, p.cover_url, p.interests,
+         p.discoverable, p.profile_viewable, p.allow_requests, p.show_online, p.show_avatar,
+         (select count(*) from public.grand_lumen_team_connections c where c.user_low = p.id or c.user_high = p.id)
+  from public.grand_lumen_profiles p
+  where lower(p.username) = lower(trim(p_username))
+    and p.profile_viewable
+    and auth.uid() is not null
+    and not public.grand_lumen_is_blocked_pair(auth.uid(), p.id)
+  limit 1;
+$;
+
 create or replace function public.grand_lumen_get_profiles_by_ids(p_user_ids uuid[])
 returns table (
   id uuid,
@@ -460,6 +492,7 @@ $$;
 revoke all on function public.grand_lumen_is_blocked_pair(uuid,uuid) from public, anon;
 revoke all on function public.grand_lumen_search_profiles(text) from public, anon;
 revoke all on function public.grand_lumen_get_profile(uuid) from public, anon;
+revoke all on function public.grand_lumen_get_shared_profile(text) from public, anon;
 revoke all on function public.grand_lumen_get_profiles_by_ids(uuid[]) from public, anon;
 revoke all on function public.grand_lumen_send_connection_request(uuid) from public, anon;
 revoke all on function public.grand_lumen_block_profile(uuid) from public, anon;
@@ -471,6 +504,7 @@ grant execute on function public.grand_lumen_is_blocked_pair(uuid,uuid) to authe
 grant execute on function public.grand_lumen_is_moment_author(uuid) to authenticated;
 grant execute on function public.grand_lumen_search_profiles(text) to authenticated;
 grant execute on function public.grand_lumen_get_profile(uuid) to authenticated;
+grant execute on function public.grand_lumen_get_shared_profile(text) to authenticated;
 grant execute on function public.grand_lumen_get_profiles_by_ids(uuid[]) to authenticated;
 grant execute on function public.grand_lumen_send_connection_request(uuid) to authenticated;
 grant execute on function public.grand_lumen_block_profile(uuid) to authenticated;
