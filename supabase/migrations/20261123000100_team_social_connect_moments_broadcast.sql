@@ -223,7 +223,7 @@ language sql
 stable
 security definer
 set search_path = public, auth
-as $
+as $$
   select p.id, p.display_name, p.username, p.bio, p.avatar_url, p.cover_url, p.interests,
          p.discoverable, p.profile_viewable, p.allow_requests, p.show_online, p.show_avatar,
          (select count(*) from public.grand_lumen_team_connections c where c.user_low = p.id or c.user_high = p.id)
@@ -420,7 +420,7 @@ language sql
 stable
 security definer
 set search_path = public, auth
-as $
+as $$
   select exists (select 1 from public.grand_lumen_moments m where m.id = p_moment_id and m.author_id = auth.uid());
 $$;
 drop policy if exists grand_lumen_moment_tags_read_visible on public.grand_lumen_moment_tags;
