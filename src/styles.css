@@ -2535,3 +2535,11 @@ body:has(.studio-shell.studio-has-preview){overflow:hidden!important}
 .team-chat-settings button{border:1px solid var(--line);border-radius:10px;padding:11px;background:var(--accent);color:#07101e;font-weight:800}
 .team-chat-settings button.cancel{background:var(--surface-2);color:var(--text)}
 @media(max-width:650px){.team-chat-fullscreen{min-height:calc(100dvh - 40px);padding:14px}.team-chat-fullscreen .team-message-list{max-height:58vh;min-height:180px}}
+
+
+.team-chat-portal-root{position:fixed!important;inset:0!important;z-index:20000!important;display:block!important;width:100vw!important;height:100vh!important;height:100dvh!important;min-width:0!important;min-height:0!important;max-width:none!important;margin:0!important;padding:0!important;overflow:hidden!important;border:0!important;border-radius:0!important;background:var(--bg,#07101e)!important;color:var(--text,#f4f7ff)!important;box-shadow:none!important;isolation:isolate!important}
+.team-chat-portal-root:before{display:none!important}
+.team-chat-portal-root>.team-chat-fullscreen{position:absolute!important;inset:0!important;z-index:1!important;display:flex!important;flex-direction:column!important;width:100%!important;height:100%!important;height:100dvh!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;margin:0!important;padding:clamp(12px,2vw,24px)!important;overflow:hidden!important;border:0!important;border-radius:0!important;background:var(--bg,#07101e)!important;box-shadow:none!important;animation:team-chat-enter .22s ease-out}
+html[data-theme="light"] .team-chat-portal-root{background:#f3f7fc!important;color:#17243a!important}
+html[data-theme="light"] .team-chat-portal-root>.team-chat-fullscreen{background:linear-gradient(145deg,#f8fbff,#edf3fa)!important;color:#17243a!important}
+@media(max-width:700px){.team-chat-portal-root>.team-chat-fullscreen{padding:max(10px,env(safe-area-inset-top)) 10px max(10px,env(safe-area-inset-bottom))!important}}
