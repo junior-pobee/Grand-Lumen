@@ -628,7 +628,6 @@ export default function TeamWorkspace({ userId, email, connectOnly = false, onCl
       const result = await supabase.from("grand_lumen_team_messages").insert({ conversation_id: conversationId, sender_id: userId, body }).select("*").single();
       if (result.error) throw result.error;
       setMessages(current => current.some(item => item.id === result.data.id) ? current : [...current, result.data as Message]);
-      const recipientId = selected.user_low === userId ? selected.user_high : selected.user_low;
       const notification = await supabase.rpc("grand_lumen_notify_team_message", { p_message_id: result.data.id });
       if (notification.error) setNotice("Message sent, but the recipient notification could not be created: " + notification.error.message);
 
