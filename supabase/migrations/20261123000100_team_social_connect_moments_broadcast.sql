@@ -144,7 +144,11 @@ stable
 security definer
 set search_path = public, auth
 as $$
-  select p.id, p.display_name, p.username, p.bio, p.avatar_url, p.cover_url, p.interests,
+  select p.id, p.display_name, p.username,
+         case when p.profile_viewable then p.bio else null end,
+         case when p.show_avatar then p.avatar_url else null end,
+         case when p.profile_viewable then p.cover_url else null end,
+         case when p.profile_viewable then p.interests else '{}'::text[] end,
          p.discoverable, p.profile_viewable, p.allow_requests, p.show_online, p.show_avatar,
          (select count(*) from public.grand_lumen_team_connections c where c.user_low = p.id or c.user_high = p.id)
   from public.grand_lumen_profiles p
@@ -246,7 +250,11 @@ stable
 security definer
 set search_path = public, auth
 as $$
-  select p.id, p.display_name, p.username, p.bio, p.avatar_url, p.cover_url, p.interests,
+  select p.id, p.display_name, p.username,
+         case when p.profile_viewable then p.bio else null end,
+         case when p.show_avatar then p.avatar_url else null end,
+         case when p.profile_viewable then p.cover_url else null end,
+         case when p.profile_viewable then p.interests else '{}'::text[] end,
          p.discoverable, p.profile_viewable, p.allow_requests, p.show_online, p.show_avatar,
          (select count(*) from public.grand_lumen_team_connections c where c.user_low = p.id or c.user_high = p.id)
   from public.grand_lumen_profiles p
