@@ -681,6 +681,11 @@ export default function TeamWorkspace({ userId, email }: { userId: string; email
     if (!supabase || message.sender_id !== userId || message.deleted_for_everyone) return;
     const result = await supabase.rpc("grand_lumen_delete_team_message_for_everyone", { p_message_id: message.id });
     if (result.error) { setNotice(result.error.message); return; }
+    const attachment = readAttachment(message.body);
+    if (attachment) {
+      const removed = await supabase.storage.from("grand-lumen-team-attachments").remove([attachment.path]);
+      if (removed.error) setNotice("Message deleted for everyone, but its attachment could not be removed from storage: " + removed.error.message);
+    }
     setMessages(current => current.map(item => item.id === message.id ? { ...item, body: "This message was deleted", deleted_for_everyone: true } : item));
     setMessageMenu(null);
     setNotice("Message deleted for everyone.");
