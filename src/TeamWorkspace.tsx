@@ -140,7 +140,7 @@ export default function TeamWorkspace({ userId, email, connectOnly = false, onCl
       ...incomingRequests.map(item => item.requester_id),
       ...outgoingRequests.map(item => item.recipient_id),
       userId
-    ])));
+    ]));
     if (ids.length) {
       const result = await supabase.from("grand_lumen_profiles").select("id,display_name,email,avatar_url").in("id", ids);
       if (result.error) {
