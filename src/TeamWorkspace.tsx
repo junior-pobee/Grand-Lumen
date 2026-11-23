@@ -748,7 +748,7 @@ export default function TeamWorkspace({ userId, email, connectOnly = false, onCl
 
   if (!supabase) return <div className={connectOnly ? "team-workspace connect-dashboard-mode" : "team-workspace"}><div className="team-empty"><h3>Cloud account required</h3><p>Sign in with a Grand Lumen cloud account to connect with other people across devices. Local browser accounts cannot use Team.</p></div></div>;
 
-  return <div className="team-workspace">
+  return <div className={connectOnly ? "team-workspace connect-dashboard-mode" : "team-workspace"}>
 
     {connectOnly && <header className="connect-dashboard-topbar"><div><span>GRAND-LUMEN</span><b>CONNECT</b></div><button type="button" onClick={() => onClose?.()}>Close <span>×</span></button></header>}
     {!selected && (connectOnly ? <TeamSocialHub userId={userId} email={email} onOpenChat={connection => setSelected(connection as Connection)}/> : <>
