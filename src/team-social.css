@@ -303,3 +303,26 @@ html[data-theme="light"] .connect-dashboard-mode>.team-social{background:#f3f7fc
   .connect-dashboard-mode .team-social-moment{padding:10px}
   .connect-dashboard-mode .team-social-tabs>button{padding:10px 12px!important}
 }
+
+.connect-dashboard-mode>.team-social{
+  scroll-behavior:smooth!important;
+  overscroll-behavior-y:contain!important;
+  -webkit-overflow-scrolling:touch!important;
+  scroll-padding-block:16px!important;
+  scrollbar-gutter:stable;
+  touch-action:pan-y!important;
+}
+.connect-dashboard-mode .team-social-panel,
+.connect-dashboard-mode .team-social-moments,
+.connect-dashboard-mode .team-social-subpanel{
+  scroll-margin-block:16px;
+}
+.connect-dashboard-mode .team-social-tabs{
+  scroll-behavior:smooth!important;
+  overscroll-behavior-x:contain!important;
+  touch-action:pan-x!important;
+}
+@media(prefers-reduced-motion:reduce){
+  .connect-dashboard-mode>.team-social,
+  .connect-dashboard-mode .team-social-tabs{scroll-behavior:auto!important}
+}
