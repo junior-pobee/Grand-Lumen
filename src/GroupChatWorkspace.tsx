@@ -355,6 +355,11 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
     if (!supabase || message.sender_id !== userId) return;
     const result = await supabase.rpc("grand_lumen_delete_group_chat_message_for_everyone", { p_message_id: message.id });
     if (result.error) { setNotice(result.error.message); return; }
+    const attachment = readAttachment(message.body);
+    if (attachment) {
+      const removed = await supabase.storage.from("grand-lumen-team-attachments").remove([attachment.path]);
+      if (removed.error) setNotice("Message deleted for everyone, but its attachment could not be removed from storage: " + removed.error.message);
+    }
     setMessageMenu(null);
   };
 
