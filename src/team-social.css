@@ -326,3 +326,13 @@ html[data-theme="light"] .connect-dashboard-mode>.team-social{background:#f3f7fc
   .connect-dashboard-mode>.team-social,
   .connect-dashboard-mode .team-social-tabs{scroll-behavior:auto!important}
 }
+
+.team-account-management{display:grid;gap:12px;padding:17px;border:1px solid var(--line);border-radius:16px;background:var(--surface-2)}
+.team-account-management h3{margin:6px 0}
+.team-account-management p{margin:0;color:var(--muted);font-size:12px;line-height:1.6}
+.team-account-management button{width:100%;padding:12px 14px;border-radius:12px;font-weight:800}
+.team-account-deactivate{border:1px solid var(--line);background:var(--surface);color:var(--text)}
+.team-account-delete{border:1px solid #b94343;background:transparent;color:#d85a5a}
+.account-deleted-wrap{position:relative;overflow:hidden;border-radius:10px}
+.account-deleted-content.blurred{filter:blur(7px);user-select:none;pointer-events:none}
+.account-deleted-overlay{position:absolute;inset:0;display:grid;place-items:center;padding:12px;background:rgba(12,16,24,.48);color:#fff;font-size:12px;font-weight:900;letter-spacing:.08em;text-align:center;text-transform:uppercase}

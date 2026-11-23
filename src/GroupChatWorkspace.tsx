@@ -6,7 +6,7 @@ import AudioMessagePlayer from "./AudioMessagePlayer";
 import { supabase } from "./auth";
 
 type Connection = { id: string; user_low: string; user_high: string };
-type Profile = { id: string; display_name: string | null; email: string | null; avatar_url: string | null };
+type Profile = { id: string; display_name: string | null; email: string | null; avatar_url: string | null; account_status?: "active" | "deactivated" | "deleted" };
 type Group = { id: string; name: string; created_by: string; created_at: string };
 type Member = { group_id: string; user_id: string; role: "admin" | "member"; joined_at: string; left_at: string | null };
 type GroupMessage = { id: string; group_id: string; sender_id: string; body: string; created_at: string; deleted_for_everyone: boolean };
@@ -99,7 +99,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
     setLoading(false);
     const profileIds = Array.from(new Set((memberResult.data || []).map(item => String(item.user_id))));
     if (profileIds.length) {
-      const profileResult = await supabase.from("grand_lumen_profiles").select("id,display_name,email,avatar_url").in("id", profileIds);
+      const profileResult = await supabase.from("grand_lumen_profiles").select("id,display_name,email,avatar_url,account_status").in("id", profileIds);
       if (!profileResult.error) setGroupProfiles(Object.fromEntries(((profileResult.data || []) as Profile[]).map(profile => [profile.id, profile])));
     }
   }, [userId]);
@@ -661,14 +661,12 @@ export default function GroupChatWorkspace({ userId, connections, profiles }: { 
         const attachment = readAttachment(message.body);
         const url = urls[message.id];
         return <article key={message.id} className={"group-chat-message" + (own ? " own" : "") + (message.deleted_for_everyone ? " deleted" : "")} onContextMenu={event => { event.preventDefault(); if (!message.deleted_for_everyone) setMessageMenu(message); }} onTouchStart={() => beginPress(message)} onTouchEnd={cancelPress} onTouchMove={cancelPress} onTouchCancel={cancelPress}>
-          {!own && !message.deleted_for_everyone && <b className="group-chat-sender">{memberName(message.sender_id)}</b>}
-          {message.deleted_for_everyone ? <p>This message was deleted</p> : attachment ? <div className="team-attachment">
+          {(() => { const deletedAccount = groupProfiles[message.sender_id]?.account_status === "deleted" || profiles[message.sender_id]?.account_status === "deleted"; return <>{!own && !message.deleted_for_everyone && <b className="group-chat-sender">{deletedAccount ? "Deleted account" : memberName(message.sender_id)}</b>}<div className="account-deleted-wrap"><div className={"account-deleted-content" + (deletedAccount ? " blurred" : "")}>{message.deleted_for_everyone ? <p>This message was deleted</p> : attachment ? <div className="team-attachment">
             {attachment.kind === "image" && (url ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={attachment.name}/></a> : <span>Loading image…</span>)}
             {attachment.kind === "video" && (url ? <video src={url} controls preload="metadata"/> : <span>Loading video…</span>)}
             {attachment.kind === "audio" && (url ? <AudioMessagePlayer src={url} name={attachment.name}/> : <span>Loading audio…</span>)}
             {attachment.kind === "file" && <div className="team-attachment-file"><span>FILE</span><div><b>{attachment.name}</b><small>{(attachment.size / 1024 / 1024).toFixed(2)} MB</small></div>{url ? <a href={url} target="_blank" rel="noreferrer" download={attachment.name}>Open / download</a> : <span>Preparing…</span>}</div>}
-          </div> : <p>{message.body}</p>}
-          <small>{own ? "You" : memberName(message.sender_id)} · {new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small>
+          </div> : <p>{message.body}</p>}</div>{deletedAccount && <div className="account-deleted-overlay">Account Deleted</div>}</div><small>{own ? "You" : deletedAccount ? "Deleted account" : memberName(message.sender_id)} · {new Date(message.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</small></>; })()}
         </article>;
       })}{!messages.filter(message => !hiddenIds.includes(message.id)).length && <div className="group-chat-first-message"><Users size={28}/><b>This is the beginning of {selected.name}</b><span>Send the first message to everyone in this group.</span></div>}</div>
       {messageMenu && <div className="team-message-menu-backdrop" onMouseDown={event => { if (event.target === event.currentTarget) setMessageMenu(null); }}><section className="team-message-menu" role="dialog" aria-modal="true" aria-label="Group message options"><span>MESSAGE OPTIONS</span><button onClick={() => void deleteForMe(messageMenu)}>Delete for me</button>{messageMenu.sender_id === userId && <button className="delete-everyone" onClick={() => void deleteForEveryone(messageMenu)}>Delete for everyone</button>}<button className="cancel" onClick={() => setMessageMenu(null)}>Cancel</button></section></div>}
