@@ -38,6 +38,8 @@ Deno.serve(async request => {
       ban_duration: "876000h"
     });
     if (anonymized.error) return Response.json({ error: "Your content has been anonymised, but sign-in could not yet be disabled. Contact support before considering deletion complete." }, { status: 500, headers: corsHeaders });
+    const scrubbedProfile = await adminClient.from("grand_lumen_profiles").update({ email: null }).eq("id", user.id);
+    if (scrubbedProfile.error) return Response.json({ error: "Sign-in has been disabled, but the profile email could not be fully anonymised. Contact support." }, { status: 500, headers: corsHeaders });
   }
 
   return Response.json({ status, notifications: changed.data?.notifications ?? 0 }, { headers: corsHeaders });
