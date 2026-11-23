@@ -46,7 +46,7 @@ export default function TeamSocialHub({ userId, email, onOpenChat }: Props) {
   const [discoverable, setDiscoverable] = useState(true);
   const [profileViewable, setProfileViewable] = useState(true);
   const [allowRequests, setAllowRequests] = useState(true);
-  const [showOnline, setShowOnline] = useState(true);
+  const [showOnline, setShowOnline] = useState(false);
   const [showAvatar, setShowAvatar] = useState(true);
   const [momentBody, setMomentBody] = useState("");
   const [momentKind, setMomentKind] = useState("idea");
