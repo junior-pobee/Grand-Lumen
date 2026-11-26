@@ -29,7 +29,6 @@ if ("serviceWorker" in navigator && import.meta.env.PROD) {
       };
 
       checkForUpdates();
-      window.setInterval(checkForUpdates, 60 * 1000);
       document.addEventListener("visibilitychange", checkForUpdates);
       window.addEventListener("focus", checkForUpdates);
     }).catch(error => {
