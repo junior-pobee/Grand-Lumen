@@ -44,6 +44,26 @@ export default function RecipeWorkspace() {
   const [error, setError] = useState("");
   const [searched, setSearched] = useState(false);
   const detailRequest = useRef(0);
+const recipeCacheKey = "grandLumenRecipeCacheV1";
+const recipeCacheDuration = 10 * 60 * 1000;
+
+function readRecipeCache(key: string) {
+  try {
+    const cache = JSON.parse(localStorage.getItem(recipeCacheKey) || "{}") as Record<string, { savedAt: number; meals: Meal[] }>;
+    const entry = cache[key];
+    return entry && Date.now() - entry.savedAt < recipeCacheDuration ? entry.meals : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeRecipeCache(key: string, meals: Meal[]) {
+  try {
+    const cache = JSON.parse(localStorage.getItem(recipeCacheKey) || "{}") as Record<string, { savedAt: number; meals: Meal[] }>;
+    cache[key] = { savedAt: Date.now(), meals };
+    localStorage.setItem(recipeCacheKey, JSON.stringify(cache));
+  } catch {}
+}
 
   async function searchMeals(value = search, selectedCategory = category) {
     setLoading(true);
@@ -99,9 +119,7 @@ export default function RecipeWorkspace() {
     setDetailError("");
   }
 
-  useEffect(() => {
-    void searchMeals("chicken", "All dishes");
-  }, []);
+
 
   useEffect(() => {
     if (!selected) return;
