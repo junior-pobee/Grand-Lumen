@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "grand-lumen-";
-const CACHE_NAME = CACHE_PREFIX + "pwa-v19";
+const CACHE_NAME = CACHE_PREFIX + "pwa-v20";
 const APP_SCOPE = new URL(self.registration.scope);
 const APP_PATH = APP_SCOPE.pathname.endsWith("/") ? APP_SCOPE.pathname : APP_SCOPE.pathname + "/";
 const APP_SHELL = [
@@ -81,10 +81,11 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  if (["script", "style", "image", "font"].includes(request.destination)) {
+  const isScriptOrStyle = ["script", "style"].includes(request.destination) || /\.(?:js|css)$/i.test(requestUrl.pathname);
+  if (isScriptOrStyle || ["image", "font"].includes(request.destination)) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
-      if (request.destination === "script" || request.destination === "style") {
+      if (isScriptOrStyle) {
         try {
           const response = await fetch(request, { cache: "no-cache" });
           if (response.ok) await cache.put(request, response.clone());
