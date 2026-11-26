@@ -119,9 +119,7 @@ function writeRecipeCache(key: string, meals: Meal[]) {
     setDetailError("");
   }
 
-  useEffect(() => {
-    void searchMeals("chicken", "All dishes");
-  }, []);
+
 
   useEffect(() => {
     if (!selected) return;
