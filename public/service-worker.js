@@ -16,7 +16,7 @@ async function trimMediaCache(cache) {
 }
 
 async function cacheResponse(cache, request, response) {
-  await cacheResponse(cache, request, response);
+  await cache.put(request, response.clone());
   if (request.destination === "image") await trimMediaCache(cache);
 }
 
