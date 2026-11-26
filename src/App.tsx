@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, startTransition, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { FormEvent } from "react";
 import { Activity, Bell, Clock, Utensils, Newspaper, ArrowDownToLine, ArrowLeft, ArrowRight, ArrowUpRight, Atom, BookOpen, Bookmark, Boxes, Calculator, Check, CheckCircle2, ChevronDown, CircleHelp, Code2, Compass, Copy, Database, ExternalLink, Eye, EyeOff, FileText, FlaskConical, Globe2, GraduationCap, Image, Languages, Layers3, Library, LocateFixed, LockKeyhole, LogIn, LogOut, Mail, MapPin, Maximize2, Menu, Network, Moon, MonitorSmartphone, Navigation, Play, Plus, Search, Send, Settings, ShieldCheck, Sparkles, Sun, Terminal, UserRound, Video, Wallet, X, Zap, QrCode, ScanLine, Share2, Upload, Download, Smartphone } from "lucide-react";
@@ -2691,7 +2691,7 @@ function App() {
   }, [authReady, session?.user.id, workspaceSyncReady, guestMode]);
 
   function selectSection(value: Section) {
-    setSection(value);
+    startTransition(() => setSection(value));
     setMobileMenu(false);
     setError("");
     setResults([]);
@@ -2729,10 +2729,9 @@ function App() {
 
   return (
     <>
-      <Suspense fallback={null}>
-      <GlobalReminderMonitor />
-      {session && <TeamMessageAlert userId={session.user.id} onOpen={() => setSection("Team")} />}
-      <LumenScan />
+      <Suspense fallback={null}><GlobalReminderMonitor /></Suspense>
+      {session && <Suspense fallback={null}><TeamMessageAlert userId={session.user.id} onOpen={() => setSection("Team")} /></Suspense>}
+      <Suspense fallback={null}><LumenScan /></Suspense>
       <div className={theme === "light" ? "app-shell theme-light" : "app-shell theme-dark"} style={{ "--gl-font-scale": fontScale, "--gl-interface-scale": interfaceScale, "--gl-font-family": fontFamily, "--gl-font-weight": fontWeight } as React.CSSProperties}>
         {appLanguage !== "en" && <button className="language-default-fab" onClick={resetToEnglish} aria-label="Switch back to English"><Globe2 size={15} /><span>English</span><ArrowRight size={13} /></button>}
         <aside className={mobileMenu ? "sidebar open" : "sidebar"}>
@@ -2756,7 +2755,7 @@ function App() {
             <div className="breadcrumb"><span>GRAND-LUMEN</span><ArrowRight size={13} /><b>{section.toUpperCase()}</b></div>
             <div className="top-actions"><span className="system-status"><i /> {session ? workspaceSyncStatus.toUpperCase() : "SYSTEM READY"}</span><div className="desktop-alert-center"><AlertCenter /></div><span className="signed-in-email">{session?.user.email || localProfile?.email || "LOCAL WORKSPACE"}</span><button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Toggle theme">{theme === "dark" ? <Sun size={17} /> : <Moon size={17} />}</button><button className="icon-button" onClick={() => void handleLogout()} aria-label="Sign out"><LogOut size={16} /></button></div>
           </header>
-          <div className="content-wrap" ref={contentRef}>
+          <div className="content-wrap" ref={contentRef}><Suspense fallback={null}>
             {section === "Lumen Hub" && <section><PageTitle eyebrow="GLOBAL DIGITAL UTILITY PLATFORM" title={heading["Lumen Hub"]} description="Connected knowledge, everyday utilities, productivity, learning and accessibility tools. AI is intentionally excluded from this release."/><ExpansionHub language={appLanguage} userId={session?.user.id || ""} onOpenScanner={() => selectSection("Scanner")}/></section>}
             {section === "Home" && <section>
               <div className="hero-block"><div className="eyebrow"><Sparkles size={13} /> YOUR EXPANDED DIGITAL UNIVERSE</div><h1>Explore beyond<br /><span>what you know.</span></h1><p>One workspace for discovery, research, learning, development and creation. Your next idea starts here.</p><div className="hero-search"><Search size={19} /><input value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === "Enter" && runSearch()} placeholder="Search knowledge, ideas, technology..." /><button onClick={() => { selectSection("Search"); runSearch(); }}>Explore <ArrowRight size={15} /></button></div><div className="quick-tags"><button onClick={() => { setQuery("artificial intelligence"); selectSection("Search"); }}>Artificial intelligence</button><button onClick={() => { setQuery("space exploration"); selectSection("Search"); }}>Space exploration</button><button onClick={() => { setQuery("web development"); selectSection("Search"); }}>Web development</button></div></div>
@@ -2796,9 +2795,8 @@ function App() {
           <footer className="app-footer"><span>GRAND-LUMEN</span><span>EXPLORE BEYOND · BUILD WHAT COMES NEXT</span><span>FOUNDATION 1.0</span></footer>
         </main>
       </div>
-      {welcomeTourOpen && <WelcomeTour name={session?.user.user_metadata?.full_name || localProfile?.fullName || session?.user.email || "explorer"} onComplete={completeWelcomeTour} />}
-      <PreviousActivityPopup entries={activityEntries} storageKey={activityStorageKey} loaded={activityLoaded && !welcomeTourOpen} />
-      </Suspense>
+      {welcomeTourOpen && <Suspense fallback={null}><WelcomeTour name={session?.user.user_metadata?.full_name || localProfile?.fullName || session?.user.email || "explorer"} onComplete={completeWelcomeTour} /></Suspense>}
+      <Suspense fallback={null}><PreviousActivityPopup entries={activityEntries} storageKey={activityStorageKey} loaded={activityLoaded && !welcomeTourOpen} /></Suspense>
     </>
   );
 }
