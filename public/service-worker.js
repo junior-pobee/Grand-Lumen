@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "grand-lumen-";
-const CACHE_NAME = CACHE_PREFIX + "pwa-v17";
+const CACHE_NAME = CACHE_PREFIX + "pwa-v18";
 const APP_SCOPE = new URL(self.registration.scope);
 const APP_PATH = APP_SCOPE.pathname.endsWith("/") ? APP_SCOPE.pathname : APP_SCOPE.pathname + "/";
 const APP_SHELL = [
@@ -7,6 +7,18 @@ const APP_SHELL = [
   new URL("icons/grand-lumen-192.png", APP_SCOPE).href,
   new URL("icons/grand-lumen-512.png", APP_SCOPE).href
 ];
+
+async function trimMediaCache(cache) {
+  const mediaRequests = (await cache.keys()).filter(request => request.destination === "image");
+  while (mediaRequests.length > 60) {
+    await cache.delete(mediaRequests.shift());
+  }
+}
+
+async function cacheResponse(cache, request, response) {
+  await cacheResponse(cache, request, response);
+  if (request.destination === "image") await trimMediaCache(cache);
+}
 
 async function cacheAppShell(cache) {
   for (const asset of APP_SHELL) {
