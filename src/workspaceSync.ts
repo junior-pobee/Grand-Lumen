@@ -396,21 +396,7 @@ export async function startWorkspaceCloudSync(
       if (status === "SUBSCRIBED") onStatus("Cloud sync connected");
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") onStatus("Live sync reconnecting");
     });
-
-  const pollTimer = window.setInterval(async () => {
-    if (disposed || !navigator.onLine || applyingRemote) return;
-    const { data, error } = await client
-      .from("grand_lumen_workspaces")
-      .select("workspace_data")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (error) {
-      onStatus("Checking cloud connection");
-      return;
-    }
-    applyRemoteSnapshot(data?.workspace_data as WorkspaceSnapshot | { version: 1; data: Record<string, string> } | undefined);
-  }, 3000);
-
+\n  const pullLatest = async () => {\n    if (disposed || !navigator.onLine || applyingRemote) return;\n    const { data, error } = await client.from(\"grand_lumen_workspaces\").select(\"workspace_data\").eq(\"user_id\", userId).maybeSingle();\n    if (error) { onStatus(\"Cloud sync will retry when connected\"); return; }\n    applyRemoteSnapshot(data?.workspace_data as WorkspaceSnapshot | { version: 1; data: Record<string, string> } | undefined);\n  };\n
   const flush = () => {
     if (saveTimer !== undefined) {
       window.clearTimeout(saveTimer);
@@ -430,15 +416,15 @@ export async function startWorkspaceCloudSync(
     });
   };
   window.addEventListener("pagehide", flush);
-  window.addEventListener("online", persist);
+  window.addEventListener("online", pullLatest);
   window.addEventListener("grand-lumen-scan-records-updated", handleScanRecordsUpdated);
 
   return () => {
     disposed = true;
     if (saveTimer !== undefined) window.clearTimeout(saveTimer);
-    window.clearInterval(pollTimer);
+
     window.removeEventListener("pagehide", flush);
-    window.removeEventListener("online", persist);
+    window.removeEventListener("online", pullLatest);
     window.removeEventListener("grand-lumen-scan-records-updated", handleScanRecordsUpdated);
     Storage.prototype.setItem = originalSetItem;
     Storage.prototype.removeItem = originalRemoveItem;
