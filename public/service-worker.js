@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "grand-lumen-";
-const CACHE_NAME = CACHE_PREFIX + "pwa-v13";
+const CACHE_NAME = CACHE_PREFIX + "pwa-v14";
 const APP_SCOPE = new URL(self.registration.scope);
 const APP_PATH = APP_SCOPE.pathname.endsWith("/") ? APP_SCOPE.pathname : APP_SCOPE.pathname + "/";
 const APP_SHELL = [
@@ -10,15 +10,13 @@ const APP_SHELL = [
 
 self.addEventListener("install", event => {
   event.waitUntil((async () => {
-    try {
-      const cache = await caches.open(CACHE_NAME);
-      await Promise.all(APP_SHELL.map(async asset => {
-        try {
-          const response = await fetch(new Request(asset, { cache: "reload" }));
-          if (response.ok) await cache.put(asset, response);
-        } catch {}
-      }));
-    } catch {}
+    const cache = await caches.open(CACHE_NAME);
+    for (const asset of APP_SHELL) {
+      try {
+        const response = await fetch(asset);
+        if (response.ok) await cache.put(asset, response);
+      } catch {}
+    }
     await self.skipWaiting();
   })());
 });
@@ -43,7 +41,7 @@ self.addEventListener("fetch", event => {
         const response = await fetch(request);
         if (response.ok) {
           const cache = await caches.open(CACHE_NAME);
-          await cache.put(request, response.clone());
+          await cache.put(APP_SCOPE.href, response.clone());
         }
         return response;
       } catch {
@@ -54,21 +52,20 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  const isAppAsset = ["script", "style", "image", "font"].includes(request.destination);
-  if (!isAppAsset) return;
-
-  event.respondWith((async () => {
-    const cached = await caches.match(request);
-    try {
-      const response = await fetch(request);
-      if (response.ok) {
-        const cache = await caches.open(CACHE_NAME);
-        await cache.put(request, response.clone());
+  if (["script", "style", "image", "font"].includes(request.destination)) {
+    event.respondWith((async () => {
+      const cached = await caches.match(request);
+      if (cached) return cached;
+      try {
+        const response = await fetch(request);
+        if (response.ok) {
+          const cache = await caches.open(CACHE_NAME);
+          await cache.put(request, response.clone());
+        }
+        return response;
+      } catch {
+        return Response.error();
       }
-      return response;
-    } catch {
-      return cached || Response.error();
-    }
-  })());
+    })());
+  }
 });
-
