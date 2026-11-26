@@ -55,6 +55,7 @@ export default function TeamWorkspace({ userId, email, connectOnly = false, onCl
   const recordingStreamRef = useRef<MediaStream | null>(null);
   const recordingChunksRef = useRef<Blob[]>([]);
   const messagePressTimer = useRef<number | null>(null);
+  const messagePressOrigin = useRef<{ x: number; y: number } | null>(null);
   const messageListRef = useRef<HTMLDivElement>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectName, setProjectName] = useState("");
@@ -823,15 +824,24 @@ export default function TeamWorkspace({ userId, email, connectOnly = false, onCl
     setNotice("Your chat profile has been updated.");
   };
 
-  const beginMessagePress = (message: Message) => {
+  const beginMessagePress = (message: Message, x: number, y: number) => {
     if (message.deleted_for_everyone) return;
     if (messagePressTimer.current) window.clearTimeout(messagePressTimer.current);
-    messagePressTimer.current = window.setTimeout(() => setMessageMenu(message), 550);
+    messagePressOrigin.current = { x, y };
+    messagePressTimer.current = window.setTimeout(() => setMessageMenu(message), 500);
+  };
+
+  const moveMessagePress = (event: React.TouchEvent<HTMLElement>) => {
+    const origin = messagePressOrigin.current;
+    if (!origin || event.touches.length !== 1) return cancelMessagePress();
+    const touch = event.touches[0];
+    if (Math.abs(touch.clientX - origin.x) > 12 || Math.abs(touch.clientY - origin.y) > 12) cancelMessagePress();
   };
 
   const cancelMessagePress = () => {
     if (messagePressTimer.current) window.clearTimeout(messagePressTimer.current);
     messagePressTimer.current = null;
+    messagePressOrigin.current = null;
   };
 
   if (!supabase) { const unavailable = <div className={connectOnly ? "team-workspace connect-dashboard-mode" : "team-workspace"}><div className="team-empty"><h3>Cloud account required</h3><p>Sign in with a Grand Lumen cloud account to connect with other people across devices. Local browser accounts cannot use Team.</p></div></div>; return connectOnly ? createPortal(unavailable, document.body) : unavailable; }
@@ -860,7 +870,7 @@ export default function TeamWorkspace({ userId, email, connectOnly = false, onCl
       const attachment = readAttachment(message.body);
       const url = attachmentUrls[message.id];
       const own = message.sender_id === userId;
-      return <article className={("team-message" + (own ? " own" : "") + (message.deleted_for_everyone ? " deleted" : "") + (attachment ? " has-attachment" : ""))} key={message.id} onContextMenu={event => { event.preventDefault(); if (!message.deleted_for_everyone) setMessageMenu(message); }} onTouchStart={event => { if (event.touches.length === 1) beginMessagePress(message); }} onTouchEnd={cancelMessagePress} onTouchMove={cancelMessagePress} onTouchCancel={cancelMessagePress}>
+      return <article className={("team-message" + (own ? " own" : "") + (message.deleted_for_everyone ? " deleted" : "") + (attachment ? " has-attachment" : ""))} key={message.id} onContextMenu={event => { event.preventDefault(); if (!message.deleted_for_everyone) setMessageMenu(message); }} onTouchStart={event => { if (event.touches.length === 1) beginMessagePress(message, event.touches[0].clientX, event.touches[0].clientY); }} onTouchEnd={cancelMessagePress} onTouchMove={moveMessagePress} onTouchCancel={cancelMessagePress}>
         {(() => { const senderProfile = profiles[message.sender_id]; const deletedAccount = senderProfile?.account_status === "deleted"; return <>{!message.deleted_for_everyone && <><b className="team-message-sender">{deletedAccount ? "Deleted account" : own ? senderProfile?.chat_display_name || senderProfile?.display_name || accountName || "You" : senderProfile?.chat_display_name || senderProfile?.display_name || "Connected account"}</b></>}<div className="account-deleted-wrap"><div className={"account-deleted-content" + (deletedAccount ? " blurred" : "")}>{message.deleted_for_everyone ? <p>This message was deleted</p> : attachment ? <div className="team-attachment">
           {attachment.kind === "image" && (url ? <a href={url} target="_blank" rel="noreferrer"><img src={url} alt={attachment.name}/></a> : <span>Loading image…</span>)}
           {attachment.kind === "video" && (url ? <video src={url} controls preload="metadata"/> : <span>Loading video…</span>)}
