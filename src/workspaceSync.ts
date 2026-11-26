@@ -236,6 +236,10 @@ export async function startWorkspaceCloudSync(
 
   const persist = () => {
     if (disposed) return;
+    if (!navigator.onLine) {
+      onStatus("Offline · changes saved on this device");
+      return;
+    }
     onStatus("Saving workspace to cloud");
     saveQueue = saveQueue.then(async () => {
       if (disposed) return;
@@ -429,7 +433,12 @@ export async function startWorkspaceCloudSync(
     });
   };
   window.addEventListener("pagehide", flush);
-  window.addEventListener("online", pullLatest);
+  const handleOnline = () => {
+    onStatus("Connection restored · syncing pending changes");
+    pullLatest();
+    if (dirtyKeys.size || scanRecordsDirty) schedulePersist();
+  };
+  window.addEventListener("online", handleOnline);
   window.addEventListener("grand-lumen-scan-records-updated", handleScanRecordsUpdated);
 
   return () => {
@@ -437,7 +446,7 @@ export async function startWorkspaceCloudSync(
     if (saveTimer !== undefined) window.clearTimeout(saveTimer);
 
     window.removeEventListener("pagehide", flush);
-    window.removeEventListener("online", pullLatest);
+    window.removeEventListener("online", handleOnline);
     window.removeEventListener("grand-lumen-scan-records-updated", handleScanRecordsUpdated);
     Storage.prototype.setItem = originalSetItem;
     Storage.prototype.removeItem = originalRemoveItem;
