@@ -9,7 +9,8 @@ import ExpansionHub from "./ExpansionHub";
 import TeamWorkspace from "./TeamWorkspace";
 import TeamPrivacySettings from "./TeamPrivacySettings";
 import LumenSheets from "./LumenSheets";
-import ActivityDigest, { type ActivityEntry } from "./ActivityDigest";
+const ActivityDigest = lazy(() => import("./ActivityDigest"));
+import type { ActivityEntry } from "./ActivityDigest";
 import PreviousActivityPopup from "./PreviousActivityPopup";
 import WelcomeTour from "./WelcomeTour";
 import LumenScan from "./LumenScan";
@@ -2728,6 +2729,7 @@ function App() {
 
   return (
     <>
+      <Suspense fallback={<div className="auth-boot" role="status">Loading workspace module…</div>}>
       <GlobalReminderMonitor />
       {session && <TeamMessageAlert userId={session.user.id} onOpen={() => setSection("Team")} />}
       <LumenScan />
@@ -2796,6 +2798,7 @@ function App() {
       </div>
       {welcomeTourOpen && <WelcomeTour name={session?.user.user_metadata?.full_name || localProfile?.fullName || session?.user.email || "explorer"} onComplete={completeWelcomeTour} />}
       <PreviousActivityPopup entries={activityEntries} storageKey={activityStorageKey} loaded={activityLoaded && !welcomeTourOpen} />
+      </Suspense>
     </>
   );
 }
