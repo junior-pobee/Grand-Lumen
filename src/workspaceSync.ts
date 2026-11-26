@@ -396,8 +396,7 @@ export async function startWorkspaceCloudSync(
       if (status === "SUBSCRIBED") onStatus("Cloud sync connected");
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") onStatus("Live sync reconnecting");
     });
-
-  const pollTimer = window.setInterval(async () => {
+  const pullLatest = async () => {
     if (disposed || !navigator.onLine || applyingRemote) return;
     const { data, error } = await client
       .from("grand_lumen_workspaces")
@@ -405,11 +404,11 @@ export async function startWorkspaceCloudSync(
       .eq("user_id", userId)
       .maybeSingle();
     if (error) {
-      onStatus("Checking cloud connection");
+      onStatus("Cloud sync will retry when connected");
       return;
     }
     applyRemoteSnapshot(data?.workspace_data as WorkspaceSnapshot | { version: 1; data: Record<string, string> } | undefined);
-  }, 3000);
+  };
 
   const flush = () => {
     if (saveTimer !== undefined) {
@@ -430,15 +429,15 @@ export async function startWorkspaceCloudSync(
     });
   };
   window.addEventListener("pagehide", flush);
-  window.addEventListener("online", persist);
+  window.addEventListener("online", pullLatest);
   window.addEventListener("grand-lumen-scan-records-updated", handleScanRecordsUpdated);
 
   return () => {
     disposed = true;
     if (saveTimer !== undefined) window.clearTimeout(saveTimer);
-    window.clearInterval(pollTimer);
+
     window.removeEventListener("pagehide", flush);
-    window.removeEventListener("online", persist);
+    window.removeEventListener("online", pullLatest);
     window.removeEventListener("grand-lumen-scan-records-updated", handleScanRecordsUpdated);
     Storage.prototype.setItem = originalSetItem;
     Storage.prototype.removeItem = originalRemoveItem;
