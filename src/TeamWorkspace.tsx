@@ -84,6 +84,11 @@ export default function TeamWorkspace({ userId, email, connectOnly = false, onCl
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  useEffect(() => {
+    if (!selected || !messages.length) return;
+    writeTeamCache(userId, "messages:" + selected.id, { messages, hiddenMessageIds });
+  }, [selected?.id, messages, hiddenMessageIds, userId]);
+
   const refreshUnreadCounts = useCallback(async () => {
     if (!supabase || !userId || !connections.length) {
       setUnreadCounts({});
