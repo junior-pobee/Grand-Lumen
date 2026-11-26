@@ -1772,7 +1772,7 @@ function NewsWorkspace() {
       setBusy(false);
     }
   };
-  useEffect(() => { void load("", "all"); }, []);
+
   const countries = [["all","All countries"],["GH","Ghana"],["NG","Nigeria"],["ZA","South Africa"],["KE","Kenya"],["US","United States"],["GB","United Kingdom"],["CA","Canada"],["IN","India"],["AU","Australia"],["DE","Germany"],["FR","France"],["JP","Japan"],["BR","Brazil"],["EG","Egypt"],["AE","United Arab Emirates"]];
   return <div className="news-workspace">
     <div className="news-search-panel"><div className="news-search-input"><Search size={18}/><input value={term} onChange={event=>setTerm(event.target.value)} onKeyDown={event=>event.key==="Enter" && void load()} placeholder="Search worldwide news, past events, years or historical topics..."/><button onClick={()=>void load()} disabled={busy}>{busy?"Searching…":"Search news"}</button></div><div className="news-filters"><label>Country<select value={country} onChange={event=>setCountry(event.target.value)}>{countries.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label></div><p className="news-source-note">Search current worldwide coverage and indexed historical newspaper collections. Try a year, historical event, country, publisher or keyword. Search availability depends on each archive's digitised records.</p></div>
