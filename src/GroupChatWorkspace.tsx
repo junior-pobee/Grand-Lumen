@@ -309,7 +309,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles, onOp
     return () => { active = false; };
   }, [messages, urls]);
 
-  useEffect(() => { if (selected && messages.length) writeGroupCache(userId, "messages:" + selected.id, { messages, hiddenIds }); }, [selected?.id, messages, hiddenIds, userId]);\n\n  useEffect(() => { if (selected && messages.length) writeGroupCache(userId, "messages:" + selected.id, { messages, hiddenIds }); }, [selected?.id, messages, hiddenIds, userId]);
+  useEffect(() => { if (selected && messages.length) writeGroupCache(userId, "messages:" + selected.id, { messages, hiddenIds }); }, [selected?.id, messages, hiddenIds, userId]);
 
   const sendText = async () => {
     if (!supabase || !selected || !draft.trim() || busy) return;
