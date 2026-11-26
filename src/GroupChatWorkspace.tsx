@@ -79,7 +79,9 @@ export default function GroupChatWorkspace({ userId, connections, profiles, onOp
     setLoading(true);
     const membershipResult = await supabase.from("grand_lumen_group_chat_members").select("group_id,user_id,role,joined_at,left_at").eq("user_id", userId).is("left_at", null).order("joined_at", { ascending: false });
     if (membershipResult.error) {
-      setNotice(membershipResult.error.message);
+      const cached = readGroupCache<{groups:Group[];members:Record<string,Member[]>;profiles:Record<string,Profile>}>(userId, "list");
+      if (cached) { setGroups(cached.groups || []); setMembers(cached.members || {}); setGroupProfiles(cached.profiles || {}); setNotice("Offline mode: showing saved groups and members."); }
+      else setNotice("Your groups could not load. Open Group Chat online once to save them for offline use.");
       setLoading(false);
       return;
     }
@@ -101,6 +103,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles, onOp
     const grouped: Record<string, Member[]> = {};
     for (const member of (memberResult.data || []) as Member[]) grouped[member.group_id] = [...(grouped[member.group_id] || []), member];
     setMembers(grouped);
+    writeGroupCache(userId, "list", { groups: (groupResult.data || []) as Group[], members: grouped, profiles: groupProfiles });
     setLoading(false);
     const profileIds = Array.from(new Set((memberResult.data || []).map(item => String(item.user_id))));
     if (profileIds.length) {
@@ -122,7 +125,8 @@ export default function GroupChatWorkspace({ userId, connections, profiles, onOp
             if (nextProfiles[status.id]) nextProfiles[status.id] = { ...nextProfiles[status.id], account_status: status.account_status };
           }
         }
-        setGroupProfiles(nextProfiles);\n        writeGroupCache(userId, "list", { groups: (groupResult.data || []) as Group[], members: grouped, profiles: nextProfiles });
+        setGroupProfiles(nextProfiles);
+        writeGroupCache(userId, "list", { groups: (groupResult.data || []) as Group[], members: grouped, profiles: nextProfiles });
       }
     }
   }, [userId]);
@@ -220,10 +224,13 @@ export default function GroupChatWorkspace({ userId, connections, profiles, onOp
       const messageResult = await client.from("grand_lumen_group_chat_messages").select("*").eq("group_id", selected.id).order("created_at", { ascending: true }).limit(500);
       if (!active) return;
       if (messageResult.error) {
-        setNotice(messageResult.error.message);
+        const cached = readGroupCache<{messages:GroupMessage[];hiddenIds:string[]}>(userId, "messages:" + selected.id);
+        if (cached) { setMessages(cached.messages || []); setHiddenIds(cached.hiddenIds || []); setNotice("Offline mode: showing saved group messages."); }
+        else setNotice("This group has no saved offline messages yet. Open it while online first.");
       } else {
         const rows = (messageResult.data || []) as GroupMessage[];
         setMessages(rows);
+        writeGroupCache(userId, "messages:" + selected.id, { messages: rows, hiddenIds: [] });
         const ids = rows.map(item => item.id);
         if (ids.length) {
           const hiddenResult = await client.from("grand_lumen_group_message_hides").select("message_id").eq("user_id", userId).in("message_id", ids);
@@ -302,7 +309,9 @@ export default function GroupChatWorkspace({ userId, connections, profiles, onOp
     return () => { active = false; };
   }, [messages, urls]);
 
-  useEffect(() => { if (selected && messages.length) writeGroupCache(userId, "messages:" + selected.id, { messages, hiddenIds }); }, [selected?.id, messages, hiddenIds, userId]);\n\n  const sendText = async () => {
+  useEffect(() => { if (selected && messages.length) writeGroupCache(userId, "messages:" + selected.id, { messages, hiddenIds }); }, [selected?.id, messages, hiddenIds, userId]);\n\n  useEffect(() => { if (selected && messages.length) writeGroupCache(userId, "messages:" + selected.id, { messages, hiddenIds }); }, [selected?.id, messages, hiddenIds, userId]);
+
+  const sendText = async () => {
     if (!supabase || !selected || !draft.trim() || busy) return;
     setBusy(true);
     const body = draft.trim();
