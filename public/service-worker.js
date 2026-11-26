@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "grand-lumen-";
-const CACHE_NAME = CACHE_PREFIX + "pwa-v20";
+const CACHE_NAME = CACHE_PREFIX + "pwa-v21";
 const APP_SCOPE = new URL(self.registration.scope);
 const APP_PATH = APP_SCOPE.pathname.endsWith("/") ? APP_SCOPE.pathname : APP_SCOPE.pathname + "/";
 const APP_SHELL = [
@@ -7,17 +7,43 @@ const APP_SHELL = [
   new URL("icons/grand-lumen-192.png", APP_SCOPE).href,
   new URL("icons/grand-lumen-512.png", APP_SCOPE).href
 ];
+const TEAM_MANIFEST_ENTRIES = ["src/TeamWorkspace.tsx", "src/GroupChatWorkspace.tsx", "src/TeamSocialHub.tsx", "src/AudioMessagePlayer.tsx"];
 
 async function trimMediaCache(cache) {
   const mediaRequests = (await cache.keys()).filter(request => request.destination === "image");
-  while (mediaRequests.length > 60) {
-    await cache.delete(mediaRequests.shift());
-  }
+  while (mediaRequests.length > 60) await cache.delete(mediaRequests.shift());
 }
 
-async function cacheResponse(cache, request, response) {
-  await cache.put(request, response.clone());
-  if (request.destination === "image") await trimMediaCache(cache);
+async function cacheAsset(cache, assetPath) {
+  const url = new URL(assetPath, APP_SCOPE);
+  if (url.origin !== self.location.origin || !url.pathname.startsWith(APP_PATH)) return;
+  try {
+    const response = await fetch(url.href);
+    if (response.ok) await cache.put(url.href, response.clone());
+  } catch {}
+}
+
+async function cacheTeamDependencies(cache) {
+  try {
+    const manifestUrl = new URL(".vite/manifest.json", APP_SCOPE);
+    const response = await fetch(manifestUrl.href);
+    if (!response.ok) return;
+    const manifest = await response.json();
+    const visited = new Set();
+    const queue = [...TEAM_MANIFEST_ENTRIES];
+    while (queue.length) {
+      const key = queue.shift();
+      if (!key || visited.has(key)) continue;
+      visited.add(key);
+      const entry = manifest[key];
+      if (!entry) continue;
+      if (entry.file) await cacheAsset(cache, entry.file);
+      for (const css of entry.css || []) await cacheAsset(cache, css);
+      for (const asset of entry.assets || []) await cacheAsset(cache, asset);
+      for (const dependency of entry.imports || []) queue.push(dependency);
+      for (const dependency of entry.dynamicImports || []) queue.push(dependency);
+    }
+  } catch {}
 }
 
 async function cacheAppShell(cache) {
@@ -31,15 +57,12 @@ async function cacheAppShell(cache) {
         const assetPaths = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css)(?:\?[^"]*)?)"/g)].map(match => match[1]);
         for (const path of assetPaths) {
           const url = new URL(path, APP_SCOPE);
-          if (url.origin !== self.location.origin || !url.pathname.startsWith(APP_PATH)) continue;
-          try {
-            const assetResponse = await fetch(url.href);
-            if (assetResponse.ok) await cache.put(url.href, assetResponse.clone());
-          } catch {}
+          if (url.origin === self.location.origin && url.pathname.startsWith(APP_PATH)) await cacheAsset(cache, url.href);
         }
       }
     } catch {}
   }
+  await cacheTeamDependencies(cache);
 }
 
 self.addEventListener("install", event => {
@@ -86,12 +109,13 @@ self.addEventListener("fetch", event => {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
       if (isScriptOrStyle) {
+        const cached = await cache.match(request);
+        if (!navigator.onLine && cached) return cached;
         try {
           const response = await fetch(request, { cache: "no-cache" });
           if (response.ok) await cache.put(request, response.clone());
           return response;
         } catch {
-          const cached = await cache.match(request);
           return cached || Response.error();
         }
       }
@@ -100,6 +124,7 @@ self.addEventListener("fetch", event => {
       try {
         const response = await fetch(request);
         if (response.ok) await cache.put(request, response.clone());
+        if (request.destination === "image") await trimMediaCache(cache);
         return response;
       } catch {
         return Response.error();
