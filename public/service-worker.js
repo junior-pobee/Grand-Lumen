@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "grand-lumen-";
-const CACHE_NAME = CACHE_PREFIX + "pwa-v15";
+const CACHE_NAME = CACHE_PREFIX + "pwa-v16";
 const APP_SCOPE = new URL(self.registration.scope);
 const APP_PATH = APP_SCOPE.pathname.endsWith("/") ? APP_SCOPE.pathname : APP_SCOPE.pathname + "/";
 const APP_SHELL = [
@@ -8,15 +8,32 @@ const APP_SHELL = [
   new URL("icons/grand-lumen-512.png", APP_SCOPE).href
 ];
 
+async function cacheAppShell(cache) {
+  for (const asset of APP_SHELL) {
+    try {
+      const response = await fetch(asset);
+      if (!response.ok) continue;
+      await cache.put(asset, response.clone());
+      if (asset === APP_SCOPE.href) {
+        const html = await response.text();
+        const assetPaths = [...html.matchAll(/(?:src|href)="([^"]+\\.(?:js|css)(?:\\?[^"]*)?)"/g)].map(match => match[1]);
+        for (const path of assetPaths) {
+          const url = new URL(path, APP_SCOPE);
+          if (url.origin !== self.location.origin || !url.pathname.startsWith(APP_PATH)) continue;
+          try {
+            const assetResponse = await fetch(url.href);
+            if (assetResponse.ok) await cache.put(url.href, assetResponse.clone());
+          } catch {}
+        }
+      }
+    } catch {}
+  }
+}
+
 self.addEventListener("install", event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE_NAME);
-    for (const asset of APP_SHELL) {
-      try {
-        const response = await fetch(asset);
-        if (response.ok) await cache.put(asset, response);
-      } catch {}
-    }
+    await cacheAppShell(cache);
     await self.skipWaiting();
   })());
 });
@@ -54,14 +71,19 @@ self.addEventListener("fetch", event => {
 
   if (["script", "style", "image", "font"].includes(request.destination)) {
     event.respondWith((async () => {
-      const cached = await caches.match(request);
-      if (cached) return cached;
+      const cache = await caches.open(CACHE_NAME);
+      const cached = await cache.match(request);
+      if (cached) {
+        if (request.destination === "script" || request.destination === "style") {
+          event.waitUntil(fetch(request).then(response => {
+            if (response.ok) return cache.put(request, response.clone());
+          }).catch(() => {}));
+        }
+        return cached;
+      }
       try {
         const response = await fetch(request);
-        if (response.ok) {
-          const cache = await caches.open(CACHE_NAME);
-          await cache.put(request, response.clone());
-        }
+        if (response.ok) await cache.put(request, response.clone());
         return response;
       } catch {
         return Response.error();
