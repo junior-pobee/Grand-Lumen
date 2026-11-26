@@ -1,5 +1,5 @@
 const CACHE_PREFIX = "grand-lumen-";
-const CACHE_NAME = CACHE_PREFIX + "pwa-v16";
+const CACHE_NAME = CACHE_PREFIX + "pwa-v17";
 const APP_SCOPE = new URL(self.registration.scope);
 const APP_PATH = APP_SCOPE.pathname.endsWith("/") ? APP_SCOPE.pathname : APP_SCOPE.pathname + "/";
 const APP_SHELL = [
@@ -16,7 +16,7 @@ async function cacheAppShell(cache) {
       await cache.put(asset, response.clone());
       if (asset === APP_SCOPE.href) {
         const html = await response.text();
-        const assetPaths = [...html.matchAll(/(?:src|href)="([^"]+\\.(?:js|css)(?:\\?[^"]*)?)"/g)].map(match => match[1]);
+        const assetPaths = [...html.matchAll(/(?:src|href)="([^"]+\.(?:js|css)(?:\?[^"]*)?)"/g)].map(match => match[1]);
         for (const path of assetPaths) {
           const url = new URL(path, APP_SCOPE);
           if (url.origin !== self.location.origin || !url.pathname.startsWith(APP_PATH)) continue;
