@@ -396,7 +396,20 @@ export async function startWorkspaceCloudSync(
       if (status === "SUBSCRIBED") onStatus("Cloud sync connected");
       if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") onStatus("Live sync reconnecting");
     });
-\n  const pullLatest = async () => {\n    if (disposed || !navigator.onLine || applyingRemote) return;\n    const { data, error } = await client.from(\"grand_lumen_workspaces\").select(\"workspace_data\").eq(\"user_id\", userId).maybeSingle();\n    if (error) { onStatus(\"Cloud sync will retry when connected\"); return; }\n    applyRemoteSnapshot(data?.workspace_data as WorkspaceSnapshot | { version: 1; data: Record<string, string> } | undefined);\n  };\n
+  const pullLatest = async () => {
+    if (disposed || !navigator.onLine || applyingRemote) return;
+    const { data, error } = await client
+      .from("grand_lumen_workspaces")
+      .select("workspace_data")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) {
+      onStatus("Cloud sync will retry when connected");
+      return;
+    }
+    applyRemoteSnapshot(data?.workspace_data as WorkspaceSnapshot | { version: 1; data: Record<string, string> } | undefined);
+  };
+
   const flush = () => {
     if (saveTimer !== undefined) {
       window.clearTimeout(saveTimer);
