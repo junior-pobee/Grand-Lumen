@@ -2729,7 +2729,7 @@ function App() {
 
   return (
     <>
-      <Suspense fallback={<div role="status" aria-live="polite" style={{minHeight:"45vh",display:"grid",placeItems:"center",padding:"24px",background:"var(--app-bg, transparent)"}}><div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:"12px",padding:"28px 36px",borderRadius:"20px",background:"var(--glass-bg, rgba(255,255,255,.04))",border:"1px solid var(--glass-border, rgba(255,255,255,.08))",color:"var(--text-primary, inherit)"}}><span className="team-chat-spinner"/><b>Opening workspace</b><small style={{opacity:.7}}>Preparing this feature…</small></div></div>}>
+      <Suspense fallback={<div className="workspace-loading-fallback" role="status" aria-live="polite"><div><span className="team-chat-spinner"/><b>Opening workspace</b><small>Preparing this feature…</small></div></div>}>
       <GlobalReminderMonitor />
       {session && <TeamMessageAlert userId={session.user.id} onOpen={() => setSection("Team")} />}
       <LumenScan />
