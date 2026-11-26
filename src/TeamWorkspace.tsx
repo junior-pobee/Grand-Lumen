@@ -15,6 +15,14 @@ type MessageAttachment = { name: string; path: string; mime: string; size: numbe
 type Project = { id: string; user_id: string; name: string; description: string; status: string };
 type CallInvite = { id: string; connection_id: string; caller_id: string; recipient_id: string; peer_id: string; media_type: "audio" | "video"; status: string; expires_at: string };
 
+const teamCacheKey = (userId: string, key: string) => "grandLumenTeamCache:" + userId + ":" + key;
+const readTeamCache = <T,>(userId: string, key: string): T | null => {
+  try { const raw = localStorage.getItem(teamCacheKey(userId, key)); return raw ? JSON.parse(raw) as T : null; } catch { return null; }
+};
+const writeTeamCache = (userId: string, key: string, value: unknown) => {
+  try { localStorage.setItem(teamCacheKey(userId, key), JSON.stringify(value)); } catch {}
+};
+
 const attachmentPrefix = "GLATTACH:";
 const readAttachment = (body: string): MessageAttachment | null => {
   if (!body.startsWith(attachmentPrefix)) return null;
@@ -76,6 +84,11 @@ export default function TeamWorkspace({ userId, email, connectOnly = false, onCl
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  useEffect(() => {
+    if (!selected || !messages.length) return;
+    writeTeamCache(userId, "messages:" + selected.id, { messages, hiddenMessageIds });
+  }, [selected?.id, messages, hiddenMessageIds, userId]);
+
   const refreshUnreadCounts = useCallback(async () => {
     if (!supabase || !userId || !connections.length) {
       setUnreadCounts({});
@@ -126,6 +139,18 @@ export default function TeamWorkspace({ userId, email, connectOnly = false, onCl
       supabase.from("grand_lumen_connection_requests").select("*").eq("requester_id", userId).eq("status", "pending").order("created_at", { ascending: false }),
       supabase.from("grand_lumen_projects").select("*").order("updated_at", { ascending: false })
     ]);
+    if (connectionResult.error && !navigator.onLine) {
+      const cached = readTeamCache<{connections:Connection[];requests:RequestRow[];sentRequests:RequestRow[];profiles:Record<string,Profile>;projects:Project[]}>(userId, "team");
+      if (cached) {
+        setConnections(cached.connections || []);
+        setRequests(cached.requests || []);
+        setSentRequests(cached.sentRequests || []);
+        setProfiles(cached.profiles || {});
+        setProjects(cached.projects || []);
+        setNotice("Offline mode: showing your saved connections and team details.");
+        return;
+      }
+    }
     if (connectionResult.error) setNotice(connectionResult.error.message);
     if (requestResult.error) setNotice(requestResult.error.message);
     if (sentRequestResult.error) setNotice(sentRequestResult.error.message);
@@ -163,9 +188,11 @@ export default function TeamWorkspace({ userId, email, connectOnly = false, onCl
           }
         }
         setProfiles(nextProfiles);
+        writeTeamCache(userId, "team", { connections: nextConnections, requests: incomingRequests, sentRequests: outgoingRequests, profiles: nextProfiles, projects: (projectResult.data || []) as Project[] });
       }
     } else {
       setProfiles({});
+      writeTeamCache(userId, "team", { connections: nextConnections, requests: incomingRequests, sentRequests: outgoingRequests, profiles: {}, projects: (projectResult.data || []) as Project[] });
     }
   }, [userId, email]);
 
@@ -359,7 +386,13 @@ export default function TeamWorkspace({ userId, email, connectOnly = false, onCl
       setChatLoading(true);
       setNotice("");
       const conversation = await client.from("grand_lumen_team_conversations").select("id").eq("connection_id", selected.id).maybeSingle();
-      if (conversation.error) { if (alive) { setNotice("We could not load this conversation: " + conversation.error.message); setChatLoading(false); } return; }
+      if (conversation.error) {
+        if (alive && !navigator.onLine) {
+          const cached = readTeamCache<{conversationId:string;messages:Message[];hiddenMessageIds:string[]}>(userId, "messages:" + selected.id);
+          if (cached) { setMessages(cached.messages || []); setHiddenMessageIds(cached.hiddenMessageIds || []); setChatLoading(false); setNotice("Offline mode: showing saved messages. Sending requires a connection."); return; }
+        }
+        if (alive) { setNotice("We could not load this conversation: " + conversation.error.message); setChatLoading(false); } return;
+      }
       if (!conversation.data) { if (alive) { setNotice("This connection does not have a conversation record yet. Please return to Connect and refresh your connections."); setChatLoading(false); } return; }
       const conversationId = conversation.data.id as string;
       const [result, hiddenResult] = await Promise.all([
@@ -367,9 +400,15 @@ export default function TeamWorkspace({ userId, email, connectOnly = false, onCl
         client.from("grand_lumen_team_message_hides").select("message_id").eq("user_id", userId)
       ]);
       if (!alive) return;
+      if (result.error && !navigator.onLine) {
+        const cached = readTeamCache<{conversationId:string;messages:Message[];hiddenMessageIds:string[]}>(userId, "messages:" + selected.id);
+        if (cached) { setMessages(cached.messages || []); setHiddenMessageIds(cached.hiddenMessageIds || []); setChatLoading(false); setNotice("Offline mode: showing saved messages. Sending requires a connection."); return; }
+      }
       if (result.error) { setNotice("Messages could not be loaded: " + result.error.message); setChatLoading(false); return; }
       if (hiddenResult.error) { setNotice("Chat preferences could not be loaded: " + hiddenResult.error.message); setChatLoading(false); return; }
-      setMessages((result.data || []) as Message[]);
+      const loadedMessages = (result.data || []) as Message[];
+      setMessages(loadedMessages);
+      writeTeamCache(userId, "messages:" + selected.id, { conversationId, messages: loadedMessages, hiddenMessageIds: (hiddenResult.data || []).map(item => String(item.message_id)) });
       setChatLoading(false);
       void markConversationRead(conversationId, (result.data || []) as Message[]);
       setHiddenMessageIds((hiddenResult.data || []).map(item => String(item.message_id)));
