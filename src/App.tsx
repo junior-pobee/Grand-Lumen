@@ -2724,12 +2724,12 @@ function App() {
     Settings: "Shape your workspace."
   };
 
-  if (!authReady) return <div className={"auth-boot theme-" + (localStorage.getItem("grandLumenTheme") === "dark" ? "dark" : "light")} role="status" aria-live="polite"><div className="portal-brand-mark"><img src={`${import.meta.env.BASE_URL}icons/grand-lumen-icon.svg`} alt="Grand-Lumen" /></div><span>Opening Grand-Lumen</span><div className="auth-boot-progress" aria-hidden="true"><i /></div></div>;
+  if (!authReady) return <div className={"auth-boot theme-" + (localStorage.getItem("grandLumenTheme") === "dark" ? "dark" : "light")} role="status" aria-live="polite"><img className="gl-startup-icon" src={`${import.meta.env.BASE_URL}icons/grand-lumen-icon.svg`} alt="Grand-Lumen" /></div>;
   if (!session && !guestMode) return <PublicPortal onGuest={(profile) => { if (profile) { setLocalProfile(profile); setWelcomeTourOpen(profile.onboardingPending === true); } setGuestMode(true); }} />;
 
   return (
     <>
-      <Suspense fallback={<div className={"workspace-loading-fallback theme-" + theme} role="status" aria-live="polite"><div><span className="team-chat-spinner"/><b>Opening workspace</b><small>Preparing this feature…</small></div></div>}>
+      <Suspense fallback={null}>
       <GlobalReminderMonitor />
       {session && <TeamMessageAlert userId={session.user.id} onOpen={() => setSection("Team")} />}
       <LumenScan />
