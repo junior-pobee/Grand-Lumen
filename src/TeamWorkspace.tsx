@@ -835,7 +835,7 @@ export default function TeamWorkspace({ userId, email, connectOnly = false, onCl
     const origin = messagePressOrigin.current;
     if (!origin || event.touches.length !== 1) return cancelMessagePress();
     const touch = event.touches[0];
-    if (Math.abs(touch.clientX - origin.x) > 12 || Math.abs(touch.clientY - origin.y) > 12) cancelMessagePress();
+    if (Math.abs(touch.clientX - origin.x) > 12) cancelMessagePress();
   };
 
   const cancelMessagePress = () => {
