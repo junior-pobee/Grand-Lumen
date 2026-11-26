@@ -3,5 +3,8 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
-  base: "/Grand-Lumen/"
+  base: "/Grand-Lumen/",
+  build: {
+    manifest: true
+  }
 });
