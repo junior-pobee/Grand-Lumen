@@ -81,7 +81,7 @@ self.addEventListener("fetch", event => {
     return;
   }
 
-  const isScriptOrStyle = ["script", "style"].includes(request.destination) || /\\.(?:js|css)$/i.test(requestUrl.pathname);
+  const isScriptOrStyle = ["script", "style"].includes(request.destination) || /\.(?:js|css)$/i.test(requestUrl.pathname);
   if (isScriptOrStyle || ["image", "font"].includes(request.destination)) {
     event.respondWith((async () => {
       const cache = await caches.open(CACHE_NAME);
