@@ -14,6 +14,10 @@ type Attachment = { name: string; path: string; mime: string; size: number; kind
 type CallInvite = { id: string; session_id: string; group_id: string; caller_id: string; recipient_id: string; peer_id: string; media_type: "audio" | "video"; status: string };
 type CallParticipant = { session_id: string; user_id: string; peer_id: string };
 
+const groupCacheKey = (userId: string, key: string) => "grandLumenGroupCache:" + userId + ":" + key;
+const readGroupCache = <T,>(userId: string, key: string): T | null => { try { const raw = localStorage.getItem(groupCacheKey(userId, key)); return raw ? JSON.parse(raw) as T : null; } catch { return null; } };
+const writeGroupCache = (userId: string, key: string, value: unknown) => { try { localStorage.setItem(groupCacheKey(userId, key), JSON.stringify(value)); } catch {} };
+
 const prefix = "GLGROUPATTACH:";
 const readAttachment = (body: string): Attachment | null => {
   if (!body.startsWith(prefix)) return null;
@@ -118,7 +122,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles, onOp
             if (nextProfiles[status.id]) nextProfiles[status.id] = { ...nextProfiles[status.id], account_status: status.account_status };
           }
         }
-        setGroupProfiles(nextProfiles);
+        setGroupProfiles(nextProfiles);\n        writeGroupCache(userId, "list", { groups: (groupResult.data || []) as Group[], members: grouped, profiles: nextProfiles });
       }
     }
   }, [userId]);
@@ -225,7 +229,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles, onOp
           const hiddenResult = await client.from("grand_lumen_group_message_hides").select("message_id").eq("user_id", userId).in("message_id", ids);
           if (!active) return;
           if (hiddenResult.error) setNotice(hiddenResult.error.message);
-          else setHiddenIds((hiddenResult.data || []).map(item => String(item.message_id)));
+          else { const hidden = (hiddenResult.data || []).map(item => String(item.message_id)); setHiddenIds(hidden); writeGroupCache(userId, "messages:" + selected.id, { messages: rows, hiddenIds: hidden }); }
         } else {
           setHiddenIds([]);
         }
@@ -298,7 +302,7 @@ export default function GroupChatWorkspace({ userId, connections, profiles, onOp
     return () => { active = false; };
   }, [messages, urls]);
 
-  const sendText = async () => {
+  useEffect(() => { if (selected && messages.length) writeGroupCache(userId, "messages:" + selected.id, { messages, hiddenIds }); }, [selected?.id, messages, hiddenIds, userId]);\n\n  const sendText = async () => {
     if (!supabase || !selected || !draft.trim() || busy) return;
     setBusy(true);
     const body = draft.trim();
